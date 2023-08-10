@@ -11,14 +11,9 @@ find_package(TileDB REQUIRED)
 
 add_executable(bolepoll src/main.cpp)
 
-target_include_directories(bolepoll
-    PRIVATE
-        ${PDAL_INCLUDE_DIRS}
-        ${GDAL_INCLUDE_DIR}
-)
 target_link_libraries(bolepoll
     PRIVATE
-        ${PDAL_LIBRARIES}
-        ${GDAL_LIBRARY}
+        pdalcpp
+        GDAL::GDAL
         TileDB::tiledb_shared
 )
