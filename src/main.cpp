@@ -6,6 +6,7 @@
 #include <pdal/PipelineManager.hpp>
 #include <pdal/Stage.hpp>
 #include <pdal/Reader.hpp>
+#include <tiledb/tiledb>
 
 using namespace pdal;
 
@@ -31,4 +32,9 @@ int main(int argc, char *argv[])
     // std::cout << "Info: " << pdal::Utils::toJSON(info->getMetadata()) << std::endl;
 
     return 0;
+}
+
+tiledb::Array& createArray()
+{
+
 }
