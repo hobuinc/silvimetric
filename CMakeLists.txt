@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(PDAL REQUIRED)
 find_package(GDAL REQUIRED)
+find_package(TileDB REQUIRED)
 
 add_executable(bolepoll src/main.cpp)
 
@@ -19,4 +20,5 @@ target_link_libraries(bolepoll
     PRIVATE
         ${PDAL_LIBRARIES}
         ${GDAL_LIBRARY}
+        TileDB::tiledb_shared
 )

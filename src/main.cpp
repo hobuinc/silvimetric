@@ -2,10 +2,10 @@
 #include <string>
 #include <exception>
 
-#include <pdal/PipelineManager.hpp>
 #include <pdal/StageFactory.hpp>
-#include <pdal/Reader.hpp>
+#include <pdal/PipelineManager.hpp>
 #include <pdal/Stage.hpp>
+#include <pdal/Reader.hpp>
 
 using namespace pdal;
 
@@ -19,18 +19,16 @@ int main(int argc, char *argv[])
     if (driver.empty())
         throw ("File not recognized");
 
-    Stage *s = &pm->addReader(driver);
+    Stage *s = &pm->makeReader(eptPath, driver);
 
-    // PointTable table;
-    Options o;
-    o.add("filename", eptPath);
-    s->addOptions(o);
-    // s->prepare(table);
-
-    // Stage *info = &pm->addFilter("filters.info");
+    Stage *info = &pm->makeFilter("filters.info", *s);
     pm->execute(ExecMode::PreferStream);
-    // std::cout <<"info metadata? " << pdal::Utils::toJSON(info->getMetadata()) << std::endl;
-    std::cout <<"reader metadata? " << pdal::Utils::toJSON(s->getMetadata()) << std::endl;
+    bool stream = pm->pipelineStreamable();
+    if (stream)
+        std::cout << "Streamable."  << std::endl;
+    else
+        std::cout << "Not streamable."  << std::endl;
+    // std::cout << "Info: " << pdal::Utils::toJSON(info->getMetadata()) << std::endl;
 
     return 0;
 }
