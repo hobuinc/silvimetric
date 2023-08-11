@@ -9,6 +9,25 @@
 #include <tiledb/tiledb>
 
 using namespace pdal;
+using namespace tiledb;
+
+int findCell(double x, double y, double z)
+{
+    return 0;
+}
+
+void viewStats(PointViewPtr view)
+{
+    // tiledb::Array a;
+    for (PointId i = 1; i < view->size(); ++i)
+    {
+        double x = view->getFieldAs<double>(pdal::Dimension::Id::X, i);
+        double y = view->getFieldAs<double>(pdal::Dimension::Id::Y, i);
+        double z = view->getFieldAs<double>(pdal::Dimension::Id::Z, i);
+        int cellNum = findCell(x, y, z);
+
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -23,18 +42,16 @@ int main(int argc, char *argv[])
     Stage *s = &pm->makeReader(eptPath, driver);
 
     Stage *info = &pm->makeFilter("filters.info", *s);
-    pm->execute(ExecMode::PreferStream);
-    bool stream = pm->pipelineStreamable();
-    if (stream)
-        std::cout << "Streamable."  << std::endl;
-    else
-        std::cout << "Not streamable."  << std::endl;
-    // std::cout << "Info: " << pdal::Utils::toJSON(info->getMetadata()) << std::endl;
+    pm->execute();
+    PointViewSet set = pm->views();
 
     return 0;
 }
 
-tiledb::Array& createArray()
-{
 
-}
+
+// tiledb::Array& createArray(MetadataNode &node)
+// {
+//     Context ctx;
+//     Domain domain(ctx);
+// }
