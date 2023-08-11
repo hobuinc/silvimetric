@@ -9,7 +9,10 @@ find_package(PDAL REQUIRED)
 find_package(GDAL REQUIRED)
 find_package(TileDB REQUIRED)
 
-add_executable(bolepoll src/main.cpp)
+add_executable(bolepoll
+    src/main.cpp
+    src/stats.cpp
+)
 
 target_link_libraries(bolepoll
     PRIVATE

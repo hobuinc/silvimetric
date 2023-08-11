@@ -9,24 +9,25 @@ namespace fusion
 class Stats
 {
 public:
-
-    Stats(pdal::BOX2D b, double xs, double ys);
+    Stats(pdal::BOX2D &b, double cs);
     ~Stats();
+
     void init();
     pdal::BOX2D bbox();
     void addToCell(double x, double y, double z);
+    void addView(pdal::PointViewPtr pv);
 
 private:
 
     pdal::BOX2D m_box;
-    double m_xsize;
+    double m_cellsize;
     double m_ysize;
-    std::vector<pdal::BOX2D> cells;
+    int m_xcells;
+    int m_ycells;
+    std::vector<int> m_attData;
 
-    tiledb::Context m_ctx;
+    std::unique_ptr<tiledb::Context> m_ctx;
     std::unique_ptr<tiledb::Array> m_array;
-
-    int findCell(double x, double y, double z);
 
 };
 

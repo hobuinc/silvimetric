@@ -2,6 +2,8 @@
 #include <string>
 #include <exception>
 
+#include "stats.hpp"
+
 #include <pdal/StageFactory.hpp>
 #include <pdal/PipelineManager.hpp>
 #include <pdal/Stage.hpp>
@@ -10,24 +12,6 @@
 
 using namespace pdal;
 using namespace tiledb;
-
-int findCell(double x, double y, double z)
-{
-    return 0;
-}
-
-void viewStats(PointViewPtr view)
-{
-    // tiledb::Array a;
-    for (PointId i = 1; i < view->size(); ++i)
-    {
-        double x = view->getFieldAs<double>(pdal::Dimension::Id::X, i);
-        double y = view->getFieldAs<double>(pdal::Dimension::Id::Y, i);
-        double z = view->getFieldAs<double>(pdal::Dimension::Id::Z, i);
-        int cellNum = findCell(x, y, z);
-
-    }
-}
 
 int main(int argc, char *argv[])
 {
@@ -44,6 +28,16 @@ int main(int argc, char *argv[])
     Stage *info = &pm->makeFilter("filters.info", *s);
     pm->execute();
     PointViewSet set = pm->views();
+    MetadataNode n = info->getMetadata();
+    MetadataNode bbox = n.findChild("bbox");
+    double maxx = std::stod(bbox.findChild("maxx").value());
+    double minx = std::stod(bbox.findChild("minx").value());
+    double maxy = std::stod(bbox.findChild("maxy").value());
+    double miny = std::stod(bbox.findChild("miny").value());
+    BOX2D b(minx, miny, maxx, maxy);
+    fusion::Stats stats(b, 10);
+    stats.init();
+    stats.addView(*set.begin());
 
     return 0;
 }
