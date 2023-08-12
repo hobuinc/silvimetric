@@ -65,6 +65,8 @@ void Stats::addView(PointViewPtr view)
     }
     q.set_layout(TILEDB_ROW_MAJOR);
     q.set_data_buffer<int>("count", m_attData);
+    q.submit();
+    m_array->close();
 }
 
 void Stats::addToCell(double x, double y, double z)
@@ -75,7 +77,9 @@ void Stats::addToCell(double x, double y, double z)
     int yIndex = std::floor((y - m_box.miny) / m_cellsize);
     int cellNumber = (m_xcells * yIndex) + xIndex;
     //TODO add stats to tiledb array index value
-    m_attData.at(cellNumber)++;
+    int yo = m_attData[cellNumber];
+    m_attData[cellNumber]++;
+    int yo1 = m_attData[cellNumber];
 }
 
 

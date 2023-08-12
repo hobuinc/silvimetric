@@ -9,5 +9,6 @@ fi
 
 echo "Building in architecture: ${ARCH}"
 
-CONDA_SUBDIR=$ARCH conda env create -f env.yaml
+CONDA_SUBDIR=$ARCH conda env create -f env.yml
 conda activate fusion
+conda config --env --set subdir $ARCH
