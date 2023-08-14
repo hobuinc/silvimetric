@@ -5,6 +5,7 @@
 
 namespace fusion
 {
+typedef std::function<void (pdal::PointViewPtr )> StatLoader;
 
 class Stats
 {
@@ -16,8 +17,14 @@ public:
     pdal::BOX2D bbox();
     void addToCell(double x, double y, double z);
     void addView(pdal::PointViewPtr pv);
+    void addLoader(StatLoader l);
+    void execute();
+
 
 private:
+
+    std::vector<StatLoader> loaders;
+    // StatLoader loader;
 
     pdal::BOX2D m_box;
     double m_cellsize;

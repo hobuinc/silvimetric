@@ -53,6 +53,16 @@ void Stats::init()
     m_attData = std::vector<int>(m_xcells * m_ycells, 0);
 }
 
+void Stats::addLoader(StatLoader l)
+{
+    loaders.push_back(l);
+}
+
+bool Stats::execute()
+{
+
+}
+
 void Stats::addView(PointViewPtr view)
 {
     Query q(*m_ctx, *m_array, TILEDB_WRITE);
