@@ -37,16 +37,6 @@ class Bounds(object):
         self.cell_size = cell_size
         self.group_size = 3
 
-    def update(self):
-        self.__init__(
-            self.minx, self.miny, self.maxx, self.maxy,
-            self.cell_size, self.srs
-        )
-
-    def get_indices(self, x, y)->list[list[int]]:
-        top = y + self.group_size
-        return [ [x,j] for j in range(y, top) if j <= self.yi ]
-
     # since the box will always be a rectangle, chunk it by cell line?
     # return list of chunk objects to operate on
     def chunk(self):
@@ -96,12 +86,11 @@ bounds = Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
 def get_counts(data, indices):
 
     # Set up data object
-    dx = [] #row
-    dy = [] #col
-    dd = [] #data
+    dx = []
+    dy = []
+    dd = []
     # these need to match up in order to insert correctly
     for i,j in indices:
-        # x, y = bounds.cell_dim(i,j)
         dd.append({"count": 0})
         dx.append(i)
         dy.append(j)
@@ -150,7 +139,6 @@ with tiledb.SparseArray("stats", "w") as tdb:
     print("Reading chunks...")
     for chunk in bounds.chunk():
         dx, dy, dd = get_stats(reader=reader, chunk=chunk)
-        # tdb[dx[0]:dx[gs - 1], dy[0]:dy[gs - 1]] = dd
         for i in range(len(dx)):
             tdb[dx[i], dy[i]] = dd[i]
         print("Chunk: (", dx, ", ", dy, ") processed.")
