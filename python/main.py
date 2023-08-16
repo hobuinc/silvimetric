@@ -83,28 +83,7 @@ class Chunk(object):
 
 bounds = Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
 
-def get_counts(data, indices):
-
-    # Set up data object
-    dx = []
-    dy = []
-    dd = []
-    # these need to match up in order to insert correctly
-    for i,j in indices:
-        dd.append({"count": 0})
-        dx.append(i)
-        dy.append(j)
-
-    # collect data and insert into data obj
-    for point in data:
-        xi, yi = bounds.get_cell(point['X'], point['Y'])
-        for it in range(len(dx)):
-            if (xi == dx[it] and yi == dy[it]):
-                dd[it]["count"] += 1
-
-    return [dx, dy, dd]
-
-def get_stats(reader, chunk):
+def get_data(reader, chunk):
 
     reader._options['bounds'] = str(chunk.bounds)
 
@@ -113,15 +92,36 @@ def get_stats(reader, chunk):
     pipeline = reader.pipeline()
     pipeline.execute()
     points = pipeline.arrays[0]
-    return get_counts(points, chunk.indices)
+
+    # Set up data object
+    dx = []
+    dy = []
+    dd = []
+    # these need to match up in order to insert correctly
+    for i,j in chunk.indices:
+        dd.append({"count": 0, "Z": [[]]})
+        dx.append(i)
+        dy.append(j)
+
+    # collect data and insert into data obj
+    for point in points:
+        xi, yi = bounds.get_cell(point['X'], point['Y'])
+        for it in range(len(dx)):
+            if (xi == dx[it] and yi == dy[it]):
+                dd[it]["count"] += 1
+                dd[it]["Z"][0].append(point["Z"])
+
+    return [dx, dy, dd]
 
 # set up tiledb
 dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
 dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
 domain = tiledb.Domain(dim_row, dim_col)
-count_att = tiledb.Attr(name="count", dtype=np.int32)
 
-schema = tiledb.ArraySchema(domain=domain, sparse=True, attrs=[count_att])
+count_att = tiledb.Attr(name="count", dtype=np.int32)
+z_att = tiledb.Attr(name="Z", dtype='O', var=True)
+
+schema = tiledb.ArraySchema(domain=domain, sparse=True, attrs=[count_att, z_att])
 tdb = tiledb.SparseArray.create('stats', schema)
 
 
@@ -138,7 +138,7 @@ with tiledb.SparseArray("stats", "w") as tdb:
     gs = bounds.group_size
     print("Reading chunks...")
     for chunk in bounds.chunk():
-        dx, dy, dd = get_stats(reader=reader, chunk=chunk)
+        dx, dy, dd = get_data(reader=reader, chunk=chunk)
         for i in range(len(dx)):
             tdb[dx[i], dy[i]] = dd[i]
         print("Chunk: (", dx, ", ", dy, ") processed.")
