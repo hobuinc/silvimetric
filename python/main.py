@@ -119,7 +119,7 @@ dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
 domain = tiledb.Domain(dim_row, dim_col)
 
 count_att = tiledb.Attr(name="count", dtype=np.int32)
-z_att = tiledb.Attr(name="Z", dtype='O', var=True)
+z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
 
 schema = tiledb.ArraySchema(domain=domain, sparse=True, attrs=[count_att, z_att])
 tdb = tiledb.SparseArray.create('stats', schema)
