@@ -77,9 +77,7 @@ void Stats::addToCell(double x, double y, double z)
     int yIndex = std::floor((y - m_box.miny) / m_cellsize);
     int cellNumber = (m_xcells * yIndex) + xIndex;
     //TODO add stats to tiledb array index value
-    int yo = m_attData[cellNumber];
     m_attData[cellNumber]++;
-    int yo1 = m_attData[cellNumber];
 }
 
 
