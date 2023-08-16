@@ -114,12 +114,12 @@ def get_data(reader, chunk):
     return [dx, dy, dd]
 
 # set up tiledb
-dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
-dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
+dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.int32)
+dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.int32)
 domain = tiledb.Domain(dim_row, dim_col)
 
-count_att = tiledb.Attr(name="count", dtype=np.int32)
-z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+count_att = tiledb.Attr(name="count", dtype=np.int32, var=True)
+z_att = tiledb.Attr(name="Z", dtype=np.dtype([("", np.float64)]), var=True)
 
 schema = tiledb.ArraySchema(domain=domain, sparse=True, attrs=[count_att, z_att])
 tdb = tiledb.SparseArray.create('stats', schema)
