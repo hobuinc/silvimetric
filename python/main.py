@@ -43,46 +43,17 @@ class Bounds(object):
             self.cell_size, self.srs
         )
 
-    def grow(self, bounds):
-        if bounds.minx < self.minx:
-            self.minx = bounds.minx
-        if bounds.miny < self.miny:
-            self.miny = bounds.miny
-        if bounds.maxx > self.maxx:
-            self.maxx = bounds.maxx
-        if bounds.maxy > self.maxy:
-            self.maxy = bounds.maxy
-        self.update()
-
     def get_indices(self, x, y)->list[list[int]]:
         top = y + self.group_size
         return [ [x,j] for j in range(y, top) if j <= self.yi ]
 
-
     # since the box will always be a rectangle, chunk it by cell line?
     # return list of chunk objects to operate on
-    def chunk(self) -> list[any]:
-        retlist = []
+    def chunk(self):
         for i in range(0, self.xi):
             for j in range(0, self.yi, self.group_size):
-                top = j + self.group_size
-                chunk_indices = [ [i,y] for y in range(j, top) if y <= self.yi ]
-                retlist.append(
-                    {
-                        "indices": chunk_indices,
-                        "bounds": self.get_chunk(i,j)
-                    }
-                )
-        return retlist
-
-    def get_chunk(self, x, y):
-        indices = self.get_indices(x, y)
-        b = self.split(x,y)
-        for i, j in indices:
-            if i != x or j != y: #don't redo the middle index
-                b.grow(self.split(i,j))
-        return b
-
+                top = min(j+self.group_size-1, self.yi)
+                yield Chunk([i,i], [j,top], self)
 
     def split(self, x, y):
         """Yields the geospatial bounding box for a given cell set provided by x, y"""
@@ -109,10 +80,16 @@ class Bounds(object):
         return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
 
 class Chunk(object):
-    def __init__(self, bounds, parent):
-        self.bounds = bounds
+    def __init__(self, xrange: list[int], yrange: list[int], parent: Bounds):
+        self.x1, self.x2 = xrange
+        self.y1 , self.y2 = yrange
         self.parent_bounds = parent
-
+        minx = (self.x1 * cell_size) + parent.minx
+        miny = (self.y1 * cell_size) + parent.miny
+        maxx = (self.x2 + 1) * cell_size + parent.minx
+        maxy = (self.y2 + 1) * cell_size + parent.miny
+        self.bounds = Bounds(minx, miny, maxx, maxy, parent.cell_size, parent.srs);
+        self.indices = [[i,j] for i in range(self.x1, self.x2+1) for j in range(self.y1, self.y2+1)]
 
 bounds = Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
 
@@ -140,20 +117,21 @@ def get_counts(data, indices):
 
 def get_stats(reader, chunk):
 
-    reader._options['bounds'] = str(chunk["bounds"])
+    reader._options['bounds'] = str(chunk.bounds)
 
     # remember that readers.copc is a thread hog
     reader._options['threads'] = 1
     pipeline = reader.pipeline()
     pipeline.execute()
     points = pipeline.arrays[0]
-    return get_counts(points, chunk['indices'])
+    return get_counts(points, chunk.indices)
 
 # set up tiledb
 dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
 dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
 domain = tiledb.Domain(dim_row, dim_col)
 count_att = tiledb.Attr(name="count", dtype=np.int32)
+
 schema = tiledb.ArraySchema(domain=domain, sparse=True, attrs=[count_att])
 tdb = tiledb.SparseArray.create('stats', schema)
 
@@ -168,11 +146,9 @@ with tiledb.SparseArray("stats", "w") as tdb:
     if (bounds.srs):
         tdb.meta["CRS"] = bounds.srs
 
-    chunks = bounds.chunk()
-
     gs = bounds.group_size
     print("Reading chunks...")
-    for chunk in chunks:
+    for chunk in bounds.chunk():
         dx, dy, dd = get_stats(reader=reader, chunk=chunk)
         # tdb[dx[0]:dx[gs - 1], dy[0]:dy[gs - 1]] = dd
         for i in range(len(dx)):
