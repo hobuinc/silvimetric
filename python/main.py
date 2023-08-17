@@ -94,6 +94,7 @@ def get_data(reader, chunk):
     pipeline.execute()
     points = pipeline.arrays[0]
 
+
     # Set up data object
     dx = []
     dy = []
@@ -103,18 +104,15 @@ def get_data(reader, chunk):
     for i,j in chunk.indices:
         dx.append(i)
         dy.append(j)
-        count_data.append(0)
-        z_data.append([])
 
-    # collect data and insert into data obj
-    for point in points:
-        xi, yi = bounds.get_cell(point['X'], point['Y'])
-        for it in range(len(dx)):
-            if (xi == dx[it] and yi == dy[it]):
-                count_data[it] += 1
-                z_data[it].append(point["Z"])
-    #craft np array for zdata
-    np_z = np.array([np.array(arr, dtype=np.float64, copy=True) for arr in z_data], dtype=object, copy=True)
+        maxy = (j+1) * cell_size + bounds.miny
+        miny = j * cell_size + bounds.miny
+        cell_points = np.where(np.logical_and(points['Y'] < maxy, points['Y'] > miny))
+
+        count_data.append(len(cell_points[0]))
+        z_data.append(cell_points)
+
+    np_z = np.array([np.array(points[arr]['Z'], dtype=np.float64) for arr in z_data], dtype=object, copy=True)
     dd = {"count" : count_data, "Z": np_z}
     return [dx, dy, dd]
 
@@ -140,9 +138,13 @@ with tiledb.SparseArray("stats", "w") as tdb:
     if (bounds.srs):
         tdb.meta["CRS"] = bounds.srs
 
+    c = 0
     print("Reading chunks...")
     for chunk in bounds.chunk():
         dx, dy, dd = get_data(reader=reader, chunk=chunk)
+        for i in range(len(dd['count'])):
+            c += dd['count'][i]
         tdb[dx, dy] = dd
         print("Chunk: (", dx, ", ", dy, ") processed.")
+    print(count, c)
 
