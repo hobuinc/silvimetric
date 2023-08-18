@@ -3,26 +3,9 @@ import pdal
 import math
 import numpy as np
 from dataclasses import dataclass
+from dask.distributed import Client, progress, as_completed
 
 
-#starting variables
-# filename = "https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz"
-filename = "autzen-classified.copc.laz"
-cell_size = 300
-
-# TODO read autzen
-reader = pdal.Reader(filename)
-pipeline = reader.pipeline()
-
-# grab our bounds
-qi = pipeline.quickinfo['readers.copc']
-bbox = qi['bounds']
-minx = bbox['minx']
-maxx = bbox['maxx']
-miny = bbox['miny']
-maxy = bbox['maxy']
-srs = qi['srs']['wkt']
-count = qi['num_points']
 
 class Bounds(object):
     def __init__(self, minx, miny, maxx, maxy, cell_size = 300, srs=None):
@@ -77,7 +60,6 @@ class Chunk(object):
         self.bounds = Bounds(minx, miny, maxx, maxy, parent.cell_size, parent.srs);
         self.indices = [[i,j] for i in range(self.x1, self.x2+1) for j in range(self.y1, self.y2+1)]
 
-bounds = Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
 
 def get_data(reader, chunk):
 
@@ -93,46 +75,90 @@ def get_data(reader, chunk):
     # Set up data object
     dx = []
     dy = []
-    z_data = []
+    z_data = np.empty((0,0))
     # these need to match up in order to insert correctly
+    shape_count = 0
     for i,j in chunk.indices:
         dx.append(i)
         dy.append(j)
 
+
     xis = np.floor((points['X'] - bounds.minx) / bounds.cell_size)
     yis = np.floor((points['Y'] - bounds.miny) / bounds.cell_size)
     for x, y in zip(dx, dy):
-        z_data.append(points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)])
+        if z_data.size == 0:
+            z_data = np.array([points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)]], np.float64)
+        else:
+            add_data = np.array([points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)]], np.float64)
+            cur_length = z_data.shape[1]
+            if add_data.size < cur_length:
+                add_data = np.pad(add_data, [(0,0), (0, z_data[0].size - add_data.size)], mode='constant', constant_values=float("nan"))
+            elif add_data.size > cur_length:
+                z_data = np.pad(z_data, [(0,0), (0, add_data.size - z_data[0].size)], mode='constant', constant_values=float("nan"))
+            z_data = np.concatenate((z_data, add_data))
+        # z_data.append(points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)])
 
-    np_z = np.array([np.array(arr, dtype=np.float64) for arr in z_data], dtype=object)
-    dd = { "count" : [len(z) for z in np_z], "Z": np_z }
+    # add last row so that tiledb doesn't throw us out
+    count = [z.size for z in z_data]
+    # np_z = np.array([np.array(arr, dtype=np.float64) for arr in z_data], dtype=object)
+    np_z = np.array([*z_data, None], dtype=object)
+    # dd = { "count" : count, "Z": z_data[:-1] }
+    dd = dict(count=count, Z=np_z[:-1])
     return [dx, dy, dd]
 
-# set up tiledb
-dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
-dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
-domain = tiledb.Domain(dim_row, dim_col)
+if __name__ == "__main__":
+    #starting variables
+    # filename = "https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz"
+    filename = "autzen-classified.copc.laz"
+    cell_size = 300
 
-count_att = tiledb.Attr(name="count", dtype=np.int32)
-z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+    # TODO read autzen
+    reader = pdal.Reader(filename)
+    pipeline = reader.pipeline()
 
-schema = tiledb.ArraySchema(domain=domain, sparse=True, capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
-tdb = tiledb.SparseArray.create('stats', schema)
+    # grab our bounds
+    qi = pipeline.quickinfo['readers.copc']
+    bbox = qi['bounds']
+    minx = bbox['minx']
+    maxx = bbox['maxx']
+    miny = bbox['miny']
+    maxy = bbox['maxy']
+    srs = qi['srs']['wkt']
+    count = qi['num_points']
 
+    bounds = Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
 
-# TODO write to tiledb
-with tiledb.SparseArray("stats", "w") as tdb:
-    # apply metadata
-    tdb.meta["LAYER_EXTENT_MINX"] = bounds.minx
-    tdb.meta["LAYER_EXTENT_MINY"] = bounds.miny
-    tdb.meta["LAYER_EXTENT_MAXX"] = bounds.maxx
-    tdb.meta["LAYER_EXTENT_MAXY"] = bounds.maxy
-    if (bounds.srs):
-        tdb.meta["CRS"] = bounds.srs
+    # set up tiledb
+    dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
+    dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
+    domain = tiledb.Domain(dim_row, dim_col)
 
-    print("Reading chunks...")
-    for chunk in bounds.chunk():
-        dx, dy, dd = get_data(reader=reader, chunk=chunk)
-        tdb[dx, dy] = dd
-        print("Chunk: (", dx, ", ", dy, ") processed.")
+    count_att = tiledb.Attr(name="count", dtype=np.int32)
+    z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+
+    schema = tiledb.ArraySchema(domain=domain, sparse=True, capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
+    tdb = tiledb.SparseArray.create('stats', schema)
+
+    # TODO write to tiledb
+    with tiledb.SparseArray("stats", "w") as tdb:
+        # apply metadata
+        tdb.meta["LAYER_EXTENT_MINX"] = bounds.minx
+        tdb.meta["LAYER_EXTENT_MINY"] = bounds.miny
+        tdb.meta["LAYER_EXTENT_MAXX"] = bounds.maxx
+        tdb.meta["LAYER_EXTENT_MAXY"] = bounds.maxy
+        if (bounds.srs):
+            tdb.meta["CRS"] = bounds.srs
+
+        print("Reading chunks...")
+        client = Client(threads_per_worker=12, n_workers=1)
+        futures = []
+        for chunk in bounds.chunk():
+            f = client.submit(get_data, reader=reader, chunk=chunk )
+            futures.append(f)
+            progress(futures)
+        client.gather(futures)
+        for future in as_completed(futures):
+            dx, dy, dd = future.result()
+            tdb[dx, dy] = dd
+
 
