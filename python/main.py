@@ -55,11 +55,6 @@ class Bounds(object):
         maxy = self.miny + ((y+1) * self.cell_size)
         return Bounds(minx, miny, maxx, maxy, self.cell_size, self.srs)
 
-    def get_cell(self, x, y):
-        xcell = math.floor((x - self.minx) / self.cell_size)
-        ycell = math.floor((y - self.miny) / self.cell_size)
-        return [xcell, ycell]
-
     def cell_dim(self, x, y):
         b = self.split(x, y)
         xcenter = (b.maxx - b.minx) / 2
@@ -99,21 +94,18 @@ def get_data(reader, chunk):
     dx = []
     dy = []
     z_data = []
-    count_data = []
     # these need to match up in order to insert correctly
     for i,j in chunk.indices:
         dx.append(i)
         dy.append(j)
 
-        maxy = (j+1) * cell_size + bounds.miny
-        miny = j * cell_size + bounds.miny
-        cell_points = np.where(np.logical_and(points['Y'] < maxy, points['Y'] > miny))
+    xis = np.floor((points['X'] - bounds.minx) / bounds.cell_size)
+    yis = np.floor((points['Y'] - bounds.miny) / bounds.cell_size)
+    for x, y in zip(dx, dy):
+        z_data.append(points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)])
 
-        count_data.append(len(cell_points[0]))
-        z_data.append(cell_points)
-
-    np_z = np.array([np.array(points[arr]['Z'], dtype=np.float64) for arr in z_data], dtype=object, copy=True)
-    dd = {"count" : count_data, "Z": np_z}
+    np_z = np.array([np.array(arr, dtype=np.float64) for arr in z_data], dtype=object)
+    dd = { "count" : [len(z) for z in np_z], "Z": np_z }
     return [dx, dy, dd]
 
 # set up tiledb
@@ -138,13 +130,9 @@ with tiledb.SparseArray("stats", "w") as tdb:
     if (bounds.srs):
         tdb.meta["CRS"] = bounds.srs
 
-    c = 0
     print("Reading chunks...")
     for chunk in bounds.chunk():
         dx, dy, dd = get_data(reader=reader, chunk=chunk)
-        for i in range(len(dd['count'])):
-            c += dd['count'][i]
         tdb[dx, dy] = dd
         print("Chunk: (", dx, ", ", dy, ") processed.")
-    print(count, c)
 
