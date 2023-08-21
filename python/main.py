@@ -2,19 +2,18 @@ import tiledb
 import pdal
 import math
 import numpy as np
-import pickle
 from dataclasses import dataclass
-from dask.distributed import Client, progress, as_completed
-import dask.array as da
+from dask.distributed import Client, progress
+import time
 
 
 #starting variables
 # filename = "https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz"
 filename = "autzen-classified.copc.laz"
-cell_size = 300
+cell_size = 100
 
 class Bounds(object):
-    def __init__(self, minx, miny, maxx, maxy, cell_size = 300, srs=None):
+    def __init__(self, minx, miny, maxx, maxy, cell_size, srs=None):
         self.minx = float(minx)
         self.miny = float(miny)
         self.maxx = float(maxx)
@@ -63,53 +62,73 @@ class Chunk(object):
         miny = (self.y1 * cell_size) + parent.miny
         maxx = (self.x2 + 1) * cell_size + parent.minx
         maxy = (self.y2 + 1) * cell_size + parent.miny
-        self.bounds = Bounds(minx, miny, maxx, maxy, parent.cell_size, parent.srs);
-        self.indices = [[i,j] for i in range(self.x1, self.x2+1) for j in range(self.y1, self.y2+1)]
+        self.bounds = Bounds(minx, miny, maxx, maxy, parent.cell_size,
+                            parent.srs);
+        self.indices = [[i,j] for i in range(self.x1, self.x2+1)
+                        for j in range(self.y1, self.y2+1)]
 
 
-def arrange_data(points, chunk, bounds):
+def arrange_data(point_data, bounds):
+
+    points, chunk = point_data
 
     # Set up data object
     dx = []
     dy = []
     z_data = np.empty((0,0))
+    count = np.array((0), np.int64)
 
     xis = np.floor((points['X'] - bounds.minx) / bounds.cell_size)
     yis = np.floor((points['Y'] - bounds.miny) / bounds.cell_size)
 
     for x, y in chunk.indices:
+
         if z_data.size == 0:
-            z_data = np.array([points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)]], np.float64)
-            if z_data.any():
-                dx.append(x)
-                dy.append(y)
-        else:
-            add_data = np.array([points["Z"][np.logical_and(xis.astype(np.int32) == x, yis.astype(np.int32) == y)]], np.float64)
+            add_data = np.array([points["Z"][np.logical_and(
+                xis.astype(np.int32) == x, yis.astype(np.int32) == y)]],
+                np.float64)
             if add_data.any():
                 dx.append(x)
                 dy.append(y)
+                count = np.array([add_data.size], np.int64)
+                z_data = add_data
+        else:
+            add_data = np.array([points["Z"][np.logical_and(
+                xis.astype(np.int32) == x, yis.astype(np.int32) == y)]],
+                np.float64)
+
+            if add_data.any():
+                dx.append(x)
+                dy.append(y)
+                count = np.append(count, add_data.size)
                 cur_length = z_data.shape[1]
                 if add_data.size < cur_length:
-                    add_data = np.pad(add_data, [(0,0), (0, z_data[0].size - add_data.size)], mode='constant', constant_values=float("nan"))
+                    add_data = np.pad(add_data,
+                        [(0,0), (0, z_data[0].size - add_data.size)],
+                        mode='constant',
+                        constant_values=float("nan"))
                 elif add_data.size > cur_length:
-                    z_data = np.pad(z_data, [(0,0), (0, add_data.size - z_data[0].size)], mode='constant', constant_values=float("nan"))
+                    z_data = np.pad(z_data,
+                        [(0,0), (0, add_data.size - z_data[0].size)],
+                        mode='constant',
+                        constant_values=float("nan"))
                 z_data = np.concatenate((z_data, add_data))
 
     # add last row so that tiledb doesn't throw us out
-    count = np.array([z.size for z in z_data], np.int64);
-    dd = pickle.dumps(dict(count=count, Z=z_data))
+    # count = np.array([z.size for z in z_data], np.int64)
+    dd = dict(count=count, Z=z_data)
     return [dx, dy, dd]
 
-def get_data(reader, chunk, bounds):
+def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
 
     # remember that readers.copc is a thread hog
     reader._options['threads'] = 1
     pipeline = reader.pipeline()
     pipeline.execute()
-    points = da.from_array(pipeline.arrays[0])
+    points = np.array(pipeline.arrays[0])
 
-    return arrange_data(points, chunk, bounds)
+    return [points, chunk]
 
 def create_tiledb(bounds: Bounds):
     if tiledb.object_type("stats") == "array":
@@ -123,7 +142,8 @@ def create_tiledb(bounds: Bounds):
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
 
-        schema = tiledb.ArraySchema(domain=domain, sparse=True, capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
+        schema = tiledb.ArraySchema(domain=domain, sparse=True,
+            capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
         tiledb.SparseArray.create('stats', schema)
 
 def create_bounds(pipeline) -> Bounds:
@@ -136,20 +156,20 @@ def create_bounds(pipeline) -> Bounds:
     maxy = bbox['maxy']
     srs = qi['srs']['wkt']
 
-    return Bounds(minx, miny, maxx, maxy, cell_size=300, srs=srs)
+    return Bounds(minx, miny, maxx, maxy, cell_size=cell_size, srs=srs)
 
 # tiledb errors if np array size is greater than array's first dim
 # work around this by adding a None value to the array, which makes
 # np not make it a multidim array
 # https://github.com/TileDB-Inc/TileDB-Py/issues/494
-def unpack_ndarrays(p: pickle, index_len: int):
-    da = pickle.loads(p)
+def unpack_ndarrays(da, index_len: int):
     for arr in da:
         if da[arr].size > index_len:
             da[arr] = np.array([*da[arr], [None]], object)[:-1]
     return da
 
 def main():
+    start = time.time()
 
     # read pointcloud
     reader = pdal.Reader(filename)
@@ -158,7 +178,6 @@ def main():
 
     # set up tiledb
     create_tiledb(bounds)
-
 
     # write to tiledb
     with tiledb.SparseArray("stats", "w") as tdb:
@@ -170,21 +189,24 @@ def main():
         if (bounds.srs):
             tdb.meta["CRS"] = bounds.srs
 
-        print("Reading chunks...")
-        client = Client(threads_per_worker=12, n_workers=2)
-        futures = []
-        for chunk in bounds.chunk():
-            # dx, dy, dd = get_data(reader, chunk, bounds)
-            # data = unpack_ndarrays(dd, bounds)
-            # tdb[dx, dy] = data
-            f = client.submit(get_data, reader=reader, chunk=chunk, bounds=bounds)
-            futures.append(f)
-            progress(futures)
-        client.gather(futures)
-        for future in as_completed(futures):
-            dx, dy, dd = future.result()
-            data = unpack_ndarrays(dd, len(dx))
-            tdb[dx, dy] = data
+        client = Client(threads_per_worker=12, n_workers=4,
+            serializers=['dask', 'pickle'], deserializers=['dask', 'pickle'])
+
+
+        # chunks = bounds.chunk()
+        # chs = client.scatter(chunks)
+        print("Reading and arranging chunks...")
+        point_futures = [client.submit(get_data, reader=reader, chunk=ch) for ch in bounds.chunk()]
+        data_futures = [client.submit(arrange_data, point_data=pf, bounds=bounds) for pf in point_futures]
+        progress(*[data_futures, point_futures])
+
+        for df in data_futures:
+            dx, dy, dd = df.result()
+            if len(dx):
+                data = unpack_ndarrays(dd, len(dx))
+                tdb[dx, dy] = data
+        end = time.time()
+        print("Done. Time elapsed: ", end-start)
 
 if __name__ == "__main__":
     main()
