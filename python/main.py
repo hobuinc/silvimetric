@@ -87,7 +87,6 @@ def arrange_data(point_data, bounds):
     xis = np.floor((points['X'] - bounds.minx) / bounds.cell_size)
     yis = np.floor((points['Y'] - bounds.miny) / bounds.cell_size)
 
-
     offset = 0
     offsets = []
     for x, y in chunk.indices:
@@ -106,43 +105,8 @@ def arrange_data(point_data, bounds):
             z_data[offset:n] = add_data
             offsets.append([offset, n])
             offset = n
-            # else:
-            #     z_data[index] = np.delete(z_data[index])
 
-        # else:
-        #     add_data = np.array([points["Z"][np.logical_and(
-        #         xis.astype(np.int32) == x, yis.astype(np.int32) == y)]],
-        #         np.float64, copy=False)
-
-        #     if add_data.any():
-        #         dx.append(x)
-        #         dy.append(y)
-        #         count = np.append(count, add_data.size)
-        #         cur_length = z_data.shape[1]
-        #         if add_data.size < cur_length:
-        #             add_data = np.pad(add_data,
-        #                 [(0,0), (0, z_data[0].size - add_data.size)],
-        #                 mode='constant',
-        #                 constant_values=float("nan"))
-        #         elif add_data.size > cur_length:
-        #             z_data = np.pad(z_data,
-        #                 [(0,0), (0, add_data.size - z_data[0].size)],
-        #                 mode='constant',
-        #                 constant_values=float("nan"))
-        #         z_data = np.concatenate((z_data, add_data))
-
-    # add last row so that tiledb doesn't throw us out
-    # count = np.array([z.size for z in z_data], np.int64)
-
-    # s = time.perf_counter_ns()
     r = np.array([z_data[lo:hi] for lo,hi in offsets], dtype=object)
-    # e = time.perf_counter_ns()
-    # r2 = np.array(np.array_split(z_data, [hi-lo for lo, hi in offsets]), dtype=object)
-    # e2 = time.perf_counter_ns()
-
-    # print("Time r: ", e - s)
-    # print("Time r2: ", e2 - e)
-    # z_data = np.array(np.array_split(z_data, [r for r in offsets]))
     if r.size == count.size:
         dd = dict(count=count, Z=r)
     else:
@@ -249,14 +213,14 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
 
             # chunks = bounds.chunk()
             # chs = client.scatter(chunks)
-            print("Reading to pdal")
+            # print("Reading to pdal")
             point_futures = [client.submit(get_data, reader=reader, chunk=ch) for ch in bounds.chunk()]
-            print("Arranging data")
+            # print("Arranging data")
             data_futures = [client.submit(arrange_data, point_data=pf, bounds=bounds) for pf in point_futures]
-            print("Writing data")
+            # print("Writing data")
             write_futures = [client.submit(write_tdb, tdb=tdb, res=df) for df in data_futures]
             futures = [ data_futures, point_futures, write_futures ]
-            progress(*futures)
+            # progress(*futures)
             client.gather(*futures)
             if stats_bool:
                 pc = 0
@@ -267,7 +231,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
         if stats_bool:
             end = time.perf_counter_ns()
             stats = dict(
-                time=(end-start)/float(1000000000), threads=threads, workers=workers,
+                time=((end-start)/float(1000000000)), threads=threads, workers=workers,
                 group_size=group_size, resolution=res, point_count=pc,
                 cell_count=cell_count, chunk_count=chunk_count
             )
