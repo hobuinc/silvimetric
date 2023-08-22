@@ -1,23 +1,18 @@
+import time
+import math
+import argparse
+import json
+
 import tiledb
 import pdal
-import math
 import numpy as np
-from dataclasses import dataclass
+import shapely
+
 from dask.distributed import Client, progress
-import time
-import argparse
 
-
-#starting variables
-# filename = "https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz"
-# filename = "autzen-classified.copc.laz"
-# cell_size = 100
-# workers = 12
-# threads = 4
-# dask_bool = True
 
 class Bounds(object):
-    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size, srs=None):
+    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
         self.minx = float(minx)
         self.miny = float(miny)
         self.maxx = float(maxx)
@@ -28,7 +23,7 @@ class Bounds(object):
         self.xi = math.ceil(self.rangex / cell_size)
         self.yi = math.ceil(self.rangey / cell_size)
         self.cell_size = cell_size
-        self.group_size = 3
+        self.group_size = group_size
 
     # since the box will always be a rectangle, chunk it by cell line?
     # return list of chunk objects to operate on
@@ -111,6 +106,10 @@ def arrange_data(point_data, bounds):
         dd = dict(count=count, Z=r)
     else:
         dd = dict(count=count, Z=np.array([r, None], object)[:-1])
+    # Tiledb errors if np array size is greater than array's first dim.
+    # Will work around this by adding a None value to the array, which forces
+    # numpy to accept it as a 1D object
+    # https://github.com/TileDB-Inc/TileDB-Py/issues/494
     return [dx, dy, dd]
 
 def get_data(reader, chunk):
@@ -140,9 +139,16 @@ def create_tiledb(bounds: Bounds):
             capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
         tiledb.SparseArray.create('stats', schema)
 
-def create_bounds(pipeline, cell_size, group_size) -> Bounds:
+def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
     # grab our bounds
-    qi = pipeline.quickinfo['readers.copc']
+    if polygon:
+        p = shapely.from_wkt(polygon)
+        if not p.is_valid:
+            raise Exception("Invalid polygon entered")
+        reader._options['polygon'] = polygon
+    pipeline = reader.pipeline()
+    qi = pipeline.quickinfo[reader.type]
+
     bbox = qi['bounds']
     minx = bbox['minx']
     maxx = bbox['maxx']
@@ -158,26 +164,14 @@ def write_tdb(tdb, res):
     tdb[dx, dy] = dd
     return dd['count'].sum()
 
-
-
-# tiledb errors if np array size is greater than array's first dim
-# work around this by adding a None value to the array, which makes
-# np not make it a multidim array
-# https://github.com/TileDB-Inc/TileDB-Py/issues/494
-def unpack_ndarrays(da, index_len: int):
-    for arr in da:
-        if da[arr].size > index_len:
-            da[arr] = np.array([*da[arr], [None]], object, copy=False)[:-1]
-    return da
-
 def main(filename: str, threads: int, workers: int, group_size: int, res: float,
-         no_threads: bool, stats_bool: bool):
+         no_threads: bool, stats_bool: bool, polygon):
 
 
     # read pointcloud
     reader = pdal.Reader(filename)
-    pipeline = reader.pipeline()
-    bounds = create_bounds(pipeline, res, group_size)
+    # pipeline = reader.pipeline()
+    bounds = create_bounds(reader, res, group_size, polygon)
 
     # set up tiledb
     create_tiledb(bounds)
@@ -203,6 +197,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
                 point_data = get_data(reader=reader, chunk=ch)
                 arranged_data = arrange_data(point_data=point_data, bounds=bounds)
                 point_count = write_tdb(tdb, arranged_data)
+
                 if stats_bool:
                     pc += point_count
                     chunk_count += 1
@@ -210,18 +205,18 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
         else:
             client = Client(threads_per_worker=threads, n_workers=workers,
                 serializers=['dask', 'pickle'], deserializers=['dask', 'pickle'])
+            b = client.scatter(bounds, broadcast=True)
 
-            # chunks = bounds.chunk()
-            # chs = client.scatter(chunks)
-            # print("Reading to pdal")
-            point_futures = [client.submit(get_data, reader=reader, chunk=ch) for ch in bounds.chunk()]
-            # print("Arranging data")
-            data_futures = [client.submit(arrange_data, point_data=pf, bounds=bounds) for pf in point_futures]
-            # print("Writing data")
-            write_futures = [client.submit(write_tdb, tdb=tdb, res=df) for df in data_futures]
+            point_futures = [client.submit(get_data, reader=reader, chunk=ch)
+                            for ch in b.result().chunk()]
+            data_futures = [client.submit(arrange_data, point_data=pf, bounds=b)
+                            for pf in point_futures]
+            write_futures = [client.submit(write_tdb, tdb=tdb, res=df)
+                            for df in data_futures]
             futures = [ data_futures, point_futures, write_futures ]
-            # progress(*futures)
+            progress(*futures)
             client.gather(*futures)
+
             if stats_bool:
                 pc = 0
                 chunk_count = len(data_futures)
@@ -233,7 +228,8 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
             stats = dict(
                 time=((end-start)/float(1000000000)), threads=threads, workers=workers,
                 group_size=group_size, resolution=res, point_count=pc,
-                cell_count=cell_count, chunk_count=chunk_count
+                cell_count=cell_count, chunk_count=chunk_count,
+                filename=filename
             )
             print(stats)
 
@@ -244,6 +240,7 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=12)
     parser.add_argument("--group_size", type=int, default=3)
     parser.add_argument("--resolution", type=float, default=100)
+    parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--no_threads", type=bool, default=False)
     parser.add_argument("--stats", type=bool, default=False)
 
@@ -254,7 +251,10 @@ if __name__ == "__main__":
     workers = args.workers
     group_size = args.group_size
     res = args.resolution
+    poly = args.polygon
+
     no_threads = args.no_threads
     stats_bool = args.stats
 
-    main(filename, threads, workers, group_size, res, no_threads, stats_bool)
+
+    main(filename, threads, workers, group_size, res, no_threads, stats_bool, poly)
