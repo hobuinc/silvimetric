@@ -7,6 +7,7 @@ import tiledb
 import pdal
 import numpy as np
 import shapely
+from pyproj import CRS
 
 from dask.distributed import Client, progress
 
@@ -50,7 +51,12 @@ class Bounds(object):
 
 
     def __repr__(self):
-        return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
+        if self.srs:
+            crs = CRS.from_user_input(self.srs)
+            epsg = crs.to_epsg()
+            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}]) / EPSG:{epsg}"
+        else:
+            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
 
 class Chunk(object):
     def __init__(self, xrange: list[int], yrange: list[int], parent: Bounds):
@@ -142,13 +148,15 @@ def create_tiledb(bounds: Bounds):
 def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
     # grab our bounds
     if polygon:
-        p = shapely.from_wkt(polygon)
-        if not p.is_valid:
-            raise Exception("Invalid polygon entered")
+        # p = shapely.from_wkt(polygon)
+        # if not p.is_valid:
+        #     raise Exception("Invalid polygon entered")
         reader._options['polygon'] = polygon
     pipeline = reader.pipeline()
     qi = pipeline.quickinfo[reader.type]
 
+    if not qi['num_points']:
+        raise Exception("No points found.")
     bbox = qi['bounds']
     minx = bbox['minx']
     maxx = bbox['maxx']
@@ -205,16 +213,19 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
         else:
             client = Client(threads_per_worker=threads, n_workers=workers,
                 serializers=['dask', 'pickle'], deserializers=['dask', 'pickle'])
-            b = client.scatter(bounds, broadcast=True)
-
+            # b = client.scatter(bounds, broadcast=True)
+            print("Pushing to PDAL...")
             point_futures = [client.submit(get_data, reader=reader, chunk=ch)
-                            for ch in b.result().chunk()]
-            data_futures = [client.submit(arrange_data, point_data=pf, bounds=b)
+                            for ch in bounds.chunk()]
+            progress(*point_futures)
+            data_futures = [client.submit(arrange_data, point_data=pf, bounds=bounds)
                             for pf in point_futures]
+            progress(*data_futures)
             write_futures = [client.submit(write_tdb, tdb=tdb, res=df)
                             for df in data_futures]
+            progress(*write_futures)
             futures = [ data_futures, point_futures, write_futures ]
-            progress(*futures)
+            # progress(*futures)
             client.gather(*futures)
 
             if stats_bool:
@@ -226,7 +237,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
         if stats_bool:
             end = time.perf_counter_ns()
             stats = dict(
-                time=((end-start)/float(1000000000)), threads=threads, workers=workers,
+                time=((end-start)/pow(10, 6)), threads=threads, workers=workers,
                 group_size=group_size, resolution=res, point_count=pc,
                 cell_count=cell_count, chunk_count=chunk_count,
                 filename=filename
@@ -241,6 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("--group_size", type=int, default=3)
     parser.add_argument("--resolution", type=float, default=100)
     parser.add_argument("--polygon", type=str, default="")
+    parser.add_argument("--polygon_srs", type=str, default="EPSG:4326")
     parser.add_argument("--no_threads", type=bool, default=False)
     parser.add_argument("--stats", type=bool, default=False)
 
@@ -252,6 +264,7 @@ if __name__ == "__main__":
     group_size = args.group_size
     res = args.resolution
     poly = args.polygon
+    srs = args.polygon_srs
 
     no_threads = args.no_threads
     stats_bool = args.stats
