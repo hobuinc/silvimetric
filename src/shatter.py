@@ -1,19 +1,16 @@
 import time
 import math
 import argparse
-from os import environ
 
 import tiledb
 import pdal
 import numpy as np
-import shapely
-from pyproj import CRS, Transformer, network
+from shapely import from_wkt
+from pyproj import CRS, Transformer
 
-from dask.distributed import Client, progress, performance_report
-from distributed.diagnostics import MemorySampler
-
-environ['PROJ_NETWORK'] = 'OFF'
-network.set_network_enabled(False)
+import dask
+import dask.array as da
+from dask.distributed import Client, performance_report
 
 
 class Bounds(object):
@@ -94,6 +91,14 @@ class Chunk(object):
         self.indices = [[i,j] for i in range(self.x1, self.x2+1)
                         for j in range(self.y1, self.y2+1)]
 
+@dask.delayed
+def cell_indices(xpoints, ypoints, x, y):
+    r =  np.logical_and(xpoints.astype(np.int32) == x, ypoints.astype(np.int32) == y)
+    return r
+
+@dask.delayed
+def assign_points(zpoints, boolcells):
+    pass
 
 def arrange_data(point_data, bounds: Bounds):
 
@@ -101,49 +106,38 @@ def arrange_data(point_data, bounds: Bounds):
     chunk: Chunk
 
     points, chunk = point_data
+
+    points = da.from_array(points)
     src_crs = bounds.src_srs
     if src_crs != chunk.srs:
         x_points, y_points = bounds.transform(points['X'], points['Y'])
-        xis = np.floor((x_points - bounds.minx) / bounds.cell_size)
-        yis = np.floor((y_points - bounds.miny) / bounds.cell_size)
+        xis = da.floor((x_points - bounds.minx) / bounds.cell_size)
+        yis = da.floor((y_points - bounds.miny) / bounds.cell_size)
     else:
-        xis = np.floor((points['X'] - bounds.minx) / bounds.cell_size)
-        yis = np.floor((points['Y'] - bounds.miny) / bounds.cell_size)
+        xis = da.floor((points['X'] - bounds.minx) / bounds.cell_size)
+        yis = da.floor((points['Y'] - bounds.miny) / bounds.cell_size)
+
 
     # Set up data object
-    dx = []
-    dy = []
+    dx = np.array([], dtype=np.int32)
+    dy = np.array([], dtype=np.int32)
     count = np.array([], dtype=np.int32)
-    z_data = np.zeros((points.size), dtype=np.float64)
-
-    offset = 0
-    offsets = []
+    idx = []
     for x, y in chunk.indices:
-        add_data = np.array([points["Z"][np.logical_and(
-            xis.astype(np.int32) == x, yis.astype(np.int32) == y)]],
-            np.float64, copy=False)
+        dx = np.append(dx, x)
+        dy = np.append(dy, y)
+        idx.append(cell_indices(xis, yis, x, y))
+    a = dask.compute(*idx)
 
-        if add_data.any():
-            dx.append(x)
-            dy.append(y)
-            size = add_data.size
+    dl = []
+    input = np.nan_to_num(dask.compute(*(points['Z'][da.where(ax == True)] for ax in a)), copy=False)
+    count = np.array([i.size for i in input], np.int32)
+    r = np.array(dtype=object, object=[
+        *input,
+        None
+    ])
 
-            count = np.append(count, size)
-
-            n = offset + size
-            z_data[offset:n] = add_data
-            offsets.append([offset, n])
-            offset = n
-
-    r = np.array([z_data[lo:hi] for lo,hi in offsets], dtype=object)
-    if r.size == count.size:
-        dd = dict(count=count, Z=r)
-    else:
-        dd = dict(count=count, Z=np.array([r, None], object)[:-1])
-    # Tiledb errors if np array size is greater than array's first dim.
-    # Will work around this by adding a None value to the array, which forces
-    # numpy to accept it as a 1D object
-    # https://github.com/TileDB-Inc/TileDB-Py/issues/494
+    dd = dict(count=count, Z=r[:-1])
     return [dx, dy, dd]
 
 def get_data(reader, chunk):
@@ -175,7 +169,7 @@ def create_tiledb(bounds: Bounds):
 def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bounds:
     # grab our bounds
     if polygon:
-        p = shapely.from_wkt(polygon)
+        p = from_wkt(polygon)
         if not p.is_valid:
             raise Exception("Invalid polygon entered")
 
@@ -282,13 +276,12 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
                 point_count = write_tdb(tdb, arranged_data)
 
                 if stats_bool:
+                    print('chunk:', ch.indices, 'pointcount:', pc)
                     pc += point_count
                     chunk_count += 1
 
         else:
             # configure diagnostic pieces
-            client = Client(threads_per_worker=threads, n_workers=workers,
-                serializers=['dask', 'pickle'])
             b = (client.scatter(bounds, broadcast=True)).result()
 
             with performance_report():
@@ -298,7 +291,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
                                 for pf in point_futures]
                 write_futures = [client.submit(write_tdb, tdb=tdb, res=df)
                                 for df in data_futures]
-                client.gather([point_futures, data_futures, write_futures])
+                client.profile(filename='profile.html')
 
             if stats_bool:
                 pc = 0
@@ -318,11 +311,12 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
             )
             print(stats)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", type=str)
-    parser.add_argument("--threads", type=int, default=4)
-    parser.add_argument("--workers", type=int, default=12)
+    parser.add_argument("--threads", type=int, default=12)
+    parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--group_size", type=int, default=3)
     parser.add_argument("--resolution", type=float, default=30)
     parser.add_argument("--polygon", type=str, default="")
@@ -342,6 +336,16 @@ if __name__ == "__main__":
 
     no_threads = args.no_threads
     stats_bool = args.stats
+
+    if no_threads:
+        dask.config.set(scheduler='threads')
+
+    else:
+        global client
+        client = Client(threads_per_worker=threads, n_workers=workers,
+            serializers=['dask', 'pickle'])
+        dask.config.set(scheduler='processes')
+
 
 
     main(filename, threads, workers, group_size, res, no_threads, stats_bool,
