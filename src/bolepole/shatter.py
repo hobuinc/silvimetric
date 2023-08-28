@@ -130,7 +130,7 @@ def arrange_data(point_data, bounds: Bounds):
     a = dask.compute(*idx)
 
     dl = []
-    input = dask.compute(*(points['Z'][da.where(ax == True)] for ax in a)))
+    input = dask.compute(*(points['Z'][da.where(ax == True)] for ax in a))
     count = np.array([i.size for i in input], np.int32)
     r = np.array(dtype=object, object=[
         *input,
@@ -241,7 +241,7 @@ def get_time_string(start, end):
     secs = (mins - mins_flr) * 60
     return f"{hrs_flr}:{mins_flr}:{secs}"
 
-def main(filename: str, threads: int, workers: int, group_size: int, res: float,
+def main_function(filename: str, threads: int, workers: int, group_size: int, res: float,
          no_threads: bool, stats_bool: bool, polygon=None, p_srs=None):
 
 
@@ -311,8 +311,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
             )
             print(stats)
 
-
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", type=str)
     parser.add_argument("--threads", type=int, default=12)
@@ -348,5 +347,8 @@ if __name__ == "__main__":
 
 
 
-    main(filename, threads, workers, group_size, res, no_threads, stats_bool,
+    main_function(filename, threads, workers, group_size, res, no_threads, stats_bool,
           poly, p_srs)
+
+if __name__ == "__main__":
+    main()
