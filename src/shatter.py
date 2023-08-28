@@ -130,7 +130,7 @@ def arrange_data(point_data, bounds: Bounds):
     a = dask.compute(*idx)
 
     dl = []
-    input = np.nan_to_num(dask.compute(*(points['Z'][da.where(ax == True)] for ax in a)), copy=False)
+    input = dask.compute(*(points['Z'][da.where(ax == True)] for ax in a)))
     count = np.array([i.size for i in input], np.int32)
     r = np.array(dtype=object, object=[
         *input,
