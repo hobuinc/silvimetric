@@ -247,7 +247,7 @@ def get_time_string(start, end):
     secs = (mins - mins_flr) * 60
     return f"{hrs_flr}:{mins_flr}:{secs}"
 
-def main(filename: str, threads: int, workers: int, group_size: int, res: float,
+def main_function(filename: str, threads: int, workers: int, group_size: int, res: float,
          no_threads: bool, stats_bool: bool, polygon=None, p_srs=None):
 
 
@@ -318,7 +318,7 @@ def main(filename: str, threads: int, workers: int, group_size: int, res: float,
             )
             print(stats)
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", type=str)
     parser.add_argument("--threads", type=int, default=4)
@@ -344,5 +344,8 @@ if __name__ == "__main__":
     stats_bool = args.stats
 
 
-    main(filename, threads, workers, group_size, res, no_threads, stats_bool,
+    main_function(filename, threads, workers, group_size, res, no_threads, stats_bool,
           poly, p_srs)
+
+if __name__ == "__main__":
+    main()
