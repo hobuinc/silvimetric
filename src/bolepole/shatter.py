@@ -6,139 +6,62 @@ import tiledb
 import pdal
 import numpy as np
 from shapely import from_wkt
-from pyproj import CRS, Transformer
+from pyproj import CRS
 
 import dask
 import dask.array as da
-from dask.distributed import Client, performance_report
+from dask.distributed import Client, performance_report, progress
+from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, ProgressBar, visualize
 
+from .bounds import Bounds, Chunk
 
-class Bounds(object):
-    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
-        self.minx = float(minx)
-        self.miny = float(miny)
-        self.maxx = float(maxx)
-        self.maxy = float(maxy)
-        if not srs:
-            raise Exception("Missing SRS for bounds")
-        self.srs = CRS.from_user_input(srs)
-        self.epsg = self.srs.to_epsg()
-
-
-        self.rangex = self.maxx - self.minx
-        self.rangey = self.maxy - self.miny
-        self.xi = math.ceil(self.rangex / cell_size)
-        self.yi = math.ceil(self.rangey / cell_size)
-        self.cell_size = cell_size
-        self.group_size = group_size
-
-    def set_transform(self, src_srs):
-        self.src_srs = CRS.from_user_input(src_srs)
-        self.trn = Transformer.from_crs(self.src_srs, self.srs, always_xy=True)
-
-    def transform(self, x_arr: np.ndarray, y_arr: np.ndarray):
-        return self.trn.transform(x_arr, y_arr)
-
-    def reproject(self):
-        dst_crs = CRS.from_user_input(5070)
-        trn = Transformer.from_crs(self.srs, dst_crs, always_xy=True)
-        box = trn.transform([self.minx, self.maxx], [self.miny, self.maxy])
-        self.__init__(box[0][0], box[1][0], box[0][1], box[1][1], self.cell_size, self.group_size, dst_crs)
-
-    # since the box will always be a rectangle, chunk it by cell line?
-    # return list of chunk objects to operate on
-    def chunk(self):
-        for i in range(0, self.xi):
-            for j in range(0, self.yi, self.group_size):
-                top = min(j+self.group_size-1, self.yi)
-                yield Chunk([i,i], [j,top], self)
-
-    def split(self, x, y):
-        """Yields the geospatial bounding box for a given cell set provided by x, y"""
-
-        minx = self.minx + (x * self.cell_size)
-        miny = self.miny + (y * self.cell_size)
-        maxx = self.minx + ((x+1) * self.cell_size)
-        maxy = self.miny + ((y+1) * self.cell_size)
-        return Bounds(minx, miny, maxx, maxy, self.cell_size, self.srs)
-
-    def cell_dim(self, x, y):
-        b = self.split(x, y)
-        xcenter = (b.maxx - b.minx) / 2
-        ycenter = (b.maxy - b.miny) / 2
-        return [xcenter, ycenter]
-
-
-    def __repr__(self):
-        if self.srs:
-            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}]) / EPSG:{self.epsg}"
-        else:
-            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
-
-class Chunk(object):
-    def __init__(self, xrange: list[int], yrange: list[int], parent: Bounds):
-        self.x1, self.x2 = xrange
-        self.y1 , self.y2 = yrange
-        self.parent_bounds = parent
-        cell_size = parent.cell_size
-        group_size = parent.group_size
-        self.srs = parent.srs
-        minx = (self.x1 * cell_size) + parent.minx
-        miny = (self.y1 * cell_size) + parent.miny
-        maxx = (self.x2 + 1) * cell_size + parent.minx
-        maxy = (self.y2 + 1) * cell_size + parent.miny
-        self.bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, self.srs.to_wkt())
-        self.indices = [[i,j] for i in range(self.x1, self.x2+1)
-                        for j in range(self.y1, self.y2+1)]
-
-@dask.delayed
 def cell_indices(xpoints, ypoints, x, y):
     r =  np.logical_and(xpoints.astype(np.int32) == x, ypoints.astype(np.int32) == y)
     return r
 
-@dask.delayed
 def assign_points(zpoints, boolcells):
     pass
 
 def arrange_data(point_data, bounds: Bounds):
 
-    points: np.ndarray
-    chunk: Chunk
+    with Profiler():
+        points: da.Array
+        chunk: Chunk
 
-    points, chunk = point_data
+        points, chunk = point_data
 
-    points = da.from_array(points)
-    src_crs = bounds.src_srs
-    if src_crs != chunk.srs:
-        x_points, y_points = bounds.transform(points['X'], points['Y'])
-        xis = da.floor((x_points - bounds.minx) / bounds.cell_size)
-        yis = da.floor((y_points - bounds.miny) / bounds.cell_size)
-    else:
-        xis = da.floor((points['X'] - bounds.minx) / bounds.cell_size)
-        yis = da.floor((points['Y'] - bounds.miny) / bounds.cell_size)
+        points = da.from_array(points)
+        src_crs = bounds.src_srs
+        if src_crs != chunk.srs:
+            x_points, y_points = bounds.transform(points['X'], points['Y'])
+            xis = da.floor((x_points - bounds.minx) / bounds.cell_size)
+            yis = da.floor((y_points - bounds.miny) / bounds.cell_size)
+        else:
+            xis = dask.delayed(da.floor)((points['X'] - bounds.minx) / bounds.cell_size)
+            yis = dask.delayed(da.floor)((points['Y'] - bounds.miny) / bounds.cell_size)
 
 
-    # Set up data object
-    dx = np.array([], dtype=np.int32)
-    dy = np.array([], dtype=np.int32)
-    count = np.array([], dtype=np.int32)
-    idx = []
-    for x, y in chunk.indices:
-        dx = np.append(dx, x)
-        dy = np.append(dy, y)
-        idx.append(cell_indices(xis, yis, x, y))
-    a = dask.compute(*idx)
+        # Set up data object
+        dx = np.array([], dtype=np.int32)
+        dy = np.array([], dtype=np.int32)
+        count = np.array([], dtype=np.int32)
+        zs = []
+        counts = []
+        for x, y in chunk.indices:
+            dx = np.append(dx, x)
+            dy = np.append(dy, y)
+            idx = dask.delayed(cell_indices)(xis, yis, x, y)
+            where = dask.delayed(da.where)(idx==True)
+            z = dask.delayed(lambda slc, pts: pts['Z'][slc])(slc=where, pts=points)
+            c = dask.delayed(lambda z: z.size)(z=z)
+            zs.append(z)
+            counts.append(c)
+        # a = dask.compute(*idx)
+        dac = dask.delayed(np.array)(counts, np.int32)
+        daz = dask.delayed(lambda zs: np.array([*zs, None],dtype=object)[:-1])(zs=zs)
 
-    dl = []
-    input = dask.compute(*(points['Z'][da.where(ax == True)] for ax in a))
-    count = np.array([i.size for i in input], np.int32)
-    r = np.array(dtype=object, object=[
-        *input,
-        None
-    ])
-
-    dd = dict(count=count, Z=r[:-1])
-    return [dx, dy, dd]
+        dd = dask.delayed(dict)(count=dac, Z=daz)
+        return [dx, dy, dd]
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
@@ -226,7 +149,11 @@ def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bo
 
 def write_tdb(tdb, res):
     dx, dy, dd = res
-    tdb[dx, dy] = dd
+    dd = dd.compute()
+    try:
+        tdb[dx, dy] = dd
+    except Exception as e:
+        print("Failed to save to tdb: ", e.args)
     return dd['count'].sum()
 
 def get_time_string(start, end):
@@ -242,7 +169,7 @@ def get_time_string(start, end):
     return f"{hrs_flr}:{mins_flr}:{secs}"
 
 def main_function(filename: str, threads: int, workers: int, group_size: int, res: float,
-         no_threads: bool, stats_bool: bool, polygon=None, p_srs=None):
+         local: bool, stats_bool: bool, polygon=None, p_srs=None):
 
 
     # read pointcloud
@@ -268,36 +195,28 @@ def main_function(filename: str, threads: int, workers: int, group_size: int, re
             chunk_count = 0
             start = time.perf_counter_ns()
 
-        if no_threads:
-            it = bounds.chunk()
-            for ch in it:
-                point_data = get_data(reader=reader, chunk=ch)
-                arranged_data = arrange_data(point_data=point_data, bounds=bounds)
-                point_count = write_tdb(tdb, arranged_data)
+        it = bounds.chunk()
+        l = []
+        for ch in it:
+            point_data = dask.delayed(get_data)(reader=reader, chunk=ch)
+            arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=bounds)
+            point_count = dask.delayed(write_tdb)(tdb, arranged_data)
+            l.append(point_count)
+            chunk_count+=1
 
-                if stats_bool:
-                    print('chunk:', ch.indices, 'pointcount:', pc)
-                    pc += point_count
-                    chunk_count += 1
+        if local:
+            with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
+                prof.register()
+                rprof.register()
+                cprof.register()
+                pc = dask.compute(l)
+                visualize([prof, rprof, cprof], save=True)
 
         else:
-            # configure diagnostic pieces
-            b = (client.scatter(bounds, broadcast=True)).result()
-
             with performance_report():
-                point_futures = [client.submit(get_data, reader=reader, chunk=ch)
-                                for ch in b.chunk()]
-                data_futures = [client.submit(arrange_data, point_data=pf, bounds=b)
-                                for pf in point_futures]
-                write_futures = [client.submit(write_tdb, tdb=tdb, res=df)
-                                for df in data_futures]
-                client.profile(filename='profile.html')
+                pc = dask.compute(l)
+                progress(pc)
 
-            if stats_bool:
-                pc = 0
-                chunk_count = len(data_futures)
-                for wf in write_futures:
-                    pc += wf.result()
 
         if stats_bool:
             end = time.perf_counter_ns()
@@ -305,7 +224,7 @@ def main_function(filename: str, threads: int, workers: int, group_size: int, re
 
             stats = dict(
                 time=t, threads=threads, workers=workers,
-                group_size=group_size, resolution=res, point_count=pc,
+                group_size=group_size, resolution=res, point_count=sum(pc[0]),
                 cell_count=cell_count, chunk_count=chunk_count,
                 filename=filename
             )
@@ -320,7 +239,7 @@ def main():
     parser.add_argument("--resolution", type=float, default=30)
     parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--polygon_srs", type=str, default="EPSG:4326")
-    parser.add_argument("--no_threads", type=bool, default=False)
+    parser.add_argument("--local", type=bool, default=False)
     parser.add_argument("--stats", type=bool, default=False)
 
     args = parser.parse_args()
@@ -333,21 +252,19 @@ def main():
     poly = args.polygon
     p_srs = args.polygon_srs
 
-    no_threads = args.no_threads
+    local = args.local
     stats_bool = args.stats
 
-    if no_threads:
-        dask.config.set(scheduler='threads')
-
+    if local:
+        dask.config.set(scheduler='processes')
     else:
         global client
         client = Client(threads_per_worker=threads, n_workers=workers,
             serializers=['dask', 'pickle'])
-        dask.config.set(scheduler='processes')
 
 
 
-    main_function(filename, threads, workers, group_size, res, no_threads, stats_bool,
+    main_function(filename, threads, workers, group_size, res, local, stats_bool,
           poly, p_srs)
 
 if __name__ == "__main__":

@@ -10,3 +10,4 @@ dependencies:
   - numpy
   - shapely
   - dask
+  - pyproj

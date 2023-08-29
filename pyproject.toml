@@ -21,7 +21,7 @@ classifiers = [
   "Topic :: Scientific/Engineering :: Image Processing"
 ]
 dependencies = [
-  "PDAL", 
+  "PDAL",
   "tiledb", "pyproj", "dask", "shapely", "numpy"
 ]
 dynamic = ["version"]
