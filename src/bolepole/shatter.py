@@ -57,12 +57,7 @@ def arrange_data(point_data, bounds: Bounds):
     dac = dask.delayed(np.array)(counts, np.int32)
     daz = dask.delayed(lambda zs: np.array([*zs, None],dtype=object)[:-1])(zs=zs)
 
-    # dd = dask.delayed(lambda count, Z: {'count': count, 'Z': Z})(count=dac, Z=daz)
-    dd = dask.delayed(lambda x=0: { 'count': np.array([1,2,3]), 'Z':np.array([
-        np.zeros((random.randint(500,100000),), object),
-        np.zeros((random.randint(500,100000),), object),
-        np.zeros((random.randint(500,100000),), object),
-        None], object)[:-1]})()
+    dd = dask.delayed(lambda count, Z: {'count': count, 'Z': Z})(count=dac, Z=daz)
     return dask.delayed([dx, dy, dd])
 
 def get_data(reader, chunk):
