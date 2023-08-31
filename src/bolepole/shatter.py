@@ -1,6 +1,7 @@
 import time
 import math
 import argparse
+import random
 
 import tiledb
 import pdal
@@ -23,45 +24,46 @@ def assign_points(zpoints, boolcells):
     pass
 
 def arrange_data(point_data, bounds: Bounds):
+    points: da.Array
+    chunk: Chunk
 
-    with Profiler():
-        points: da.Array
-        chunk: Chunk
+    points, chunk = point_data
 
-        points, chunk = point_data
-
-        points = da.from_array(points)
-        src_crs = bounds.src_srs
-        if src_crs != chunk.srs:
-            x_points, y_points = bounds.transform(points['X'], points['Y'])
-            xis = da.floor((x_points - bounds.minx) / bounds.cell_size)
-            yis = da.floor((y_points - bounds.miny) / bounds.cell_size)
-        else:
-            xis = dask.delayed(da.floor)((points['X'] - bounds.minx) / bounds.cell_size)
-            yis = dask.delayed(da.floor)((points['Y'] - bounds.miny) / bounds.cell_size)
+    points = da.from_array(points)
+    src_crs = bounds.src_srs
+    if src_crs != chunk.srs:
+        x_points, y_points = bounds.transform(points['X'], points['Y'])
+        xis = da.floor((x_points - bounds.minx) / bounds.cell_size)
+        yis = da.floor((y_points - bounds.miny) / bounds.cell_size)
+    else:
+        xis = dask.delayed(da.floor)((points['X'] - bounds.minx) / bounds.cell_size)
+        yis = dask.delayed(da.floor)((points['Y'] - bounds.miny) / bounds.cell_size)
 
 
-        # Set up data object
-        dx = np.array([], dtype=np.int32)
-        dy = np.array([], dtype=np.int32)
-        count = np.array([], dtype=np.int32)
-        zs = []
-        counts = []
-        for x, y in chunk.indices:
-            dx = np.append(dx, x)
-            dy = np.append(dy, y)
-            idx = dask.delayed(cell_indices)(xis, yis, x, y)
-            where = dask.delayed(da.where)(idx==True)
-            z = dask.delayed(lambda slc, pts: pts['Z'][slc])(slc=where, pts=points)
-            c = dask.delayed(lambda z: z.size)(z=z)
-            zs.append(z)
-            counts.append(c)
-        # a = dask.compute(*idx)
-        dac = dask.delayed(np.array)(counts, np.int32)
-        daz = dask.delayed(lambda zs: np.array([*zs, None],dtype=object)[:-1])(zs=zs)
+    # Set up data object
+    dx = np.array([], dtype=np.int32)
+    dy = np.array([], dtype=np.int32)
+    zs = []
+    counts = []
+    for x, y in chunk.indices:
+        dx = np.append(dx, x)
+        dy = np.append(dy, y)
+        idx = dask.delayed(cell_indices)(xis, yis, x, y)
+        where = dask.delayed(da.where)(idx==True)
+        z = dask.delayed(lambda slc, pts: np.array(pts['Z'][slc], object))(slc=where, pts=points)
+        c = dask.delayed(lambda z: z.size)(z=z)
+        zs.append(z)
+        counts.append(c)
+    dac = dask.delayed(np.array)(counts, np.int32)
+    daz = dask.delayed(lambda zs: np.array([*zs, None],dtype=object)[:-1])(zs=zs)
 
-        dd = dask.delayed(dict)(count=dac, Z=daz)
-        return [dx, dy, dd]
+    # dd = dask.delayed(lambda count, Z: {'count': count, 'Z': Z})(count=dac, Z=daz)
+    dd = dask.delayed(lambda x=0: { 'count': np.array([1,2,3]), 'Z':np.array([
+        np.zeros((random.randint(500,100000),), object),
+        np.zeros((random.randint(500,100000),), object),
+        np.zeros((random.randint(500,100000),), object),
+        None], object)[:-1]})()
+    return dask.delayed([dx, dy, dd])
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
@@ -83,10 +85,11 @@ def create_tiledb(bounds: Bounds):
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True, fill=float(0))
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=bounds.xi*bounds.yi, attrs=[count_att, z_att])
+            capacity=10000000000, attrs=[count_att, z_att], allows_duplicates=True)
+        schema.check()
         tiledb.SparseArray.create('stats', schema)
 
 def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bounds:
@@ -148,12 +151,8 @@ def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bo
         return bounds
 
 def write_tdb(tdb, res):
-    dx, dy, dd = res
-    dd = dd.compute()
-    try:
-        tdb[dx, dy] = dd
-    except Exception as e:
-        print("Failed to save to tdb: ", e.args)
+    dx, dy, dd = res.compute()
+    tdb[dx, dy] = dd
     return dd['count'].sum()
 
 def get_time_string(start, end):
@@ -181,6 +180,7 @@ def main_function(filename: str, threads: int, workers: int, group_size: int, re
 
     # write to tiledb
     with tiledb.SparseArray("stats", "w") as tdb:
+        # write_tdb(tdb, [1,2,3])
         # apply metadata
         tdb.meta["LAYER_EXTENT_MINX"] = bounds.minx
         tdb.meta["LAYER_EXTENT_MINY"] = bounds.miny
@@ -205,18 +205,20 @@ def main_function(filename: str, threads: int, workers: int, group_size: int, re
             chunk_count+=1
 
         if local:
-            with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
+            with  Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
                 prof.register()
                 rprof.register()
                 cprof.register()
-                pc = dask.compute(l)
-                visualize([prof, rprof, cprof], save=True)
+                pc = dask.compute(l, traverse=True, optimize_graph=True)
+                # prof.visualize(save=True, show=False)
+                # visualize([prof], save=True)
 
         else:
             with performance_report():
-                pc = dask.compute(l)
-                progress(pc)
-
+                t = (client.scatter(tdb)).result()
+                futures = client.compute(l, optimize_graph=True)
+                client.gather(futures)
+                # progress(futures)
 
         if stats_bool:
             end = time.perf_counter_ns()
@@ -255,13 +257,12 @@ def main():
     local = args.local
     stats_bool = args.stats
 
+    global client
+    client = None
     if local:
         dask.config.set(scheduler='processes')
     else:
-        global client
-        client = Client(threads_per_worker=threads, n_workers=workers,
-            serializers=['dask', 'pickle'])
-
+        client = Client()
 
 
     main_function(filename, threads, workers, group_size, res, local, stats_bool,
