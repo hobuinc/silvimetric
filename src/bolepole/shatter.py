@@ -35,49 +35,31 @@ def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
         return [ points['X'], points['Y'] ]
 
 def where_true(points, idx):
-    where = da.where(idx==True)
-    return da.array(points['Z'][where], np.float64)
+    return np.array(points['Z'][np.where(idx==True)], np.float64)
 
 def get_zs(points, chunk, bounds):
     src_srs = bounds.src_srs
     dst_srs = chunk.srs
 
     x_points, y_points = xform(src_srs, dst_srs, points, bounds)
-    xis = floor_x(x_points, bounds)
-    yis = floor_y(y_points, bounds)
+    xis = dask.delayed(floor_x)(x_points, bounds)
+    yis = dask.delayed(floor_y)(y_points, bounds)
 
     # Set up data object
     zs = []
     for x, y in chunk.indices:
-        idx = cell_indices(xis, yis, x, y)
-        z = where_true(points, idx)
-        # z = da.array(points['Z'][where], object)
-        zs.append(z)
-        # counts.append(z.size)
+        idx = dask.delayed(cell_indices)(xis, yis, x, y)
+        zs.append(dask.delayed(where_true)(points, idx))
 
-        # counts.append(dask.delayed(lambda z: z.size)(z=z))
-    return dask.compute(zs)[0]
+    return np.array([*[z for z in dask.compute(zs)[0]], None], object)[:-1]
 
 def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
     points, chunk = point_data
 
     zs = get_zs(points, chunk, bounds)
-    npz = np.array([*[np.array(z, np.float64) for z in zs], None], dtype=object)[:-1]
+    # npz = np.array([*[np.array(z, np.float64) for z in zs], None], dtype=object)[:-1]
     counts = np.array([z.size for z in zs], np.int32)
-    dd = {'count': counts, 'Z': npz }
-    # dd = dask.delayed(
-    #     lambda zs:
-    #         {
-    #             'count': da.array([z.size for z in zs]),
-    #             'Z': np.array([
-    #                 *[np.array(z, np.float64) for z in zs],
-    #                 None
-    #             ], dtype=object)[:-1]
-    #         }
-    # )(zs=zs)
-    # counts = da.from_delayed(value=[z.size for z in zs], shape=(len(zs)))
-
-    # dask.compute(zs)
+    dd = {'count': counts, 'Z': zs }
 
     dx = da.array([], np.int32)
     dy = da.array([], np.int32)
@@ -85,15 +67,10 @@ def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
         dx = da.append(dx, x)
         dy = da.append(dy, y)
 
-    return [
-        dx,
-        dy,
-        dd
-    ]
+    return [ dx, dy, dd ]
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
-
     # remember that readers.copc is a thread hog
     reader._options['threads'] = 1
     pipeline = reader.pipeline()
@@ -183,7 +160,7 @@ def write_tdb(res):
         tdb[dx, dy] = dd
         return dd['count'].sum()
 
-def run_one(reader, chunk):
+def run_one(reader, chunk: Chunk):
     point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
     arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=chunk.parent_bounds)
     point_count = dask.delayed(write_tdb)(arranged_data)
@@ -214,8 +191,6 @@ def main_function(filename: str, group_size: int, res: float,
             rprof.register()
             cprof.register()
             dask.compute(l, traverse=True, optimize_graph=True)[0]
-            # prof.visualize(save=True, show=False)
-            # visualize([prof], save=True)
 
     else:
         futures = []
@@ -227,7 +202,7 @@ def main_function(filename: str, group_size: int, res: float,
         # futures = client.compute(l)
         client.gather(futures)
         if watch:
-            input("Press enter to finish watching.")
+            input("Press 'enter' to finish watching.")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -263,7 +238,7 @@ def main():
             dask.config.set(scheduler='processes')
     else:
         client = Client(n_workers=workers, set_as_default=False)
-        dask.config.set(scheduler='threads')
+        dask.config.set(scheduler='processes')
         if watch:
             webbrowser.open(client.cluster.dashboard_link)
 
