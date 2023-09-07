@@ -11,7 +11,7 @@ from pyproj import CRS
 
 import dask
 import dask.array as da
-from dask.distributed import Client, performance_report, progress, LocalCluster, PipInstall, UploadDirectory
+from dask.distributed import performance_report, progress, LocalCluster, PipInstall, UploadDirectory
 from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, ProgressBar, visualize
 
 from .bounds import Bounds, Chunk
@@ -51,7 +51,7 @@ def get_zs(points, chunk, bounds):
         idx = dask.delayed(cell_indices)(xis, yis, x, y)
         zs.append(dask.delayed(where_true)(points, idx))
 
-    return np.array([*[z for z in dask.compute(zs)[0]], None], object)[:-1]
+    return np.array([*[z for z in dask.compute(zs, optimize_graph=True)[0]], None], object)[:-1]
 
 def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
     points, chunk = point_data
@@ -160,16 +160,13 @@ def write_tdb(res):
         tdb[dx, dy] = dd
         return dd['count'].sum()
 
-def run_one(reader, chunk: Chunk):
+def run_one(reader, chunk: Chunk, local=False):
     point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
     arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=chunk.parent_bounds)
-    point_count = dask.delayed(write_tdb)(arranged_data)
-    return point_count.compute()
+    return dask.delayed(write_tdb)(arranged_data)
 
-def main_function(filename: str, group_size: int, res: float,
-         local: bool, polygon=None, p_srs=None, watch=False):
-
-
+def shatter(filename: str, group_size: int, res: float, local: bool, client,
+             polygon=None, p_srs=None, watch=False):
     # read pointcloud
     reader = pdal.Reader(filename)
     bounds = create_bounds(reader, res, group_size, polygon, p_srs)
@@ -177,16 +174,13 @@ def main_function(filename: str, group_size: int, res: float,
     # set up tiledb
     create_tiledb(bounds)
 
-    # write to tiledb
+    start = time.perf_counter_ns()
 
+    l = []
+    for ch in bounds.chunk():
+        l.append(run_one(reader, ch))
     if local:
         with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
-            l = []
-            for ch in bounds.chunk():
-                point_data = dask.delayed(get_data)(reader=reader, chunk=ch)
-                arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=bounds)
-                point_count = dask.delayed(write_tdb)(arranged_data)
-                l.append(point_count)
             prof.register()
             rprof.register()
             cprof.register()
@@ -194,56 +188,20 @@ def main_function(filename: str, group_size: int, res: float,
 
     else:
         futures = []
-        for it in bounds.chunk():
-            futures.append(client.submit(run_one, reader=reader, chunk=it))
+        if watch:
+            dask.compute(l, optimize_graph=True)
+            client.gather(futures)
+            input("Press 'enter' to finish watching.")
+        else:
+            with performance_report():
+                dask.compute(l, optimize_graph=True)
+                # for it in bounds.chunk():
+                #     futures.append(client.submit(run_one, reader=reader, chunk=it, local=False))
+                # progress(futures)
         # gd = [client.submit(get_data, reader=reader, chunk=ch) for ch in bounds.chunk()]
         # ad = [client.submit(arrange_data, point_data=d, bounds=bounds) for d in gd]
         # pc = [client.submit(write_tdb, res=d) for d in ad]
         # futures = client.compute(l)
-        client.gather(futures)
-        if watch:
-            input("Press 'enter' to finish watching.")
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("filename", type=str)
-    parser.add_argument("--threads", type=int, default=4)
-    parser.add_argument("--workers", type=int, default=12)
-    parser.add_argument("--group_size", type=int, default=3)
-    parser.add_argument("--resolution", type=float, default=30)
-    parser.add_argument("--polygon", type=str, default="")
-    parser.add_argument("--polygon_srs", type=str, default="EPSG:4326")
-    parser.add_argument("--local", type=bool, default=False)
-    parser.add_argument("--watch", type=bool, default=False)
-
-    args = parser.parse_args()
-
-    filename = args.filename
-    threads = args.threads
-    workers = args.workers
-    group_size = args.group_size
-    res = args.resolution
-    poly = args.polygon
-    p_srs = args.polygon_srs
-
-    local = args.local
-    watch = args.watch
-
-    global client
-    client = None
-    if local:
-        if threads == 1:
-            dask.config.set(scheduler="single-threaded")
-        else:
-            dask.config.set(scheduler='processes')
-    else:
-        client = Client(n_workers=workers, set_as_default=False)
-        dask.config.set(scheduler='processes')
-        if watch:
-            webbrowser.open(client.cluster.dashboard_link)
-
-
-    main_function(filename, group_size, res, local, poly, p_srs, watch)
-
-if __name__ == "__main__":
-    main()
+    end = time.perf_counter_ns()
+    print("Time", (end-start)/(pow(10,9)))
