@@ -11,7 +11,7 @@ from pyproj import CRS
 
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress, LocalCluster, PipInstall, UploadDirectory
+from dask.distributed import performance_report, progress, Client
 from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, ProgressBar, visualize
 
 from .bounds import Bounds, Chunk
@@ -30,42 +30,43 @@ def floor_y(points: da.Array, bounds: Bounds):
 
 def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
     if src_srs != dst_srs:
-        return bounds.transform(points['X'], points['Y'])
+        return da.array(bounds.transform(points['X'], points['Y']))
     else:
-        return [ points['X'], points['Y'] ]
+        return da.array([points['X'], points['Y']])
 
 def where_true(points, idx):
-    return np.array(points['Z'][np.where(idx==True)], np.float64)
+    return da.array(points['Z'][da.where(idx==True)], np.float64)
 
 def get_zs(points, chunk, bounds):
     src_srs = bounds.src_srs
     dst_srs = chunk.srs
 
-    x_points, y_points = xform(src_srs, dst_srs, points, bounds)
-    xis = dask.delayed(floor_x)(x_points, bounds)
-    yis = dask.delayed(floor_y)(y_points, bounds)
+    # xform_points = xform(src_srs, dst_srs, points, bounds)
+    xis = floor_x(points['X'], bounds)
+    yis = floor_y(points['Y'], bounds)
 
     # Set up data object
     zs = []
     for x, y in chunk.indices:
-        idx = dask.delayed(cell_indices)(xis, yis, x, y)
-        zs.append(dask.delayed(where_true)(points, idx))
+        idx = cell_indices(xis, yis, x, y)
+        zs.append(where_true(points, idx))
 
-    return np.array([*[z for z in dask.compute(zs, optimize_graph=True)[0]], None], object)[:-1]
+    new_zs = dask.compute(zs, scheduler="threads", optimize_graph=True)[0]
+    ret = np.array([*[z for z in new_zs], None], object)[:-1]
+    return ret
 
 def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
     points, chunk = point_data
 
     zs = get_zs(points, chunk, bounds)
-    # npz = np.array([*[np.array(z, np.float64) for z in zs], None], dtype=object)[:-1]
     counts = np.array([z.size for z in zs], np.int32)
     dd = {'count': counts, 'Z': zs }
 
-    dx = da.array([], np.int32)
-    dy = da.array([], np.int32)
+    dx = np.array([], np.int32)
+    dy = np.array([], np.int32)
     for x, y in chunk.indices:
-        dx = da.append(dx, x)
-        dy = da.append(dy, y)
+        dx = np.append(dx, x)
+        dy = np.append(dy, y)
 
     return [ dx, dy, dd ]
 
@@ -91,7 +92,7 @@ def create_tiledb(bounds: Bounds):
         z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True, fill=float(0))
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=10000, attrs=[count_att, z_att], allows_duplicates=True)
+            capacity=1000000, attrs=[count_att, z_att], allows_duplicates=True)
         schema.check()
         tiledb.SparseArray.create('stats', schema)
 
@@ -153,19 +154,19 @@ def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bo
 
         return bounds
 
-def write_tdb(res):
-    with tiledb.SparseArray("stats", "w") as tdb:
-        dx, dy, dd = res
-        dd = {k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()}
-        tdb[dx, dy] = dd
-        return dd['count'].sum()
+def write_tdb(tdb, res):
+    dx, dy, dd = res
+    dd = {k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()}
+    tdb[dx, dy] = dd
+    return dd['count'].sum()
 
-def run_one(reader, chunk: Chunk, local=False):
+def run_one(reader, chunk: Chunk, tdb):
     point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
     arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=chunk.parent_bounds)
-    return dask.delayed(write_tdb)(arranged_data)
+    # return arranged_data
+    return dask.delayed(write_tdb)(tdb, arranged_data)
 
-def shatter(filename: str, group_size: int, res: float, local: bool, client,
+def shatter(filename: str, group_size: int, res: float, local: bool, client: Client,
              polygon=None, p_srs=None, watch=False):
     # read pointcloud
     reader = pdal.Reader(filename)
@@ -177,14 +178,15 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client,
     start = time.perf_counter_ns()
 
     l = []
-    for ch in bounds.chunk():
-        l.append(run_one(reader, ch))
+    with tiledb.open("stats", "w") as tdb:
+        for ch in bounds.chunk():
+            l.append(run_one(reader, ch, tdb))
     if local:
         with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
             prof.register()
             rprof.register()
             cprof.register()
-            dask.compute(l, traverse=True, optimize_graph=True)[0]
+            ads = dask.compute(l, traverse=True, optimize_graph=True)[0]
 
     else:
         futures = []
@@ -194,7 +196,8 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client,
             input("Press 'enter' to finish watching.")
         else:
             with performance_report():
-                dask.compute(l, optimize_graph=True)
+                ads = client.compute(l, optimize_graph=True)
+                progress(ads)
                 # for it in bounds.chunk():
                 #     futures.append(client.submit(run_one, reader=reader, chunk=it, local=False))
                 # progress(futures)
@@ -204,4 +207,14 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client,
         # futures = client.compute(l)
 
     end = time.perf_counter_ns()
-    print("Time", (end-start)/(pow(10,9)))
+    print("Read/Arrange Time", (end-start)/(pow(10,9)))
+
+    # with performance_report("write_tdb.html"):
+    #     start = time.perf_counter_ns()
+    #     with tiledb.open("stats", "w") as tdb:
+    #         l = []
+    #         for ad in ads:
+    #             l.append(dask.delayed(write_tdb)(tdb=tdb, res=ad.result()))
+    #         dask.compute(l)
+    #     end = time.perf_counter_ns()
+    #     print("Write Time", (end-start)/(pow(10,9)))
