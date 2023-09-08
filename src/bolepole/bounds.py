@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 from pyproj import CRS, Transformer
+from shapely import from_wkt
 
 class Bounds(object):
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
@@ -80,3 +81,62 @@ class Chunk(object):
         self.bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, self.srs.to_wkt())
         self.indices = [[i,j] for i in range(self.x1, self.x2+1)
                         for j in range(self.y1, self.y2+1)]
+
+def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bounds:
+    # grab our bounds
+    if polygon:
+        p = from_wkt(polygon)
+        if not p.is_valid:
+            raise Exception("Invalid polygon entered")
+
+        b = p.bounds
+        minx = b[0]
+        miny = b[1]
+        if len(b) == 4:
+            maxx = b[2]
+            maxy = b[3]
+        elif len(b) == 6:
+            maxx = b[3]
+            maxy = b[4]
+        else:
+            raise Exception("Invalid bounds found.")
+
+        # TODO handle srs that's geographic
+        user_crs = CRS.from_user_input(p_srs)
+        user_wkt = user_crs.to_wkt()
+
+        bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, user_wkt)
+        bounds.reproject()
+
+        reader._options['bounds'] = str(bounds)
+        pipeline = reader.pipeline()
+
+        qi = pipeline.quickinfo[reader.type]
+        pc = qi['num_points']
+        src_srs = qi['srs']['wkt']
+        bounds.set_transform(src_srs)
+        print("Points found",  pc)
+
+        if not pc:
+            raise Exception("No points found.")
+
+        return bounds
+    else:
+
+        pipeline = reader.pipeline()
+        qi = pipeline.quickinfo[reader.type]
+
+        if not qi['num_points']:
+            raise Exception("No points found.")
+
+        bbox = qi['bounds']
+        minx = bbox['minx']
+        maxx = bbox['maxx']
+        miny = bbox['miny']
+        maxy = bbox['maxy']
+        srs = qi['srs']['wkt']
+        bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
+                    group_size=group_size, srs=srs)
+        bounds.set_transform(srs)
+
+        return bounds

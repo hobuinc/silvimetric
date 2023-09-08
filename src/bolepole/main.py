@@ -41,7 +41,7 @@ def main():
             dask.config.set(scheduler='processes')
 
     else:
-        client = Client(n_workers=workers, threads_per_worker=threads)
+        client = Client(n_workers=workers, threads_per_worker=threads, serializers=['dask', 'pickle'])
         # client = Client()
         if watch:
             webbrowser.open(client.cluster.dashboard_link)

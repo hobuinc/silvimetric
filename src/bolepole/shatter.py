@@ -6,7 +6,6 @@ import webbrowser
 import tiledb
 import pdal
 import numpy as np
-from shapely import from_wkt
 from pyproj import CRS
 
 import dask
@@ -14,7 +13,7 @@ import dask.array as da
 from dask.distributed import performance_report, progress, Client
 from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, ProgressBar, visualize
 
-from .bounds import Bounds, Chunk
+from .bounds import Bounds, Chunk, create_bounds
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(
@@ -51,12 +50,12 @@ def get_zs(points, chunk, bounds):
         idx = cell_indices(xis, yis, x, y)
         zs.append(where_true(points, idx))
 
-    new_zs = dask.compute(zs, scheduler="threads", optimize_graph=True)[0]
+    new_zs = dask.compute(zs, scheduler="threads")[0]
     ret = np.array([*[z for z in new_zs], None], object)[:-1]
     return ret
 
-def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
-    points, chunk = point_data
+def arrange_data(points: da.Array, chunk:Chunk, tdb=None):
+    bounds = chunk.parent_bounds
 
     zs = get_zs(points, chunk, bounds)
     counts = np.array([z.size for z in zs], np.int32)
@@ -68,16 +67,16 @@ def arrange_data(point_data: tuple[da.Array, Chunk], bounds: Bounds):
         dx = np.append(dx, x)
         dy = np.append(dy, y)
 
+    # return write_tdb(tdb, [ dx, dy, dd ])
     return [ dx, dy, dd ]
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
     # remember that readers.copc is a thread hog
-    reader._options['threads'] = 1
+    reader._options['threads'] = 2
     pipeline = reader.pipeline()
     pipeline.execute()
-    points = da.array(pipeline.arrays[0])
-    return [points, chunk]
+    return da.array(pipeline.arrays[0])
 
 def create_tiledb(bounds: Bounds):
     if tiledb.object_type("stats") == "array":
@@ -96,74 +95,17 @@ def create_tiledb(bounds: Bounds):
         schema.check()
         tiledb.SparseArray.create('stats', schema)
 
-def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bounds:
-    # grab our bounds
-    if polygon:
-        p = from_wkt(polygon)
-        if not p.is_valid:
-            raise Exception("Invalid polygon entered")
-
-        b = p.bounds
-        minx = b[0]
-        miny = b[1]
-        if len(b) == 4:
-            maxx = b[2]
-            maxy = b[3]
-        elif len(b) == 6:
-            maxx = b[3]
-            maxy = b[4]
-        else:
-            raise Exception("Invalid bounds found.")
-
-        # TODO handle srs that's geographic
-        user_crs = CRS.from_user_input(p_srs)
-        user_wkt = user_crs.to_wkt()
-
-        bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, user_wkt)
-        bounds.reproject()
-
-        reader._options['bounds'] = str(bounds)
-        pipeline = reader.pipeline()
-
-        qi = pipeline.quickinfo[reader.type]
-        pc = qi['num_points']
-        src_srs = qi['srs']['wkt']
-        bounds.set_transform(src_srs)
-
-        if not pc:
-            raise Exception("No points found.")
-
-        return bounds
-    else:
-
-        pipeline = reader.pipeline()
-        qi = pipeline.quickinfo[reader.type]
-
-        if not qi['num_points']:
-            raise Exception("No points found.")
-
-        bbox = qi['bounds']
-        minx = bbox['minx']
-        maxx = bbox['maxx']
-        miny = bbox['miny']
-        maxy = bbox['maxy']
-        srs = qi['srs']['wkt']
-        bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
-                    group_size=group_size, srs=srs)
-        bounds.set_transform(srs)
-
-        return bounds
 
 def write_tdb(tdb, res):
     dx, dy, dd = res
-    dd = {k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()}
+    # dd = dask.persist({k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()})
     tdb[dx, dy] = dd
     return dd['count'].sum()
 
-def run_one(reader, chunk: Chunk, tdb):
+def run_one(reader, chunk: Chunk, tdb=None):
     point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
-    arranged_data = dask.delayed(arrange_data)(point_data=point_data, bounds=chunk.parent_bounds)
-    # return arranged_data
+    arranged_data = dask.delayed(arrange_data)(points=point_data, chunk=chunk, tdb=tdb)
+    return arranged_data
     return dask.delayed(write_tdb)(tdb, arranged_data)
 
 def shatter(filename: str, group_size: int, res: float, local: bool, client: Client,
@@ -179,35 +121,48 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
 
     l = []
     with tiledb.open("stats", "w") as tdb:
-        for ch in bounds.chunk():
-            l.append(run_one(reader, ch, tdb))
-    if local:
-        with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
-            prof.register()
-            rprof.register()
-            cprof.register()
-            ads = dask.compute(l, traverse=True, optimize_graph=True)[0]
-
-    else:
-        futures = []
-        if watch:
-            dask.compute(l, optimize_graph=True)
-            client.gather(futures)
-            input("Press 'enter' to finish watching.")
+        if local:
+            t = tdb
         else:
-            with performance_report():
-                ads = client.compute(l, optimize_graph=True)
-                progress(ads)
-                # for it in bounds.chunk():
-                #     futures.append(client.submit(run_one, reader=reader, chunk=it, local=False))
-                # progress(futures)
-        # gd = [client.submit(get_data, reader=reader, chunk=ch) for ch in bounds.chunk()]
-        # ad = [client.submit(arrange_data, point_data=d, bounds=bounds) for d in gd]
-        # pc = [client.submit(write_tdb, res=d) for d in ad]
-        # futures = client.compute(l)
+            t = client.scatter(tdb)
 
-    end = time.perf_counter_ns()
-    print("Read/Arrange Time", (end-start)/(pow(10,9)))
+        for ch in bounds.chunk():
+            l.append(run_one(reader, ch, t))
+
+        if local:
+            with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
+                prof.register()
+                rprof.register()
+                cprof.register()
+                futures = dask.compute(l, traverse=True, optimize_graph=True)[0]
+
+        else:
+            futures = []
+            if watch:
+                futures = client.compute(l, optimize_graph=True)
+                progress(futures)
+                input("Press 'enter' to finish watching.")
+            else:
+                with performance_report():
+                    futures = client.compute(l, optimize_graph=True)
+                    progress(futures)
+
+        end = time.perf_counter_ns()
+        print("Time", (end-start)/(pow(10,9)))
+
+        dpcs = da.array([], dtype=np.int32)
+        for f in futures:
+            dx, dy, dd = f
+            dpcs = da.append(dpcs, dd['count'])
+        npcs = np.array(dpcs.compute())
+        print('mean', np.mean(npcs))
+        print('median', np.median(npcs))
+        print('max', np.max(npcs))
+        print('min', np.min(npcs))
+
+
+
+
 
     # with performance_report("write_tdb.html"):
     #     start = time.perf_counter_ns()
