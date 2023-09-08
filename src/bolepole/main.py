@@ -1,5 +1,3 @@
-import time
-import math
 import argparse
 import webbrowser
 

@@ -1,12 +1,8 @@
 import time
-import math
-import argparse
-import webbrowser
 
 import tiledb
 import pdal
 import numpy as np
-from pyproj import CRS
 
 import dask
 import dask.array as da
@@ -67,7 +63,7 @@ def arrange_data(points: da.Array, chunk:Chunk, tdb=None):
         dx = np.append(dx, x)
         dy = np.append(dy, y)
 
-    # return write_tdb(tdb, [ dx, dy, dd ])
+    return write_tdb(tdb, [ dx, dy, dd ])
     return [ dx, dy, dd ]
 
 def get_data(reader, chunk):
@@ -78,29 +74,11 @@ def get_data(reader, chunk):
     pipeline.execute()
     return da.array(pipeline.arrays[0])
 
-def create_tiledb(bounds: Bounds):
-    if tiledb.object_type("stats") == "array":
-        with tiledb.open("stats", "d") as A:
-            A.query(cond="X>=0").submit()
-    else:
-        dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
-        dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
-        domain = tiledb.Domain(dim_row, dim_col)
-
-        count_att = tiledb.Attr(name="count", dtype=np.int32)
-        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True, fill=float(0))
-
-        schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=1000000, attrs=[count_att, z_att], allows_duplicates=True)
-        schema.check()
-        tiledb.SparseArray.create('stats', schema)
-
-
 def write_tdb(tdb, res):
     dx, dy, dd = res
     # dd = dask.persist({k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()})
     tdb[dx, dy] = dd
-    return dd['count'].sum()
+    return dd['count']
 
 def run_one(reader, chunk: Chunk, tdb=None):
     point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
@@ -115,12 +93,12 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
     bounds = create_bounds(reader, res, group_size, polygon, p_srs)
 
     # set up tiledb
-    create_tiledb(bounds)
+    config = create_tiledb(bounds)
 
     start = time.perf_counter_ns()
 
     l = []
-    with tiledb.open("stats", "w") as tdb:
+    with tiledb.open("stats", "w", config=config) as tdb:
         if local:
             t = tdb
         else:
@@ -151,25 +129,36 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
         print("Time", (end-start)/(pow(10,9)))
 
         dpcs = da.array([], dtype=np.int32)
-        for f in futures:
-            dx, dy, dd = f
-            dpcs = da.append(dpcs, dd['count'])
+        for count in client.gather(futures):
+            dpcs = da.append(dpcs, count)
         npcs = np.array(dpcs.compute())
-        print('mean', np.mean(npcs))
-        print('median', np.median(npcs))
-        print('max', np.max(npcs))
-        print('min', np.min(npcs))
 
+        print("\nCell point count stats: ")
+        print('  mean:', np.mean(npcs))
+        print('  median:', np.median(npcs))
+        print('  max:', np.max(npcs))
+        print('  min:', np.min(npcs))
 
+def create_tiledb(bounds: Bounds):
+    if tiledb.object_type("stats") == "array":
+        with tiledb.open("stats", "d") as A:
+            A.query(cond="X>=0").submit()
+    else:
+        dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
+        dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
+        domain = tiledb.Domain(dim_row, dim_col)
 
+        count_att = tiledb.Attr(name="count", dtype=np.int32)
+        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True, fill=float(0))
 
+        schema = tiledb.ArraySchema(domain=domain, sparse=True,
+            capacity=1000000, attrs=[count_att, z_att], allows_duplicates=True)
+        schema.check()
+        tiledb.SparseArray.create('stats', schema)
+    return tiledb.Config({
+        "sm.check_coord_oob": False,
+        "sm.check_global_order": False,
+        "sm.check_coord_dedups": False,
+        "sm.dedup_coords": False
 
-    # with performance_report("write_tdb.html"):
-    #     start = time.perf_counter_ns()
-    #     with tiledb.open("stats", "w") as tdb:
-    #         l = []
-    #         for ad in ads:
-    #             l.append(dask.delayed(write_tdb)(tdb=tdb, res=ad.result()))
-    #         dask.compute(l)
-    #     end = time.perf_counter_ns()
-    #     print("Write Time", (end-start)/(pow(10,9)))
+    })
