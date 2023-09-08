@@ -1,4 +1,5 @@
 import time
+from os import path
 
 import tiledb
 import pdal
@@ -29,9 +30,6 @@ def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
     else:
         return da.array([points['X'], points['Y']])
 
-def where_true(points, idx):
-    return da.array(points['Z'][da.where(idx==True)], np.float64)
-
 def get_zs(points, chunk, bounds):
     src_srs = bounds.src_srs
     dst_srs = chunk.srs
@@ -44,7 +42,7 @@ def get_zs(points, chunk, bounds):
     zs = []
     for x, y in chunk.indices:
         idx = cell_indices(xis, yis, x, y)
-        zs.append(where_true(points, idx))
+        zs.append(da.array(points['Z'][idx], np.float64))
 
     new_zs = dask.compute(zs, scheduler="threads")[0]
     ret = np.array([*[z for z in new_zs], None], object)[:-1]
@@ -88,17 +86,23 @@ def run_one(reader, chunk: Chunk, tdb=None):
 
 def shatter(filename: str, group_size: int, res: float, local: bool, client: Client,
              polygon=None, p_srs=None, watch=False):
+
+    if 'ept.json' in filename:
+        tdbname = path.dirname(filename)
+    else:
+        tdbname = path.splitext(path.basename(filename))[0]
+
     # read pointcloud
     reader = pdal.Reader(filename)
     bounds = create_bounds(reader, res, group_size, polygon, p_srs)
 
     # set up tiledb
-    config = create_tiledb(bounds)
+    config = create_tiledb(bounds, tdbname)
 
     start = time.perf_counter_ns()
 
     l = []
-    with tiledb.open("stats", "w", config=config) as tdb:
+    with tiledb.open(tdbname, "w", config=config) as tdb:
         if local:
             t = tdb
         else:
@@ -121,17 +125,14 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
                 progress(futures)
                 input("Press 'enter' to finish watching.")
             else:
-                with performance_report():
+                with performance_report('dask-report.html'):
                     futures = client.compute(l, optimize_graph=True)
                     progress(futures)
 
         end = time.perf_counter_ns()
         print("Time", (end-start)/(pow(10,9)))
 
-        dpcs = da.array([], dtype=np.int32)
-        for count in client.gather(futures):
-            dpcs = da.append(dpcs, count)
-        npcs = np.array(dpcs.compute())
+        npcs = da.array([x.flatten() for x in client.gather(futures)]).flatten().compute()
 
         print("\nCell point count stats: ")
         print('  mean:', np.mean(npcs))
@@ -139,9 +140,9 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
         print('  max:', np.max(npcs))
         print('  min:', np.min(npcs))
 
-def create_tiledb(bounds: Bounds):
-    if tiledb.object_type("stats") == "array":
-        with tiledb.open("stats", "d") as A:
+def create_tiledb(bounds: Bounds, dirname):
+    if tiledb.object_type(dirname) == "array":
+        with tiledb.open(dirname, "d") as A:
             A.query(cond="X>=0").submit()
     else:
         dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
@@ -154,7 +155,7 @@ def create_tiledb(bounds: Bounds):
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
             capacity=1000000, attrs=[count_att, z_att], allows_duplicates=True)
         schema.check()
-        tiledb.SparseArray.create('stats', schema)
+        tiledb.SparseArray.create(dirname, schema)
     return tiledb.Config({
         "sm.check_coord_oob": False,
         "sm.check_global_order": False,
