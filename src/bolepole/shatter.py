@@ -13,16 +13,13 @@ from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, Progress
 from .bounds import Bounds, Chunk, create_bounds
 
 def cell_indices(xpoints, ypoints, x, y):
-    return da.logical_and(
-        xpoints.astype(np.int32) == x,
-        ypoints.astype(np.int32) == y
-    )
+    return da.logical_and(xpoints == x, ypoints == y)
 
 def floor_x(points: da.Array, bounds: Bounds):
-    return da.floor((points - bounds.minx) / bounds.cell_size)
+    return da.array(da.floor((points - bounds.minx) / bounds.cell_size), np.int32)
 
 def floor_y(points: da.Array, bounds: Bounds):
-    return da.floor((points - bounds.miny) / bounds.cell_size)
+    return da.array(da.floor((points - bounds.miny) / bounds.cell_size), np.int32)
 
 def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
     if src_srs != dst_srs:
@@ -30,39 +27,27 @@ def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
     else:
         return da.array([points['X'], points['Y']])
 
-def get_zs(points, chunk, bounds):
+def get_zs(points: da.Array, chunk: Chunk, bounds: Bounds):
     src_srs = bounds.src_srs
     dst_srs = chunk.srs
 
     # xform_points = xform(src_srs, dst_srs, points, bounds)
-    xis = floor_x(points['X'], bounds)
-    yis = floor_y(points['Y'], bounds)
+    dt = {
+        'names': ['X', 'Y'],
+        'formats': ['<f8', '<f8'],
+        'offsets': [0, 8],
+        'itemsize': 54
+    }
+    xypoints = points[['X','Y']].view(dt)
+    xis = floor_x(xypoints['X'], bounds)
+    yis = floor_y(xypoints['Y'], bounds)
 
     # Set up data object
-    zs = []
-    for x, y in chunk.indices:
-        idx = cell_indices(xis, yis, x, y)
-        zs.append(da.array(points['Z'][idx], np.float64))
-
-    new_zs = dask.compute(zs, scheduler="threads")[0]
-    ret = np.array([*[z for z in new_zs], None], object)[:-1]
-    return ret
-
-def arrange_data(points: da.Array, chunk:Chunk, tdb=None):
-    bounds = chunk.parent_bounds
-
-    zs = get_zs(points, chunk, bounds)
-    counts = np.array([z.size for z in zs], np.int32)
-    dd = {'count': counts, 'Z': zs }
-
-    dx = np.array([], np.int32)
-    dy = np.array([], np.int32)
-    for x, y in chunk.indices:
-        dx = np.append(dx, x)
-        dy = np.append(dy, y)
-
-    return write_tdb(tdb, [ dx, dy, dd ])
-    return [ dx, dy, dd ]
+    zs = dask.compute([
+        da.array(points['Z'][cell_indices(xis, yis, x, y)], np.float64)
+        for x,y in chunk.indices
+    ], scheduler="threads")[0]
+    return np.array([*[z for z in zs], None], object)[:-1]
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
@@ -74,21 +59,30 @@ def get_data(reader, chunk):
 
 def write_tdb(tdb, res):
     dx, dy, dd = res
-    # dd = dask.persist({k: v.astype(np.dtype(v.dtype.kind)) for k,v in dd.items()})
     tdb[dx, dy] = dd
     return dd['count']
 
-def run_one(reader, chunk: Chunk, tdb=None):
-    point_data = dask.delayed(get_data)(reader=reader, chunk=chunk)
-    arranged_data = dask.delayed(arrange_data)(points=point_data, chunk=chunk, tdb=tdb)
-    return arranged_data
-    return dask.delayed(write_tdb)(tdb, arranged_data)
+@dask.delayed
+def arrange_data(reader, chunk:Chunk, tdb=None):
+    points = get_data(reader, chunk)
+    bounds = chunk.parent_bounds
+
+    zs = get_zs(points, chunk, bounds)
+    counts = np.array([z.size for z in zs], np.int32)
+    dd = {'count': counts, 'Z': zs }
+
+    dx = chunk.indices['x']
+    dy = chunk.indices['y']
+
+    return write_tdb(tdb, [ dx, dy, dd ])
 
 def shatter(filename: str, group_size: int, res: float, local: bool, client: Client,
              polygon=None, p_srs=None, watch=False):
 
     if 'ept.json' in filename:
         tdbname = path.dirname(filename)
+    elif '.copc.' in filename:
+        tdbname = path.splitext(path.splitext(path.basename(filename))[0])[0]
     else:
         tdbname = path.splitext(path.basename(filename))[0]
 
@@ -109,7 +103,7 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
             t = client.scatter(tdb)
 
         for ch in bounds.chunk():
-            l.append(run_one(reader, ch, t))
+            l.append(arrange_data(reader, ch, t))
 
         if local:
             with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
@@ -134,11 +128,12 @@ def shatter(filename: str, group_size: int, res: float, local: bool, client: Cli
 
         npcs = da.array([x.flatten() for x in client.gather(futures)]).flatten().compute()
 
-        print("\nCell point count stats: ")
-        print('  mean:', np.mean(npcs))
-        print('  median:', np.median(npcs))
-        print('  max:', np.max(npcs))
-        print('  min:', np.min(npcs))
+        # print("\nCell point count stats: ")
+        # print('  Total:', np.sum(npcs))
+        # print('  mean:', np.mean(npcs))
+        # print('  median:', np.median(npcs))
+        # print('  max:', np.max(npcs))
+        # print('  min:', np.min(npcs))
 
 def create_tiledb(bounds: Bounds, dirname):
     if tiledb.object_type(dirname) == "array":
