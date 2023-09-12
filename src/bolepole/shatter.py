@@ -7,8 +7,7 @@ import numpy as np
 
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress, Client
-from dask.diagnostics import Profiler, ResourceProfiler, CacheProfiler, ProgressBar, visualize
+from dask.distributed import performance_report, progress, Client, as_completed
 
 from .bounds import Bounds, Chunk, create_bounds
 
@@ -32,13 +31,7 @@ def get_zs(points: da.Array, chunk: Chunk, bounds: Bounds):
     dst_srs = chunk.srs
 
     # xform_points = xform(src_srs, dst_srs, points, bounds)
-    dt = {
-        'names': ['X', 'Y'],
-        'formats': ['<f8', '<f8'],
-        'offsets': [0, 8],
-        'itemsize': 54
-    }
-    xypoints = points[['X','Y']].view(dt)
+    xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
 
@@ -74,66 +67,41 @@ def arrange_data(reader, chunk:Chunk, tdb=None):
     dx = chunk.indices['x']
     dy = chunk.indices['y']
 
-    return write_tdb(tdb, [ dx, dy, dd ])
+    write_tdb(tdb, [ dx, dy, dd ])
+    del zs
 
-def shatter(filename: str, group_size: int, res: float, local: bool, client: Client,
+def shatter(filename: str, tdb_dir: str, group_size: int, res: float, debug: bool, client: Client,
              polygon=None, p_srs=None, watch=False):
-
-    if 'ept.json' in filename:
-        tdbname = path.dirname(filename)
-    elif '.copc.' in filename:
-        tdbname = path.splitext(path.splitext(path.basename(filename))[0])[0]
-    else:
-        tdbname = path.splitext(path.basename(filename))[0]
 
     # read pointcloud
     reader = pdal.Reader(filename)
     bounds = create_bounds(reader, res, group_size, polygon, p_srs)
 
     # set up tiledb
-    config = create_tiledb(bounds, tdbname)
+    config = create_tiledb(bounds, tdb_dir)
 
+    # Begin main operations
     start = time.perf_counter_ns()
+    with tiledb.open(tdb_dir, "w", config=config) as tdb:
+        t = tdb if debug else client.scatter(tdb)
 
-    l = []
-    with tiledb.open(tdbname, "w", config=config) as tdb:
-        if local:
-            t = tdb
-        else:
-            t = client.scatter(tdb)
-
+        # Create method collection for dask to compute
+        l = []
         for ch in bounds.chunk():
             l.append(arrange_data(reader, ch, t))
 
-        if local:
-            with ProgressBar(), Profiler() as prof, ResourceProfiler(dt=0.25) as rprof, CacheProfiler() as cprof:
-                prof.register()
-                rprof.register()
-                cprof.register()
-                futures = dask.compute(l, traverse=True, optimize_graph=True)[0]
-
+        if debug:
+            data_futures = dask.compute(l, traverse=True, optimize_graph=True)[0]
         else:
-            futures = []
-            if watch:
-                futures = client.compute(l, optimize_graph=True)
-                progress(futures)
-                input("Press 'enter' to finish watching.")
-            else:
-                with performance_report('dask-report.html'):
-                    futures = client.compute(l, optimize_graph=True)
-                    progress(futures)
+            with performance_report(f'{tdb_dir}-dask-report.html'):
+                data_futures = client.compute(l, optimize_graph=True)
+                progress(data_futures)
+
 
         end = time.perf_counter_ns()
-        print("Time", (end-start)/(pow(10,9)))
-
-        npcs = da.array([x.flatten() for x in client.gather(futures)]).flatten().compute()
-
-        # print("\nCell point count stats: ")
-        # print('  Total:', np.sum(npcs))
-        # print('  mean:', np.mean(npcs))
-        # print('  median:', np.median(npcs))
-        # print('  max:', np.max(npcs))
-        # print('  min:', np.min(npcs))
+        print("Done in", (end-start)/10**9, "seconds")
+        if watch:
+            input("Press 'enter' to finish watching.")
 
 def create_tiledb(bounds: Bounds, dirname):
     if tiledb.object_type(dirname) == "array":

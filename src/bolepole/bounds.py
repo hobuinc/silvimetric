@@ -1,6 +1,7 @@
 import math
 
 import numpy as np
+import dask.array as da
 from pyproj import CRS, Transformer
 from shapely import from_wkt
 
@@ -13,8 +14,9 @@ class Bounds(object):
         if not srs:
             raise Exception("Missing SRS for bounds")
         self.srs = CRS.from_user_input(srs)
+        if self.srs.is_geographic:
+            raise Exception(f"Bounds SRS({srs}) is geographic.")
         self.epsg = self.srs.to_epsg()
-
 
         self.rangex = self.maxx - self.minx
         self.rangey = self.maxy - self.miny
@@ -22,19 +24,6 @@ class Bounds(object):
         self.yi = math.ceil(self.rangey / cell_size)
         self.cell_size = cell_size
         self.group_size = group_size
-
-    def set_transform(self, src_srs):
-        self.src_srs = CRS.from_user_input(src_srs)
-        self.trn = Transformer.from_crs(self.src_srs, self.srs, always_xy=True)
-
-    def transform(self, x_arr: np.ndarray, y_arr: np.ndarray):
-        return self.trn.transform(x_arr, y_arr)
-
-    def reproject(self):
-        dst_crs = CRS.from_user_input(5070)
-        trn = Transformer.from_crs(self.srs, dst_crs, always_xy=True)
-        box = trn.transform([self.minx, self.maxx], [self.miny, self.maxy])
-        self.__init__(box[0][0], box[1][0], box[0][1], box[1][1], self.cell_size, self.group_size, dst_crs)
 
     # since the box will always be a rectangle, chunk it by cell line?
     # return list of chunk objects to operate on
@@ -59,7 +48,6 @@ class Bounds(object):
         ycenter = (b.maxy - b.miny) / 2
         return [xcenter, ycenter]
 
-
     def __repr__(self):
         if self.srs:
             return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}]) / EPSG:{self.epsg}"
@@ -79,13 +67,13 @@ class Chunk(object):
         maxx = (self.x2 + 1) * cell_size + parent.minx
         maxy = (self.y2 + 1) * cell_size + parent.miny
         self.bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, self.srs.to_wkt())
-        self.indices = np.array(
+        self.indices = da.array(
             [(i,j) for i in range(self.x1, self.x2+1)
             for j in range(self.y1, self.y2+1)],
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bounds:
+def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
     # grab our bounds
     if polygon:
         p = from_wkt(polygon)
@@ -104,42 +92,38 @@ def create_bounds(reader, cell_size, group_size, polygon=None, p_srs=None) -> Bo
         else:
             raise Exception("Invalid bounds found.")
 
-        # TODO handle srs that's geographic
-        user_crs = CRS.from_user_input(p_srs)
-        user_wkt = user_crs.to_wkt()
+        qi = pipeline.quickinfo[reader.type]
+        pc = qi['num_points']
+        srs = qi['srs']['wkt']
+        if not srs:
+            raise Exception("No SRS found in data.")
 
-        bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, user_wkt)
-        bounds.reproject()
+        bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
+                         group_size=group_size, srs=srs)
 
         reader._options['bounds'] = str(bounds)
         pipeline = reader.pipeline()
 
-        qi = pipeline.quickinfo[reader.type]
-        pc = qi['num_points']
-        src_srs = qi['srs']['wkt']
-        bounds.set_transform(src_srs)
-        print("Points found",  pc)
-
-        if not pc:
-            raise Exception("No points found.")
-
-        return bounds
     else:
-
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
-
-        if not qi['num_points']:
-            raise Exception("No points found.")
+        pc = qi['num_points']
+        srs = qi['srs']['wkt']
+        if not srs:
+            raise Exception("No SRS found in data.")
 
         bbox = qi['bounds']
         minx = bbox['minx']
         maxx = bbox['maxx']
         miny = bbox['miny']
         maxy = bbox['maxy']
-        srs = qi['srs']['wkt']
         bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
                     group_size=group_size, srs=srs)
-        bounds.set_transform(srs)
 
-        return bounds
+
+    if not pc:
+        raise Exception("No points found.")
+    print("Points found",  pc)
+
+
+    return bounds
