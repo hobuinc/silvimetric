@@ -1,5 +1,6 @@
 import argparse
 import webbrowser
+import atexit
 
 from os import path
 
@@ -48,10 +49,11 @@ def main():
         dask.config.set(scheduler="single-threaded")
     else:
         client = Client(n_workers=workers, threads_per_worker=threads)
+        atexit.register(client.close)
         if watch:
             webbrowser.open(client.cluster.dashboard_link)
 
-    shatter(filename, tdb_dir, group_size, res, debug, client, poly, p_srs, watch)
+    shatter(filename, tdb_dir, group_size, res, debug, client, poly, watch)
 
 
 

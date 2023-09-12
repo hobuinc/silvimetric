@@ -20,17 +20,7 @@ def floor_x(points: da.Array, bounds: Bounds):
 def floor_y(points: da.Array, bounds: Bounds):
     return da.array(da.floor((points - bounds.miny) / bounds.cell_size), np.int32)
 
-def xform(src_srs: str, dst_srs: str, points: da.Array, bounds: Bounds):
-    if src_srs != dst_srs:
-        return da.array(bounds.transform(points['X'], points['Y']))
-    else:
-        return da.array([points['X'], points['Y']])
-
 def get_zs(points: da.Array, chunk: Chunk, bounds: Bounds):
-    src_srs = bounds.src_srs
-    dst_srs = chunk.srs
-
-    # xform_points = xform(src_srs, dst_srs, points, bounds)
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
@@ -71,11 +61,11 @@ def arrange_data(reader, chunk:Chunk, tdb=None):
     del zs
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float, debug: bool, client: Client,
-             polygon=None, p_srs=None, watch=False):
+             polygon=None, watch=False):
 
     # read pointcloud
     reader = pdal.Reader(filename)
-    bounds = create_bounds(reader, res, group_size, polygon, p_srs)
+    bounds = create_bounds(reader, res, group_size, polygon)
 
     # set up tiledb
     config = create_tiledb(bounds, tdb_dir)

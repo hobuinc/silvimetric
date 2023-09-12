@@ -67,7 +67,7 @@ class Chunk(object):
         maxx = (self.x2 + 1) * cell_size + parent.minx
         maxy = (self.y2 + 1) * cell_size + parent.miny
         self.bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, self.srs.to_wkt())
-        self.indices = da.array(
+        self.indices = np.array(
             [(i,j) for i in range(self.x1, self.x2+1)
             for j in range(self.y1, self.y2+1)],
             dtype=[('x', np.int32), ('y', np.int32)]
