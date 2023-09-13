@@ -46,7 +46,7 @@ def main():
 
     if debug:
         dask.config.set(scheduler="single-threaded")
-        shatter(filename, tdb_dir, group_size, res, debug, poly=poly, watch=watch)
+        shatter(filename, tdb_dir, group_size, res, debug, polygon=poly)
     else:
         with Client(n_workers=workers, threads_per_worker=threads) as client:
             if watch:

@@ -1,9 +1,13 @@
 import math
 
+import dask
+import pdal
+
 import numpy as np
 import dask.array as da
-from pyproj import CRS, Transformer
+from pyproj import CRS
 from shapely import from_wkt
+from itertools import chain
 
 class Bounds(object):
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
@@ -25,13 +29,20 @@ class Bounds(object):
         self.cell_size = cell_size
         self.group_size = group_size
 
-    # since the box will always be a rectangle, chunk it by cell line?
-    # return list of chunk objects to operate on
-    def chunk(self):
-        for i in range(0, self.xi):
-            for j in range(0, self.yi, self.group_size):
-                top = min(j+self.group_size-1, self.yi)
-                yield Chunk([i,i], [j,top], self)
+    def chunk(self, filename:str):
+        c = Chunk([self.minx, self.maxx], [self.miny, self.maxy], self)
+        c.filter(filename)
+        c.set_leaves()
+        leaves = c.leaves
+        for l in c.leaves:
+            yield l.get_read_chunks()
+        c.get_read_chunks()
+        return c.leaves
+
+        # for i in range(0, self.xi):
+        #     for j in range(0, self.yi, self.group_size):
+        #         top = min(j+self.group_size-1, self.yi)
+        #         yield Chunk([i,i], [j,top], self)
 
     def split(self, x, y):
         """Yields the geospatial bounding box for a given cell set provided by x, y"""
@@ -56,22 +67,101 @@ class Bounds(object):
 
 class Chunk(object):
     def __init__(self, xrange: list[int], yrange: list[int], parent: Bounds):
-        self.x1, self.x2 = xrange
-        self.y1 , self.y2 = yrange
+        self.minx, self.maxx = xrange
+        self.miny, self.maxy = yrange
+        self.midx = self.minx + ((self.maxx - self.minx)/ 2)
+        self.midy = self.miny + ((self.maxx - self.minx)/ 2)
+
         self.parent_bounds = parent
         cell_size = parent.cell_size
         group_size = parent.group_size
-        self.srs = parent.srs
-        minx = (self.x1 * cell_size) + parent.minx
-        miny = (self.y1 * cell_size) + parent.miny
-        maxx = (self.x2 + 1) * cell_size + parent.minx
-        maxy = (self.y2 + 1) * cell_size + parent.miny
-        self.bounds = Bounds(minx, miny, maxx, maxy, cell_size, group_size, self.srs.to_wkt())
+
+        self.x1 = math.floor((self.minx - parent.minx) / cell_size)
+        self.x2 = math.ceil(((self.maxx - parent.minx) / cell_size) - 1)
+        self.y1 = math.floor((self.miny - parent.miny) / cell_size)
+        self.y2 = math.ceil(((self.maxy - parent.miny) / cell_size) - 1)
+
+        self.bounds = Bounds(self.minx, self.miny, self.maxx, self.maxy,
+                             cell_size, group_size, parent.srs.to_wkt())
+
         self.indices = np.array(
             [(i,j) for i in range(self.x1, self.x2+1)
             for j in range(self.y1, self.y2+1)],
             dtype=[('x', np.int32), ('y', np.int32)]
         )
+        self.leaf = False
+
+    # create quad tree of chunks for this bounds, run pdal quickinfo over this
+    # chunk to determine if there are any points available in this
+    # set a bottom resolution of ~1km
+    def filter(self, filename):
+        reader = pdal.Reader(filename)
+        reader._options['bounds'] = str(self.bounds)
+        pipeline = reader.pipeline()
+        qi = pipeline.quickinfo[reader.type]
+        pc = qi['num_points']
+
+        if not pc:
+            self.empty = True
+            return
+
+        self.empty = False
+
+        t = 500
+        if self.maxx - self.minx < t or self.maxy - self.miny < t :
+            self.leaf = True
+            return
+
+        self.children = [
+            Chunk([self.minx, self.midx], [self.miny, self.midy], self.parent_bounds), #lower left
+            Chunk([self.midx, self.maxx], [self.miny, self.midy], self.parent_bounds), #lower right
+            Chunk([self.minx, self.midx], [self.midy, self.maxy], self.parent_bounds), #top left
+            Chunk([self.midx, self.maxx], [self.midy, self.maxy], self.parent_bounds)  #top right
+        ]
+
+        dask.compute([c.filter(filename) for c in self.children])
+
+    def set_leaves(self):
+        if self.leaf:
+            return self
+        elif not self.empty:
+            leaves = dask.compute([c.set_leaves() for c in self.children])
+            # if returned from local dask, access first item in tuple
+            if isinstance(leaves, tuple):
+                leaves = leaves[0]
+            # # higher level nodes
+            if isinstance(leaves, list):
+                if isinstance(leaves[0], list):
+                    leaves = list(chain.from_iterable(leaves))
+                self.leaves = [l for l in leaves if l.leaf]
+
+            return self.leaves
+
+    def find_dims(self, gs):
+        rng = np.arange(1, gs+1, dtype=np.int32)
+        factors = rng[np.where(gs % rng == 0)]
+        idx = int((len(factors)/2)-1)
+        x = factors[idx]
+        y = int(gs / x)
+        return [x, y]
+
+    def get_read_chunks(self):
+        res = self.parent_bounds.cell_size
+        gs = self.parent_bounds.group_size
+        x_size = self.maxx - self.minx
+        y_size = self.maxy - self.miny
+
+        xnum, ynum = self.find_dims(gs)
+
+        dx = da.array([da.arange(x, x+xnum) for x in range(self.x1, self.x2, xnum)], dtype=np.int32)
+        dy = da.array([da.arange(y, y+ynum) for y in range(self.y1, self.y2, ynum)], dtype=np.int32)
+        print(dx.compute())
+
+
+
+
+
+
 
 def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
     # grab our bounds

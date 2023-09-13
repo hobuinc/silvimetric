@@ -76,7 +76,10 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
 
         # Create method collection for dask to compute
         l = []
-        for ch in bounds.chunk():
+        valid_chunks = bounds.chunk(filename)
+
+        chunks = []
+        for ch in chunks:
             l.append(arrange_data(reader, ch, t))
 
         if debug:
