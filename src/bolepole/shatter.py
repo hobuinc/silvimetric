@@ -58,10 +58,9 @@ def arrange_data(reader, chunk:Chunk, tdb=None):
     dy = chunk.indices['y']
 
     write_tdb(tdb, [ dx, dy, dd ])
-    del zs
 
-def shatter(filename: str, tdb_dir: str, group_size: int, res: float, debug: bool, client: Client,
-             polygon=None, watch=False):
+def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
+            debug: bool, client=None, polygon=None, watch=False):
 
     # read pointcloud
     reader = pdal.Reader(filename)
@@ -81,7 +80,7 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float, debug: boo
             l.append(arrange_data(reader, ch, t))
 
         if debug:
-            data_futures = dask.compute(l, traverse=True, optimize_graph=True)[0]
+            data_futures = dask.compute(l, optimize_graph=True)[0]
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
                 data_futures = client.compute(l, optimize_graph=True)

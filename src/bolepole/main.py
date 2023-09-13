@@ -43,19 +43,15 @@ def main():
 
     debug = args.debug
     watch = args.watch
-    client = None
 
     if debug:
         dask.config.set(scheduler="single-threaded")
+        shatter(filename, tdb_dir, group_size, res, debug, poly=poly, watch=watch)
     else:
-        client = Client(n_workers=workers, threads_per_worker=threads)
-        atexit.register(client.close)
-        if watch:
-            webbrowser.open(client.cluster.dashboard_link)
-
-    shatter(filename, tdb_dir, group_size, res, debug, client, poly, watch)
-
-
+        with Client(n_workers=workers, threads_per_worker=threads) as client:
+            if watch:
+                webbrowser.open(client.cluster.dashboard_link)
+            shatter(filename, tdb_dir, group_size, res, debug, client, poly, watch)
 
 if __name__ == "__main__":
     main()
