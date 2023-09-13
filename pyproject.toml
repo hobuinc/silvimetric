@@ -1,12 +1,12 @@
 [project]
-name = "bolepole"
+name = "treetally"
 requires-python = ">=3.9"
 description = "A forestry LiDAR processing package"
-readme = "readme.md"
+readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
-  { name = "Kyle Mann", email = "kyle@hobu.co"},
-  { name = "Howard Butler", email ="howard@hobu.co" },
+  { name = "Kyle Mann", email = "kyle@hobu.co" },
+  { name = "Howard Butler", email = "howard@hobu.co" },
   { name = "Bahirah Adewunmi" }
 ]
 maintainers = [
@@ -27,22 +27,22 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/hobuinc/bolepole"
-repository = "https://github.com/hobuinc/bolepole"
+homepage = "https://github.com/hobuinc/treetally"
+repository = "https://github.com/hobuinc/treetally"
 
 [tool.setuptools]
 package-dir = {"" =  "src"}
 zip-safe = false
 
 [tool.setuptools.dynamic]
-version = { attr = "bolepole.__version__" }
+version = { attr = "treetally.__version__" }
 
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-bolepole = "bolepole.main:main"
+treetally = "treetally.main:main"
 
 [tool.black]
 line-length = 88
