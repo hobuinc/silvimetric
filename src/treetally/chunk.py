@@ -1,7 +1,12 @@
 import math
+from itertools import chain
 
 import dask
 import pdal
+import dask.array as da
+import numpy as np
+
+from .bounds import Bounds
 
 class Chunk(object):
     def __init__(self, minx, maxx, miny, maxy, parent: Bounds):
@@ -47,20 +52,23 @@ class Chunk(object):
 
         self.empty = False
 
-        t = 500
-        if self.maxx - self.minx < t or self.maxy - self.miny < t :
-            self.leaf = True
-            self.set_leaf_children()
-            return
+        t = 1000 * 1000
+        area = (self.maxx - self.minx) * (self.maxy - self.miny)
+        if area < t:
+            return self.get_leaf_children()
 
-        self.children = [
+        children = [
             Chunk(self.minx, self.midx, self.miny, self.midy, self.parent_bounds), #lower left
             Chunk(self.midx, self.maxx, self.miny, self.midy, self.parent_bounds), #lower right
             Chunk(self.minx, self.midx, self.midy, self.maxy, self.parent_bounds), #top left
             Chunk(self.midx, self.maxx, self.midy, self.maxy, self.parent_bounds)  #top right
         ]
 
-        dask.compute([c.filter(filename) for c in self.children])
+        # TODO figure out why this is messing up in recursion
+        futures = dask.compute(c.filter(filename) for c in children)
+        return futures[0] if isinstance(futures, tuple) else futures
+
+
 
     def set_leaves(self):
         if self.leaf:
@@ -89,7 +97,7 @@ class Chunk(object):
         y = int(gs / x)
         return [x, y]
 
-    def set_leaf_children(self):
+    def get_leaf_children(self):
         res = self.parent_bounds.cell_size
         gs = self.parent_bounds.group_size
         xnum, ynum = self.find_dims(gs)
@@ -97,5 +105,4 @@ class Chunk(object):
         # find bounds of chunks within this chunk
         dx = da.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2, xnum)], dtype=np.float64) * res + self.minx
         dy = da.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2, ynum)], dtype=np.float64) * res + self.miny
-        dxy = da.array([[*x,*y] for y in dy for x in dx],dtype=np.float64)
-        self.children = [Chunk(*xy, parent=self.parent_bounds) for xy in dxy.compute()]
+        return da.array([[*x,*y] for y in dy for x in dx],dtype=np.float64)

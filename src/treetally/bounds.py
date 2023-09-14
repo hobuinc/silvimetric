@@ -7,8 +7,6 @@ import dask.array as da
 from pyproj import CRS
 from shapely import from_wkt
 
-from .chunk import Chunk
-
 class Bounds(object):
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
         self.minx = float(minx)
@@ -30,27 +28,12 @@ class Bounds(object):
         self.group_size = group_size
 
     def chunk(self, filename:str):
+        from .chunk import Chunk
         c = Chunk(self.minx, self.maxx, self.miny, self.maxy, self)
-        c.filter(filename)
-        c.set_leaves()
-        for l in c.leaves:
-            for child in l.children:
+        # c.set_leaves()
+        for child_list in dask.compute(c.filter(filename), traverse=True):
+            for child in child_list:
                 yield child
-
-    def split(self, x, y):
-        """Yields the geospatial bounding box for a given cell set provided by x, y"""
-
-        minx = self.minx + (x * self.cell_size)
-        miny = self.miny + (y * self.cell_size)
-        maxx = self.minx + ((x+1) * self.cell_size)
-        maxy = self.miny + ((y+1) * self.cell_size)
-        return Bounds(minx, miny, maxx, maxy, self.cell_size, self.srs)
-
-    def cell_dim(self, x, y):
-        b = self.split(x, y)
-        xcenter = (b.maxx - b.minx) / 2
-        ycenter = (b.maxy - b.miny) / 2
-        return [xcenter, ycenter]
 
     def __repr__(self):
         if self.srs:

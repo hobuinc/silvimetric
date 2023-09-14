@@ -9,7 +9,8 @@ import dask
 import dask.array as da
 from dask.distributed import performance_report, progress, Client, as_completed
 
-from .bounds import Bounds, Chunk, create_bounds
+from .bounds import Bounds, create_bounds
+from .chunk import Chunk
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
