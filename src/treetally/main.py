@@ -49,6 +49,7 @@ def main():
         shatter(filename, tdb_dir, group_size, res, debug, polygon=poly)
     else:
         with Client(n_workers=workers, threads_per_worker=threads) as client:
+            dask.config.set(scheduler="processes")
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
             shatter(filename, tdb_dir, group_size, res, debug, client, poly, watch)

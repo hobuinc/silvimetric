@@ -30,8 +30,7 @@ class Bounds(object):
     def chunk(self, filename:str):
         from .chunk import Chunk
         c = Chunk(self.minx, self.maxx, self.miny, self.maxy, self)
-        futures = dask.compute(c.filter(filename), traverse=True)
-        return futures[0] if isinstance(futures, tuple) else futures
+        return c.filter(filename)
 
     def __repr__(self):
         if self.srs:

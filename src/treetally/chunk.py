@@ -66,9 +66,9 @@ class Chunk(object):
         ]
 
         # TODO figure out why this is messing up in recursion
-        futures = dask.compute(children)
-        arr = futures[0] if isinstance(futures, tuple) else futures
-        return da.array([a for b in arr for a in b], np.float64)
+        futures = dask.compute(*children)
+        # arr = futures[0] if isinstance(futures, tuple) else futures
+        return da.array([a for b in futures for a in b], np.float64)
 
     def set_leaves(self):
         if self.leaf:

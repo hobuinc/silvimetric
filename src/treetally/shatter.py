@@ -7,7 +7,8 @@ import numpy as np
 
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress, Client, as_completed
+from dask.diagnostics import ProgressBar
+from dask.distributed import performance_report, progress
 
 from .bounds import Bounds, create_bounds
 from .chunk import Chunk
@@ -71,24 +72,26 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     config = create_tiledb(bounds, tdb_dir)
 
     # Begin main operations
-    start = time.perf_counter_ns()
     with tiledb.open(tdb_dir, "w", config=config) as tdb:
+        start = time.perf_counter_ns()
 
         # Create method collection for dask to compute
         l = []
         if debug:
-            chunks = bounds.chunk(filename)
-            for ch in chunks:
-                l.append(arrange_data(reader, ch, bounds, tdb))
-
-        with performance_report(f'{tdb_dir}-dask-report.html'):
-            t = client.scatter(tdb)
-            b = client.scatter(bounds)
-            chunks = bounds.chunk(filename)
-            for ch in chunks:
-                l.append(arrange_data(reader, ch, b, t))
-            data_futures = client.compute(l, optimize_graph=True)
-            progress(data_futures)
+            with ProgressBar():
+                chunks = bounds.chunk(filename).compute()
+                for ch in chunks:
+                    l.append(arrange_data(reader, ch, bounds, tdb))
+                dask.compute(l, optimize_graph=True)
+        else:
+            with performance_report(f'{tdb_dir}-dask-report.html'):
+                t = client.scatter(tdb)
+                b = client.scatter(bounds)
+                chunks = dask.compute(bounds.chunk(filename))[0]
+                for ch in chunks:
+                    l.append(arrange_data(reader, ch, b, t))
+                data_futures = client.compute(l, optimize_graph=True)
+                progress(data_futures)
 
 
         end = time.perf_counter_ns()
