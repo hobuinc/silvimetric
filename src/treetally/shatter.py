@@ -47,11 +47,11 @@ def write_tdb(tdb, res):
     return dd['count']
 
 @dask.delayed
-def arrange_data(reader, chunk:Chunk, tdb=None):
+def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
+    chunk = Chunk(*bounds, parent=root_bounds)
     points = get_data(reader, chunk)
-    bounds = chunk.parent_bounds
 
-    zs = get_zs(points, chunk, bounds)
+    zs = get_zs(points, chunk, root_bounds)
     counts = np.array([z.size for z in zs], np.int32)
     dd = {'count': counts, 'Z': zs }
 
@@ -73,21 +73,22 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     # Begin main operations
     start = time.perf_counter_ns()
     with tiledb.open(tdb_dir, "w", config=config) as tdb:
-        t = tdb if debug else client.scatter(tdb)
 
         # Create method collection for dask to compute
         l = []
-        chunks = bounds.chunk(filename)
-
-        for ch in chunks:
-            l.append(arrange_data(reader, ch, t))
-
         if debug:
-            data_futures = dask.compute(l, optimize_graph=True)[0]
-        else:
-            with performance_report(f'{tdb_dir}-dask-report.html'):
-                data_futures = client.compute(l, optimize_graph=True)
-                progress(data_futures)
+            chunks = bounds.chunk(filename)
+            for ch in chunks:
+                l.append(arrange_data(reader, ch, bounds, tdb))
+
+        with performance_report(f'{tdb_dir}-dask-report.html'):
+            t = client.scatter(tdb)
+            b = client.scatter(bounds)
+            chunks = bounds.chunk(filename)
+            for ch in chunks:
+                l.append(arrange_data(reader, ch, b, t))
+            data_futures = client.compute(l, optimize_graph=True)
+            progress(data_futures)
 
 
         end = time.perf_counter_ns()

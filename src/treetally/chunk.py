@@ -39,6 +39,7 @@ class Chunk(object):
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
+    @dask.delayed
     def filter(self, filename):
         reader = pdal.Reader(filename)
         reader._options['bounds'] = str(self.bounds)
@@ -58,17 +59,16 @@ class Chunk(object):
             return self.get_leaf_children()
 
         children = [
-            Chunk(self.minx, self.midx, self.miny, self.midy, self.parent_bounds), #lower left
-            Chunk(self.midx, self.maxx, self.miny, self.midy, self.parent_bounds), #lower right
-            Chunk(self.minx, self.midx, self.midy, self.maxy, self.parent_bounds), #top left
-            Chunk(self.midx, self.maxx, self.midy, self.maxy, self.parent_bounds)  #top right
+            Chunk(self.minx, self.midx, self.miny, self.midy, self.parent_bounds).filter(filename), #lower left
+            Chunk(self.midx, self.maxx, self.miny, self.midy, self.parent_bounds).filter(filename), #lower right
+            Chunk(self.minx, self.midx, self.midy, self.maxy, self.parent_bounds).filter(filename), #top left
+            Chunk(self.midx, self.maxx, self.midy, self.maxy, self.parent_bounds).filter(filename)  #top right
         ]
 
         # TODO figure out why this is messing up in recursion
-        futures = dask.compute(c.filter(filename) for c in children)
-        return futures[0] if isinstance(futures, tuple) else futures
-
-
+        futures = dask.compute(children)
+        arr = futures[0] if isinstance(futures, tuple) else futures
+        return da.array([a for b in arr for a in b], np.float64)
 
     def set_leaves(self):
         if self.leaf:
