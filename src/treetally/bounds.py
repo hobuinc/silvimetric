@@ -7,6 +7,14 @@ import dask.array as da
 from pyproj import CRS
 from shapely import from_wkt
 
+def flatten(l):
+    if isinstance(l, tuple):
+        if isinstance(l[0], tuple):
+            for v in l:
+                yield from flatten(v)
+        else:
+            yield l
+
 class Bounds(object):
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
         self.minx = float(minx)
@@ -27,16 +35,32 @@ class Bounds(object):
         self.cell_size = cell_size
         self.group_size = group_size
 
+
     def chunk(self, filename:str):
         from .chunk import Chunk
         c = Chunk(self.minx, self.maxx, self.miny, self.maxy, self)
-        return c.filter(filename)
+        c.filter(filename)
+        leaves = c.get_leaves()
+        return leaves
+
+    def split(self, x, y):
+        """Yields the geospatial bounding box for a given cell set provided by x, y"""
+        minx = self.minx + (x * self.cell_size)
+        miny = self.miny + (y * self.cell_size)
+        maxx = self.minx + ((x+1) * self.cell_size)
+        maxy = self.miny + ((y+1) * self.cell_size)
+        return Bounds(minx, miny, maxx, maxy, self.cell_size, self.srs)
+
+
+        # return flatten(chunks)
 
     def __repr__(self):
         if self.srs:
             return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}]) / EPSG:{self.epsg}"
         else:
             return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
+
+
 
 def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
     # grab our bounds

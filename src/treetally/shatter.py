@@ -8,7 +8,7 @@ import numpy as np
 import dask
 import dask.array as da
 from dask.diagnostics import ProgressBar
-from dask.distributed import performance_report, progress
+from dask.distributed import performance_report, progress, Client
 
 from .bounds import Bounds, create_bounds
 from .chunk import Chunk
@@ -49,8 +49,10 @@ def write_tdb(tdb, res):
 
 @dask.delayed
 def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
-    chunk = Chunk(*bounds, parent=root_bounds)
+    chunk = Chunk(*bounds, root=root_bounds)
     points = get_data(reader, chunk)
+    if not points.size:
+        return np.array([0], np.int32)
 
     zs = get_zs(points, chunk, root_bounds)
     counts = np.array([z.size for z in zs], np.int32)
@@ -58,12 +60,14 @@ def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
 
     dx = chunk.indices['x']
     dy = chunk.indices['y']
-
-    write_tdb(tdb, [ dx, dy, dd ])
+    if tdb:
+        write_tdb(tdb, [ dx, dy, dd ])
+    return counts
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
             debug: bool, client=None, polygon=None, watch=False):
 
+    client:Client = client
     # read pointcloud
     reader = pdal.Reader(filename)
     bounds = create_bounds(reader, res, group_size, polygon)
@@ -78,21 +82,38 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
         # Create method collection for dask to compute
         l = []
         if debug:
-            with ProgressBar():
-                chunks = bounds.chunk(filename).compute()
-                for ch in chunks:
-                    l.append(arrange_data(reader, ch, bounds, tdb))
-                dask.compute(l, optimize_graph=True)
+            # with ProgressBar():
+                c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
+                f = dask.compute(c.filter(filename))
+                leaves = c.get_leaves()
+                leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaves])[0]
+                l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+                counts = dask.compute(*l, optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
                 t = client.scatter(tdb)
                 b = client.scatter(bounds)
-                chunks = dask.compute(bounds.chunk(filename))[0]
-                for ch in chunks:
-                    l.append(arrange_data(reader, ch, b, t))
-                data_futures = client.compute(l, optimize_graph=True)
+
+                # chunks = bounds.chunk(filename=filename)
+                c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
+                f = client.compute(c.filter(filename), sync=True)
+                leaves = c.get_leaves()
+                # for leaf in leaves:
+                #     print(leaf.get_leaf_children())
+                leaf_procs = client.compute([node.get_leaf_children() for node in leaves])[0]
+
+                data_futures = [
+                    client.submit(arrange_data, reader=reader, bounds=ch, root_bounds=b, tdb=t)
+                    for leaf in leaf_procs for ch in leaf
+                ]
                 progress(data_futures)
 
+                # l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+                # for ch in chunks:
+                #     l.append(arrange_data(reader, ch, b, t))
+
+                # data_futures = client.compute(l, optimize_graph=True)
+                # progress(data_futures)
 
         end = time.perf_counter_ns()
         print("Done in", (end-start)/10**9, "seconds")

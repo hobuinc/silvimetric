@@ -1,4 +1,5 @@
 import math
+import types
 from itertools import chain
 
 import dask
@@ -9,82 +10,74 @@ import numpy as np
 from .bounds import Bounds
 
 class Chunk(object):
-    def __init__(self, minx, maxx, miny, maxy, parent: Bounds):
-        self.minx = minx
-        self.maxx = maxx
-        self.miny = miny
-        self.maxy = maxy
+    def __init__(self, minx, maxx, miny, maxy, root: Bounds):
+        cell_size = root.cell_size
+        self.x1 = math.floor((minx - root.minx) / cell_size)
+        self.y1 = math.floor((miny - root.miny) / cell_size)
+
+        self.x2 = math.floor(((maxx - root.minx) / cell_size))
+        self.y2 = math.floor(((maxy - root.miny) / cell_size))
+
+        # make bounds in scale with the desired resolution
+        self.minx = self.x1 * cell_size + root.minx
+        self.miny = self.y1 * cell_size + root.miny
+
+        self.maxx = (self.x2 * cell_size) + root.minx
+        self.maxy = (self.y2 * cell_size) + root.miny
+
         self.midx = self.minx + ((self.maxx - self.minx)/ 2)
-        self.midy = self.miny + ((self.maxx - self.minx)/ 2)
+        self.midy = self.miny + ((self.maxy - self.miny)/ 2)
 
-        self.parent_bounds = parent
-        cell_size = parent.cell_size
-        group_size = parent.group_size
+        self.root_bounds = root
+        group_size = root.group_size
 
-        self.x1 = math.floor((self.minx - parent.minx) / cell_size)
-        self.x2 = math.ceil(((self.maxx - parent.minx) / cell_size))
-        self.y1 = math.floor((self.miny - parent.miny) / cell_size)
-        self.y2 = math.ceil(((self.maxy - parent.miny) / cell_size))
 
         self.bounds = Bounds(self.minx, self.miny, self.maxx, self.maxy,
-                             cell_size, group_size, parent.srs.to_wkt())
+                             cell_size, group_size, root.srs.to_wkt())
 
         self.indices = np.array(
-            [(i,j) for i in range(self.x1, self.x2+1)
-            for j in range(self.y1, self.y2+1)],
+            [(i,j) for i in range(self.x1, self.x2)
+            for j in range(self.y1, self.y2)],
             dtype=[('x', np.int32), ('y', np.int32)]
         )
-        self.leaf = False
 
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
-    @dask.delayed
-    def filter(self, filename):
+    def filter(self, filename, threshold=1000):
         reader = pdal.Reader(filename)
         reader._options['bounds'] = str(self.bounds)
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
         pc = qi['num_points']
 
+        # is it empty?
         if not pc:
-            self.empty = True
-            return
+            yield None
+        else:
+            # has it hit the threshold yet?
+            area = (self.maxx - self.minx) * (self.maxy - self.miny)
+            t = threshold**2
+            if area < t:
+                yield self
+            else:
+                children = self.split()
+                yield from [c.filter(filename,threshold) for c in children]
 
-        self.empty = False
-
-        t = 1000 * 1000
-        area = (self.maxx - self.minx) * (self.maxy - self.miny)
-        if area < t:
-            return self.get_leaf_children()
-
-        children = [
-            Chunk(self.minx, self.midx, self.miny, self.midy, self.parent_bounds).filter(filename), #lower left
-            Chunk(self.midx, self.maxx, self.miny, self.midy, self.parent_bounds).filter(filename), #lower right
-            Chunk(self.minx, self.midx, self.midy, self.maxy, self.parent_bounds).filter(filename), #top left
-            Chunk(self.midx, self.maxx, self.midy, self.maxy, self.parent_bounds).filter(filename)  #top right
+    def split(self):
+        yield from [
+            Chunk(self.minx, self.midx, self.miny, self.midy, self.root_bounds), #lower left
+            Chunk(self.midx, self.maxx, self.miny, self.midy, self.root_bounds), #lower right
+            Chunk(self.minx, self.midx, self.midy, self.maxy, self.root_bounds), #top left
+            Chunk(self.midx, self.maxx, self.midy, self.maxy, self.root_bounds)  #top right
         ]
 
-        # TODO figure out why this is messing up in recursion
-        futures = dask.compute(*children)
-        # arr = futures[0] if isinstance(futures, tuple) else futures
-        return da.array([a for b in futures for a in b], np.float64)
-
-    def set_leaves(self):
+    def get_leaves(self):
         if self.leaf:
-            return self
+            yield self
         elif not self.empty:
-            leaves = dask.compute([c.set_leaves() for c in self.children])
-            # if returned from local dask, access first item in tuple
-            if isinstance(leaves, tuple):
-                leaves = leaves[0]
-            # # higher level nodes
-            if isinstance(leaves, list):
-                if isinstance(leaves[0], list):
-                    leaves = list(chain.from_iterable(leaves))
-                self.leaves = [l for l in leaves if l.leaf]
-
-            return self.leaves
+            for child in self.children:
+                yield from child.get_leaves()
 
     def find_dims(self, gs):
         s = math.sqrt(gs)
@@ -92,17 +85,23 @@ class Chunk(object):
             return [s, s]
         rng = np.arange(1, gs+1, dtype=np.int32)
         factors = rng[np.where(gs % rng == 0)]
-        idx = int((len(factors)/2)-1)
+        idx = int((factors.size/2)-1)
         x = factors[idx]
         y = int(gs / x)
-        return [x, y]
+        return [int(x), int(y)]
 
     def get_leaf_children(self):
-        res = self.parent_bounds.cell_size
-        gs = self.parent_bounds.group_size
+        res = self.root_bounds.cell_size
+        gs = self.root_bounds.group_size
         xnum, ynum = self.find_dims(gs)
+        xnum = int(xnum)
+        ynum = int(ynum)
 
-        # find bounds of chunks within this chunk
-        dx = da.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2, xnum)], dtype=np.float64) * res + self.minx
-        dy = da.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2, ynum)], dtype=np.float64) * res + self.miny
-        return da.array([[*x,*y] for y in dy for x in dx],dtype=np.float64)
+        # xcount = (self.maxx - self.minx) / (xnum * res)
+        # ycount = (self.maxy - self.miny) / (ynum * res)
+        # print(xcount * ycount)
+
+        dx = np.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2+xnum, xnum)], dtype=np.float64) * res + self.root_bounds.minx
+        dy = np.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2+ynum, ynum)], dtype=np.float64) * res + self.root_bounds.miny
+        return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
+
