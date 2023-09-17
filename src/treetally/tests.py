@@ -94,6 +94,7 @@ def test_pointcount():
     c = Chunk(minx, maxx, miny, maxy, root)
     f = c.filter(filename)
 
+    global chunklist
     chunklist = []
     get_leaves(f)
 
@@ -150,10 +151,30 @@ def test_filtering():
         index_info(leaves2, chunk)
         test_leaves(leaves1, chunk=chunk)
 
+def test_bounds_fill():
+    root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
+    chunk = Chunk(minx, maxx, miny, maxy, root)
+    f = chunk.filter(filename, 3000)
+
+    global chunklist
+    chunklist = []
+    get_leaves(f)
+
+    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in chunklist])[0]
+    leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
+    dx = np.unique(leaves[:, 0:2], axis=0)
+    dy = np.unique(leaves[:, 2:4], axis=0)
+    x_in_meters = np.arange(chunk.minx, chunk.maxx)
+    np.where(
+
+
+
+
 
 
 if __name__ == "__main__":
     dask.config.set(scheduler="single-threaded")
     # test_chunking()
-    # test_pointcount()
+    test_pointcount()
     test_filtering()
+    # test_bounds_fill()
