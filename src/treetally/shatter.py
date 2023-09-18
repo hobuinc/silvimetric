@@ -93,6 +93,7 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
             dask.compute(*l, optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
+                print('Filtering out empty chunks...')
                 t = client.scatter(tdb)
                 b = client.scatter(bounds)
 
@@ -101,8 +102,9 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
 
                 chunklist = []
                 get_leaves(f)
-
                 leaf_procs = client.compute([node.get_leaf_children() for node in chunklist])
+
+                print('Fetching and arranging data...')
                 l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
                 data_futures = client.compute(l, optimize_graph=True)
 
