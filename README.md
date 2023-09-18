@@ -1,5 +1,5 @@
 ## TreeTally
-This software is built with the intion of processing pointcloud data and inserting it into a TileDB data structure as a base, so that future processing can look at this TileDB structure and compute stats bsed on the data present.
+This software is built with the intention of processing pointcloud data and inserting it into a TileDB data structure as a base, so that future processing can look at this TileDB structure and compute stats based on the data present.
 
 ### Process
 
