@@ -12,7 +12,9 @@ This software is built with the intion of processing pointcloud data and inserti
 ### Usage
 
 ```
-treetally [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS] [--group_size GROUP_SIZE] [--resolution RESOLUTION] [--polygon POLYGON] [--debug DEBUG] [--watch WATCH] filename
+treetally [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
+[--group_size GROUP_SIZE] [--resolution RESOLUTION] [--polygon POLYGON]
+[--debug DEBUG] [--watch WATCH] filename
 ```
 
 #### Options
@@ -33,7 +35,10 @@ treetally [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS] [--gr
 
 ### Example
 ```
-treetally https://github.com/PDAL/data/raw/master/autzen/autzen-classified.copc.laz --tdb_dir autzen_class --threads 6 --workers 10 --group_size 16 --resolution 100 --watch True
+treetally \
+https://github.com/PDAL/data/raw/master/autzen/autzen-classified.copc.laz \
+--tdb_dir autzen_class --threads 6 --workers 10 --group_size 16 \
+--resolution 100 --watch True
 ```
 
 This script will open a window in your default browser that monitors dask tasks and resources. It will then create a dask client with `10` workers and `6` threads per worker, and a tiledb sparse array named `autzen_class`. The cells produced from this will have a `100` ft resolution (because autzen is measured in feet), and cells will be processed in chunks of `16`.
