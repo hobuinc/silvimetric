@@ -172,7 +172,7 @@ def test_bounds_fill():
     for x in dx:
         b = np.logical_or(xrange < x[0], xrange > x[1])
         if not xbool.any():
-            xbool = b;
+            xbool = b
         else:
             xbool = np.vstack((xbool,b))
     xbool = np.reshape(xbool, newshape=(xbool.shape[1], xbool.shape[0]))
@@ -182,7 +182,7 @@ def test_bounds_fill():
 
 if __name__ == "__main__":
     dask.config.set(scheduler="single-threaded")
-    # test_chunking()
-    # test_pointcount()
-    # test_filtering()
+    test_chunking()
+    test_pointcount()
+    test_filtering()
     test_bounds_fill()

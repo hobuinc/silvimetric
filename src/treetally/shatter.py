@@ -1,4 +1,5 @@
 import time
+import types
 from os import path
 
 import tiledb
@@ -60,8 +61,7 @@ def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
 
     dx = chunk.indices['x']
     dy = chunk.indices['y']
-    if tdb:
-        write_tdb(tdb, [ dx, dy, dd ])
+    write_tdb(tdb, [ dx, dy, dd ])
     return counts
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
@@ -75,50 +75,54 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     # set up tiledb
     config = create_tiledb(bounds, tdb_dir)
 
+    global chunklist
     # Begin main operations
     with tiledb.open(tdb_dir, "w", config=config) as tdb:
         start = time.perf_counter_ns()
 
-        # Create method collection for dask to compute
-        l = []
+        # debug uses single threaded dask
         if debug:
-            # with ProgressBar():
-                c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
-                f = dask.compute(c.filter(filename))
-                leaves = c.get_leaves()
-                leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaves])[0]
-                l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
-                counts = dask.compute(*l, optimize_graph=True)
+            c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
+            f = c.filter(filename)
+
+            chunklist = []
+            get_leaves(f)
+
+            leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in chunklist])[0]
+            l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+            dask.compute(*l, optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
                 t = client.scatter(tdb)
                 b = client.scatter(bounds)
 
-                # chunks = bounds.chunk(filename=filename)
                 c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
-                f = client.compute(c.filter(filename), sync=True)
-                leaves = c.get_leaves()
-                # for leaf in leaves:
-                #     print(leaf.get_leaf_children())
-                leaf_procs = client.compute([node.get_leaf_children() for node in leaves])[0]
+                f = c.filter(filename)
 
-                data_futures = [
-                    client.submit(arrange_data, reader=reader, bounds=ch, root_bounds=b, tdb=t)
-                    for leaf in leaf_procs for ch in leaf
-                ]
+                chunklist = []
+                get_leaves(f)
+
+                leaf_procs = client.compute([node.get_leaf_children() for node in chunklist])
+                l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+                data_futures = client.compute(l, optimize_graph=True)
+
                 progress(data_futures)
-
-                # l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
-                # for ch in chunks:
-                #     l.append(arrange_data(reader, ch, b, t))
-
-                # data_futures = client.compute(l, optimize_graph=True)
-                # progress(data_futures)
 
         end = time.perf_counter_ns()
         print("Done in", (end-start)/10**9, "seconds")
         if watch:
             input("Press 'enter' to finish watching.")
+
+def get_leaves(c):
+    while True:
+        try:
+            n = next(c)
+            if isinstance(n, types.GeneratorType):
+                get_leaves(n)
+            elif isinstance(n, Chunk):
+                chunklist.append(n)
+        except StopIteration:
+            break
 
 def create_tiledb(bounds: Bounds, dirname):
     if tiledb.object_type(dirname) == "array":
