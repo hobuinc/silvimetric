@@ -94,15 +94,7 @@ class Chunk(object):
         res = self.root_bounds.cell_size
         gs = self.root_bounds.group_size
         xnum, ynum = self.find_dims(gs)
-        # xnum = int(xnum)
-        # ynum = int(ynum)
 
-        # xcount = (self.maxx - self.minx) / (xnum * res)
-        # ycount = (self.maxy - self.miny) / (ynum * res)
-        # print(xcount * ycount)
-
-        # dx = (np.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2+int(xnum), int(xnum))], dtype=np.float64) * res) + self.root_bounds.minx
-        # dy = (np.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2+int(ynum), int(ynum))], dtype=np.float64) * res) + self.root_bounds.miny
         dx = (np.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2, int(xnum))], dtype=np.float64) * res) + self.root_bounds.minx
         dy = (np.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2, int(ynum))], dtype=np.float64) * res) + self.root_bounds.miny
         return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)

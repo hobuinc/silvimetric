@@ -87,7 +87,6 @@ def test_chunking():
 
     test_leaves(leaves, chunk)
 
-
 def test_pointcount():
     reader = pdal.Reader(filename)
     root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
@@ -164,17 +163,26 @@ def test_bounds_fill():
     leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
     dx = np.unique(leaves[:, 0:2], axis=0)
     dy = np.unique(leaves[:, 2:4], axis=0)
-    x_in_meters = np.arange(chunk.minx, chunk.maxx)
-    np.where(
 
+    # Create a range of xs and ys and find which points are not present in any
+    # of the given unique bounds
+    xrange = np.arange(root.minx, root.maxx)
+    yrange = np.arange(root.miny, root.maxy)
+    xbool = np.array([])
+    for x in dx:
+        b = np.logical_or(xrange < x[0], xrange > x[1])
+        if not xbool.any():
+            xbool = b;
+        else:
+            xbool = np.vstack((xbool,b))
+    xbool = np.reshape(xbool, newshape=(xbool.shape[1], xbool.shape[0]))
 
-
-
+    print(xbool)
 
 
 if __name__ == "__main__":
     dask.config.set(scheduler="single-threaded")
     # test_chunking()
-    test_pointcount()
-    test_filtering()
-    # test_bounds_fill()
+    # test_pointcount()
+    # test_filtering()
+    test_bounds_fill()
