@@ -4,9 +4,9 @@ import numpy as np
 import itertools
 import types
 
-from .chunk import Chunk
-from .bounds import Bounds
-from .shatter import arrange_data
+from treetally import Chunk
+from treetally import Bounds
+from treetally.shatter import arrange_data
 
 global chunklist
 res = 100
@@ -16,7 +16,7 @@ minx = 635577.79
 maxx = 639003.73
 miny = 848882.15
 maxy = 853537.66
-filename = '/Users/kmann/code/treetally/data/autzen-classified.copc.laz'
+
 point_count = 10653336
 
 def get_leaves(c):
@@ -30,7 +30,7 @@ def get_leaves(c):
         except StopIteration:
             break
 
-def test_leaves(leaves, chunk):
+def check_leaves(leaves, chunk):
     test_minx = 0
     test_maxx = 0
     test_miny = 0
@@ -85,13 +85,13 @@ def test_chunking():
     chunk = Chunk(minx, maxx, miny, maxy, root)
     leaves = chunk.get_leaf_children()
 
-    test_leaves(leaves, chunk)
+    check_leaves(leaves, chunk)
 
-def test_pointcount():
-    reader = pdal.Reader(filename)
+def test_pointcount(autzen_classified):
+    reader = pdal.Reader(autzen_classified)
     root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
     c = Chunk(minx, maxx, miny, maxy, root)
-    f = c.filter(filename)
+    f = c.filter(autzen_classified)
 
     global chunklist
     chunklist = []
@@ -127,11 +127,11 @@ def index_info(leaves, chunk):
     if dup.any():
         print("Duplicates:", dup)
 
-def test_filtering():
+def test_filtering(autzen_classified):
 
     root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
     chunk = Chunk(minx, maxx, miny, maxy, root)
-    f = chunk.filter(filename, 3000)
+    f = chunk.filter(autzen_classified, 3000)
 
     global chunklist
     chunklist = []
@@ -148,12 +148,12 @@ def test_filtering():
         index_info(leaves1, chunk)
         print("unfiltered info:")
         index_info(leaves2, chunk)
-        test_leaves(leaves1, chunk=chunk)
+        check_leaves(leaves1, chunk=chunk)
 
-def test_bounds_fill():
+def test_bounds_fill(autzen_classified):
     root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
     chunk = Chunk(minx, maxx, miny, maxy, root)
-    f = chunk.filter(filename, 3000)
+    f = chunk.filter(autzen_classified, 3000)
 
     global chunklist
     chunklist = []
@@ -176,13 +176,4 @@ def test_bounds_fill():
         else:
             xbool = np.vstack((xbool,b))
     xbool = np.reshape(xbool, newshape=(xbool.shape[1], xbool.shape[0]))
-
     print(xbool)
-
-
-if __name__ == "__main__":
-    dask.config.set(scheduler="single-threaded")
-    test_chunking()
-    test_pointcount()
-    test_filtering()
-    test_bounds_fill()

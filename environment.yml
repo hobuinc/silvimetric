@@ -2,7 +2,7 @@ name: fusion-py
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.11
   - tiledb-py
   - python-pdal
   - pyarrow
@@ -11,3 +11,4 @@ dependencies:
   - shapely
   - dask
   - pyproj
+  - gdal

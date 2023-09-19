@@ -61,7 +61,8 @@ def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
 
     dx = chunk.indices['x']
     dy = chunk.indices['y']
-    write_tdb(tdb, [ dx, dy, dd ])
+    if tdb:
+        write_tdb(tdb, [ dx, dy, dd ])
     return counts
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
