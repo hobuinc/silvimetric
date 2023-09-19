@@ -21,7 +21,7 @@ def floor_x(points: da.Array, bounds: Bounds):
     return da.array(da.floor((points - bounds.minx) / bounds.cell_size), np.int32)
 
 def floor_y(points: da.Array, bounds: Bounds):
-    return da.array(da.floor((points - bounds.miny) / bounds.cell_size), np.int32)
+    return da.array(da.floor((bounds.maxy - points) / bounds.cell_size), np.int32)
 
 def get_zs(points: da.Array, chunk: Chunk, bounds: Bounds):
     xypoints = points[['X','Y']].view()

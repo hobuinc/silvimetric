@@ -13,17 +13,17 @@ class Chunk(object):
     def __init__(self, minx, maxx, miny, maxy, root: Bounds):
         cell_size = root.cell_size
         self.x1 = math.floor((minx - root.minx) / cell_size)
-        self.y1 = math.floor((miny - root.miny) / cell_size)
+        self.y1 = math.floor((root.maxy - maxy) / cell_size)
 
         self.x2 = math.floor(((maxx - root.minx) / cell_size))
-        self.y2 = math.floor(((maxy - root.miny) / cell_size))
+        self.y2 = math.floor(((root.maxy - miny) / cell_size))
 
         # make bounds in scale with the desired resolution
-        self.minx = self.x1 * cell_size + root.minx
-        self.miny = self.y1 * cell_size + root.miny
+        self.minx = (self.x1 * cell_size) + root.minx
+        self.miny = root.maxy - (self.y2 * cell_size)
 
         self.maxx = (self.x2 * cell_size) + root.minx
-        self.maxy = (self.y2 * cell_size) + root.miny
+        self.maxy = root.maxy - (self.y1 * cell_size)
 
         self.midx = self.minx + ((self.maxx - self.minx)/ 2)
         self.midy = self.miny + ((self.maxy - self.miny)/ 2)
@@ -95,7 +95,17 @@ class Chunk(object):
         gs = self.root_bounds.group_size
         xnum, ynum = self.find_dims(gs)
 
-        dx = (np.array([[x, min(x+xnum, self.x2)] for x in range(self.x1, self.x2, int(xnum))], dtype=np.float64) * res) + self.root_bounds.minx
-        dy = (np.array([[y, min(y+ynum, self.y2)] for y in range(self.y1, self.y2, int(ynum))], dtype=np.float64) * res) + self.root_bounds.miny
+        dx = (np.array([
+            [x, min(x+xnum, self.x2)]
+            for x in range(self.x1, self.x2, int(xnum))
+        ], dtype=np.float64) * res) + self.root_bounds.minx
+
+        dy = self.root_bounds.maxy - (
+            np.array([
+                [min(y+ynum, self.y2), y]
+                for y in range(self.y1, self.y2, int(ynum))
+            ],
+            dtype=np.float64) * res)
+
         return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
 

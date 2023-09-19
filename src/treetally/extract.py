@@ -19,7 +19,6 @@ def extract(tdb_dir, out_file):
         z_data = np.empty(shape=shape, dtype=np.float64)
         z_data[:] = np.nan
         for x,y,z in zip(xs,ys,zs):
-
             z_data[int(x),int(y)] = z.mean()
 
         # shape = (x.tile, y.tile)
