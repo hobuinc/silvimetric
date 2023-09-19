@@ -168,7 +168,7 @@ def create_tiledb(bounds: Bounds, dirname, atts):
             var=True, fill=float('nan'))
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=10000000000, attrs=[count_att, *tdb_atts], allows_duplicates=True)
+            capacity=10000000000, attrs=[count_att, z_att, hag_att], allows_duplicates=True)
         schema.check()
         tiledb.SparseArray.create(dirname, schema)
 
