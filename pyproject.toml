@@ -22,7 +22,7 @@ classifiers = [
 ]
 dependencies = [
   "PDAL",
-  "tiledb", "pyproj", "dask", "shapely", "numpy"
+  "tiledb", "pyproj", "dask", "shapely", "numpy", "GDAL"
 ]
 dynamic = ["version"]
 

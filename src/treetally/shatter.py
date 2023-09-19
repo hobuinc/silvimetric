@@ -109,11 +109,12 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
                 data_futures = client.compute(l, optimize_graph=True)
 
                 progress(data_futures)
+                client.gather(data_futures)
 
         end = time.perf_counter_ns()
         print("Done in", (end-start)/10**9, "seconds")
-        if watch:
-            input("Press 'enter' to finish watching.")
+        return
+
 
 def get_leaves(c):
     while True:
