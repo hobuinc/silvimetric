@@ -18,28 +18,35 @@ def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
 def floor_x(points: da.Array, bounds: Bounds):
-    return da.array(da.floor((points - bounds.minx) / bounds.cell_size), np.int32)
+    return da.array(da.floor((points - bounds.minx) / bounds.cell_size),
+        np.int32)
 
 def floor_y(points: da.Array, bounds: Bounds):
-    return da.array(da.floor((bounds.maxy - points) / bounds.cell_size), np.int32)
+    return da.array(da.floor((bounds.maxy - points) / bounds.cell_size),
+        np.int32)
 
-def get_zs(points: da.Array, chunk: Chunk, bounds: Bounds):
-    xypoints = points[['X','Y']].view()
-    xis = floor_x(xypoints['X'], bounds)
-    yis = floor_y(xypoints['Y'], bounds)
-
+def get_zs(points: da.Array, xis: da.Array, yis: da.Array, chunk: Chunk,
+    bounds: Bounds):
     # Set up data object
-    zs = dask.compute([
-        da.array(points['Z'][cell_indices(xis, yis, x, y)], np.float64)
-        for x,y in chunk.indices
-    ], scheduler="threads")[0]
+    zs = dask.compute([da.array(points['Z'][cell_indices(xis, yis, x, y)],
+        np.float64) for x,y in chunk.indices], scheduler="threads")[0]
     return np.array([*[z for z in zs], None], object)[:-1]
+
+def get_hag(points: da.Array, xis: da.Array, yis: da.Array, chunk: Chunk,
+    bounds: Bounds):
+    hag = dask.compute([da.array(points['HeightAboveGround'][cell_indices(xis,
+        yis, x, y)], np.float32) for x,y in chunk.indices ],
+        scheduler="threads")[0]
+    return np.array([*[h for h in hag], None], object)[:-1]
+
 
 def get_data(reader, chunk):
     reader._options['bounds'] = str(chunk.bounds)
     # remember that readers.copc is a thread hog
     reader._options['threads'] = 2
-    pipeline = reader.pipeline()
+    smrf = pdal.Filter.smrf(inputs=[reader.tag], tag='smrf')
+    hag = pdal.Filter.hag_nn(inputs=[smrf.tag], tag='hag')
+    pipeline = pdal.Pipeline([reader,smrf,hag])
     pipeline.execute()
     return da.array(pipeline.arrays[0])
 
@@ -55,9 +62,17 @@ def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
     if not points.size:
         return np.array([0], np.int32)
 
-    zs = get_zs(points, chunk, root_bounds)
+    xypoints = points[['X','Y']].view()
+    xis = floor_x(xypoints['X'], root_bounds)
+    yis = floor_y(xypoints['Y'], root_bounds)
+    # att_data = dask.compute([da.array(points[:][cell_indices(xis,
+    #     yis, x, y)], dtype=points.dtype) for x,y in chunk.indices ],
+    #     scheduler="threads")[0]
+
+    zs = get_zs(points, xis, yis, chunk, root_bounds)
+    hags = get_hag(points, xis, yis, chunk, root_bounds)
     counts = np.array([z.size for z in zs], np.int32)
-    dd = {'count': counts, 'Z': zs }
+    dd = {'count': counts, 'Z': zs , 'HeightAboveGround': hags}
 
     dx = chunk.indices['x']
     dy = chunk.indices['y']
@@ -69,7 +84,7 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
 
     client:Client = client
     # read pointcloud
-    reader = pdal.Reader(filename)
+    reader = pdal.Reader(filename, tag='reader')
     bounds = create_bounds(reader, res, group_size, polygon)
 
     # set up tiledb
@@ -88,8 +103,10 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
             chunklist = []
             get_leaves(f)
 
-            leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in chunklist])[0]
-            l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+            leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in
+                chunklist])[0]
+            l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs
+                for ch in leaf]
             dask.compute(*l, optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
@@ -102,10 +119,12 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
 
                 chunklist = []
                 get_leaves(f)
-                leaf_procs = client.compute([node.get_leaf_children() for node in chunklist])
+                leaf_procs = client.compute([node.get_leaf_children() for node
+                    in chunklist])
 
                 print('Fetching and arranging data...')
-                l = [arrange_data(reader, ch, bounds, tdb) for leaf in leaf_procs for ch in leaf]
+                l = [arrange_data(reader, ch, bounds, tdb) for leaf in
+                    leaf_procs for ch in leaf]
                 data_futures = client.compute(l, optimize_graph=True)
 
                 progress(data_futures)
@@ -137,10 +156,15 @@ def create_tiledb(bounds: Bounds, dirname):
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True, fill=float(0))
+        # names = attrs.names
+        # atts = [tiledb.Attr(name=name, dtype=names[name], var=True, fill=np.dtype()) for name in names]
+        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True,
+            fill=float('nan'))
+        hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32,
+            var=True, fill=float('nan'))
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=1000000, attrs=[count_att, z_att], allows_duplicates=True)
+            capacity=10000000000, attrs=[count_att, z_att, hag_att], allows_duplicates=True)
         schema.check()
         tiledb.SparseArray.create(dirname, schema)
     return tiledb.Config({

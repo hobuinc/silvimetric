@@ -9,23 +9,34 @@ def extract(tdb_dir, out_file):
     with tiledb.open(tdb_dir, "r") as tdb:
         x1 = tdb.domain.dim("X")
         y1 = tdb.domain.dim("Y")
-        shape = (int(x1.tile),int(y1.tile))
-        q = tdb.query(attrs=('Z'))[:]
+        shape = (int(y1.tile + 1),int(x1.tile + 1))
+        q = tdb.query(attrs=('Z', 'HeightAboveGround'))[:]
         xs = q['X']
         ys = q['Y']
         zs = q['Z']
+        hags = q['HeightAboveGround']
         # z_mean = np.array([z.mean() if z.any() else float('nan') for z in z_data], np.float64)
         # z_data = np.reshape(z_mean, newshape=(int(x.tile), int(y.tile)))
         z_data = np.empty(shape=shape, dtype=np.float64)
         z_data[:] = np.nan
-        for x,y,z in zip(xs,ys,zs):
-            z_data[int(x),int(y)] = z.mean()
+        hag_data = np.empty(shape=shape, dtype=np.float64)
+        hag_data[:] = np.nan
+        for x,y,z,hag in zip(xs,ys,zs,hags):
+            z_data[int(y),int(x)] = z.mean()
+            hag_data[int(y), int(x)] = hag.mean()
 
         # shape = (x.tile, y.tile)
 
         driver = gdal.GetDriverByName("GTiff")
 
-        outdata = driver.Create(out_file, int(y1.tile), int(x1.tile), 1, gdal.GDT_Float64)
-        outdata.GetRasterBand(1).WriteArray(z_data)
-        outdata.GetRasterBand(1).SetNoDataValue(99999)
-        outdata.FlushCache()
+        z_tif = driver.Create(f'{out_file}_z.tif', int(x1.tile + 1), int(y1.tile + 1), 1, gdal.GDT_Float64)
+        z_tif.GetRasterBand(1).WriteArray(z_data)
+        z_tif.GetRasterBand(1).SetNoDataValue(99999)
+        z_tif.FlushCache()
+
+        hag_tif = driver.Create(f'{out_file}_hag_nn.tif', int(x1.tile + 1), int(y1.tile + 1), 1, gdal.GDT_Float32)
+        hag_tif.GetRasterBand(1).WriteArray(hag_data)
+        hag_tif.GetRasterBand(1).SetNoDataValue(99999)
+        hag_tif.FlushCache()
+
+

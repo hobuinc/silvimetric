@@ -42,7 +42,7 @@ def main():
 
     out_file = args.out_file or args.o
     if not out_file:
-        out_file = f'{short}.tif'
+        out_file = short
 
 
     threads = args.threads
