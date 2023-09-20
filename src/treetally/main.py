@@ -63,7 +63,7 @@ def main():
             dask.config.set(scheduler="processes")
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter(filename, tdb_dir, group_size, res, debug, client, poly, watch)
+            shatter(filename, tdb_dir, group_size, res, debug, client, poly)
             extract(tdb_dir, out_file)
 
 if __name__ == "__main__":
