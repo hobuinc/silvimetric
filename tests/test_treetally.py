@@ -19,17 +19,6 @@ maxy = 853534.37
 
 point_count = 61201
 
-# def get_leaves(c):
-#     while True:
-#         try:
-#             n = next(c)
-#             if isinstance(n, types.GeneratorType):
-#                 get_leaves(n)
-#             elif isinstance(n, Chunk):
-#                 chunklist.append(n)
-#         except StopIteration:
-#             break
-
 def check_for_holes(leaves, chunk):
     c = np.copy(leaves)
     dx = c[:, 0:2]

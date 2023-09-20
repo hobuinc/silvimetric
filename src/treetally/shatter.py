@@ -116,7 +116,6 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
         print("Done in", (end-start)/10**9, "seconds")
         return
 
-
 def get_leaves(c):
     while True:
         try:
@@ -149,5 +148,4 @@ def create_tiledb(bounds: Bounds, dirname):
         "sm.check_global_order": False,
         "sm.check_coord_dedups": False,
         "sm.dedup_coords": False
-
     })
