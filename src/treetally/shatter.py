@@ -66,7 +66,7 @@ def arrange_data(reader, bounds: list[float], root_bounds: Bounds, tdb=None):
     return counts
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
-            debug: bool, client=None, polygon=None, watch=False):
+            debug: bool, client=None, polygon=None):
 
     client:Client = client
     # read pointcloud

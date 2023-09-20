@@ -7,7 +7,7 @@ def autzen_classified() -> str:
     path = os.path.join(
             os.path.dirname(__file__),
             "data",
-            "autzen-classified.copc.laz"
+            "autzen_test.copc.laz"
     )
     assert os.path.exists(path)
     return os.path.abspath(path)
