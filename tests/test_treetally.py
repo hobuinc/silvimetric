@@ -4,9 +4,9 @@ import numpy as np
 import itertools
 import types
 
-from treetally import Chunk
-from treetally import Bounds
-from treetally.shatter import arrange_data, get_leaves
+from treetally import Chunk, Bounds
+from treetally.chunk import get_leaves
+from treetally.shatter import arrange_data
 
 global chunklist
 res = 100
@@ -27,15 +27,15 @@ def check_for_holes(leaves, chunk):
     ux = np.unique(dx, axis=0)
     uy = np.unique(dy, axis=0)
 
-    assert(ux.min() == minx,
-        f"Derived minx ({ux.min()}) doesn't match bounds minx ({minx}).")
-    assert(ux.max() == maxx,
-        f"Derived minx ({ux.max()}) doesn't match bounds minx ({maxx}).")
+    assert(ux.min() == chunk.minx,
+        f"Derived minx ({ux.min()}) doesn't match bounds minx ({chunk.minx}).")
+    assert(ux.max() == chunk.maxx,
+        f"Derived minx ({ux.max()}) doesn't match bounds minx ({chunk.maxx}).")
 
-    assert(uy.min() == miny,
-        f"Derived miny ({uy.min()}) doesn't match bounds minx ({miny}).")
-    assert(uy.max() == maxy,
-        f"Derived minx ({uy.max()}) doesn't match bounds minx ({maxy}).")
+    assert(uy.min() == chunk.miny,
+        f"Derived miny ({uy.min()}) doesn't match bounds minx ({chunk.miny}).")
+    assert(uy.max() == chunk.maxy,
+        f"Derived minx ({uy.max()}) doesn't match bounds minx ({chunk.maxy}).")
 
     #if min of this index doesn't fit max of next then there are holes
     xrange = np.sort(ux, axis=0)
@@ -61,16 +61,19 @@ def test_chunking():
 
 def test_pointcount(autzen_classified):
     reader = pdal.Reader(autzen_classified)
+    reader._options['threads'] = 2
+    pipeline = pdal.Pipeline([reader])
+
     root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
     c = Chunk(minx, maxx, miny, maxy, root)
     f = c.filter(autzen_classified)
 
     global chunklist
     chunklist = []
-    get_leaves(f)
+    leaf_list = get_leaves(f)
 
-    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in chunklist])[0]
-    l = [arrange_data(reader, ch, root) for leaf in leaf_procs for ch in leaf]
+    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
+    l = [arrange_data(pipeline, ch, root) for leaf in leaf_procs for ch in leaf]
     counts = dask.compute(*l, optimize_graph=True)
     count = 0
     for a in counts:
@@ -85,8 +88,8 @@ def test_filtering(autzen_classified):
 
     global chunklist
     chunklist = []
-    get_leaves(f)
+    leaf_list = get_leaves(f)
 
-    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in chunklist])[0]
+    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
     leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
     check_for_holes(leaves, chunk)

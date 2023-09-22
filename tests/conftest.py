@@ -14,4 +14,4 @@ def autzen_classified() -> str:
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
-    dask.config.set(scheduler="single-threaded")
+    dask.config.set(scheduler="Threads")

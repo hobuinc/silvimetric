@@ -109,3 +109,22 @@ class Chunk(object):
 
         return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
 
+def flatten(il):
+    ol = []
+    for s in il:
+        if isinstance(s, list):
+            ol.append(flatten(il))
+        ol.append(s)
+    return ol
+
+def get_leaves(c):
+    l = []
+    while True:
+        try:
+            n = next(c)
+            if isinstance(n, types.GeneratorType):
+                l += flatten(get_leaves(n))
+            elif isinstance(n, Chunk):
+                l.append(n)
+        except StopIteration:
+            return l

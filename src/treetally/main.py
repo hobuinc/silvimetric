@@ -42,7 +42,7 @@ def main():
 
     out_file = args.out_file or args.o
     if not out_file:
-        out_file = short
+        out_file = f'data/{short}'
 
 
     threads = args.threads
@@ -61,6 +61,7 @@ def main():
     else:
         with Client(n_workers=workers, threads_per_worker=threads) as client:
             dask.config.set(scheduler="processes")
+            client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
             shatter(filename, tdb_dir, group_size, res, debug, client, poly)
