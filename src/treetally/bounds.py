@@ -16,6 +16,7 @@ def flatten(l):
             yield l
 
 class Bounds(object):
+
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
         self.minx = float(minx)
         self.miny = float(miny)
@@ -109,10 +110,8 @@ def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
         bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
                     group_size=group_size, srs=srs)
 
-
     if not pc:
         raise Exception("No points found.")
     print("Points found",  pc)
-
 
     return bounds

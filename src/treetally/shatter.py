@@ -28,10 +28,9 @@ def get_atts(points, chunk, bounds):
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
-    att_data = dask.compute([da.array(points[:][cell_indices(xis,
-        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices ],
-        scheduler="threads")[0]
-    return att_data
+    att_data = [da.array(points[:][cell_indices(xis,
+        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices ]
+    return dask.compute(att_data, scheduler="Threads")[0]
 
 def get_data(pipeline, chunk):
     for stage in pipeline.stages:
@@ -40,7 +39,6 @@ def get_data(pipeline, chunk):
             break
     reader._options['bounds'] = str(chunk.bounds)
 
-    # remember that readers.copc is a thread hog
     try:
         pipeline.execute()
     except Exception as e:
@@ -50,10 +48,7 @@ def get_data(pipeline, chunk):
 
 def write_tdb(tdb, res):
     dx, dy, dd = res
-    try:
-        tdb[dx, dy] = dd
-    except Exception as e:
-        print(e)
+    tdb[dx, dy] = dd
 
 @dask.delayed
 def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, tdb=None):
@@ -73,13 +68,10 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, tdb=None):
     dy = chunk.indices['y']
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
+    del data, dd, points, chunk
     return counts
 
-def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
-            debug: bool, client=None, polygon=None):
-
-    client:Client = client
-    # read pointcloud
+def create_pipeline(filename):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
     reader._options['resolution'] = 1
@@ -88,7 +80,15 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
     smrf = pdal.Filter.smrf()
     hag = pdal.Filter.hag_nn()
-    pipeline = reader | class_zero | rn | nor | smrf | hag
+    return reader | class_zero | rn | nor | smrf | hag
+
+def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
+            debug: bool, client=None, polygon=None):
+
+    client: Client = client
+    # read pointcloud
+    pipeline = create_pipeline(filename)
+    reader = pipeline.stages[0]
     bounds = create_bounds(reader, res, group_size, polygon)
 
     # set up tiledb
@@ -124,7 +124,7 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
 
                 print('Fetching and arranging data...')
                 data_futures = client.compute([
-                    arrange_data(pipeline, ch, bounds, tdb)
+                    arrange_data(pipeline, ch, b, t)
                     for leaf in leaf_procs for ch in leaf
                 ])
 
@@ -149,13 +149,12 @@ def create_tiledb(bounds: Bounds, dirname):
         # names = atts.names
         # tdb_atts = [tiledb.Attr(name=name, dtype=names[name], var=True, fill=np.dtype()) for name in names]
 
-        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True,
-            fill=float('nan'))
-        hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32,
-            var=True, fill=float('nan'))
+        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+        hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32, var=True)
+        atts = [count_att, z_att, hag_att]
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=10000000000, attrs=[count_att, z_att, hag_att], allows_duplicates=True)
+            capacity=len(atts)*bounds.xi*bounds.yi, attrs=[count_att, z_att, hag_att], allows_duplicates=True)
         schema.check()
         tiledb.SparseArray.create(dirname, schema)
 

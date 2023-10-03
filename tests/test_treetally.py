@@ -1,23 +1,9 @@
 import dask
 import pdal
 import numpy as np
-import itertools
-import types
 
-from treetally import Chunk, Bounds
 from treetally.chunk import get_leaves
 from treetally.shatter import arrange_data
-
-global chunklist
-res = 100
-gs = 16
-srs = 2992
-minx = 635579.19
-maxx = 639003.73
-miny = 848887.49
-maxy = 853534.37
-
-point_count = 61201
 
 def check_for_holes(leaves, chunk):
     c = np.copy(leaves)
@@ -52,44 +38,30 @@ def check_for_holes(leaves, chunk):
 
 # sub chunks should all add up to exactly what their parent is
 # original chunk will be expanded to fit the cell size
-def test_chunking():
-    root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
-    chunk = Chunk(minx, maxx, miny, maxy, root)
+def test_chunking(chunk):
     leaves = chunk.get_leaf_children()
 
     check_for_holes(leaves, chunk)
 
-def test_pointcount(autzen_classified):
-    reader = pdal.Reader(autzen_classified)
-    reader._options['threads'] = 2
-    pipeline = pdal.Pipeline([reader])
+def test_filtering(autzen_classified, chunk):
 
-    root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
-    c = Chunk(minx, maxx, miny, maxy, root)
-    f = c.filter(autzen_classified)
-
-    global chunklist
-    chunklist = []
-    leaf_list = get_leaves(f)
-
-    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
-    l = [arrange_data(pipeline, ch, root) for leaf in leaf_procs for ch in leaf]
-    counts = dask.compute(*l, optimize_graph=True)
-    count = 0
-    for a in counts:
-        count += a.sum()
-    assert(count == point_count, f"Point counts don't match. Expected {point_count}, got {count}")
-
-def test_filtering(autzen_classified):
-
-    root = Bounds(minx, miny, maxx, maxy, res, gs, srs)
-    chunk = Chunk(minx, maxx, miny, maxy, root)
     f = chunk.filter(autzen_classified, 3000)
 
-    global chunklist
-    chunklist = []
     leaf_list = get_leaves(f)
 
     leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
     leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
     check_for_holes(leaves, chunk)
+
+def test_pointcount(pipeline, chunk, autzen_classified, point_count):
+    f = chunk.filter(autzen_classified)
+
+    leaf_list = get_leaves(f)
+
+    leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
+    l = [arrange_data(pipeline, ch, chunk.root_bounds) for leaf in leaf_procs for ch in leaf]
+    counts = dask.compute(*l, optimize_graph=True)
+    count = 0
+    for a in counts:
+        count += a.sum()
+    assert(count == point_count, f"Point counts don't match. Expected {point_count}, got {count}")
