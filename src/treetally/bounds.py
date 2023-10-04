@@ -7,14 +7,6 @@ import dask.array as da
 from pyproj import CRS
 from shapely import from_wkt
 
-def flatten(l):
-    if isinstance(l, tuple):
-        if isinstance(l[0], tuple):
-            for v in l:
-                yield from flatten(v)
-        else:
-            yield l
-
 class Bounds(object):
 
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
@@ -52,8 +44,6 @@ class Bounds(object):
         maxy = self.miny + ((y+1) * self.cell_size)
         return Bounds(minx, miny, maxx, maxy, self.cell_size, self.srs)
 
-
-        # return flatten(chunks)
 
     def __repr__(self):
         if self.srs:

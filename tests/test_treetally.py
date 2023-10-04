@@ -53,15 +53,15 @@ def test_filtering(autzen_classified, chunk):
     leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
     check_for_holes(leaves, chunk)
 
-def test_pointcount(pipeline, chunk, autzen_classified, point_count):
-    f = chunk.filter(autzen_classified)
+def test_pointcount(pipeline, chunk, test_pointcloud, test_point_count):
+    f = chunk.filter(test_pointcloud)
 
     leaf_list = get_leaves(f)
 
     leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
-    l = [arrange_data(pipeline, ch, chunk.root_bounds) for leaf in leaf_procs for ch in leaf]
+    l = [arrange_data(pipeline, ch, chunk.root_bounds, ['Z']) for leaf in leaf_procs for ch in leaf]
     counts = dask.compute(*l, optimize_graph=True)
     count = 0
     for a in counts:
         count += a.sum()
-    assert(count == point_count, f"Point counts don't match. Expected {point_count}, got {count}")
+    assert(count == test_point_count, f"Point counts don't match. Expected {test_point_count}, got {count}")

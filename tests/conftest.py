@@ -6,18 +6,21 @@ import pdal
 from treetally import Chunk, Bounds
 from treetally.shatter import create_pipeline
 
-res = 100
-gs = 16
-srs = 2992
-minx = 635579.19
-maxx = 639003.73
-miny = 848887.49
-maxy = 853534.37
 
-point_count = 61201
+
 @pytest.fixture(scope='session')
-def point_count():
-    return point_count
+def test_point_count():
+    return 1065
+
+@pytest.fixture(scope='function')
+def test_pointcloud() -> str:
+    path = os.path.join(
+            os.path.dirname(__file__),
+            "data",
+            "1.2-with-color.copc.laz"
+    )
+    assert os.path.exists(path)
+    return os.path.abspath(path)
 
 @pytest.fixture(scope="session")
 def autzen_classified() -> str:
@@ -37,10 +40,22 @@ def configure_dask():
 def pipeline(autzen_classified) -> pdal.Pipeline:
     return create_pipeline(autzen_classified)
 
-@pytest.fixture(scope='session')
+
+@pytest.fixture(scope='function')
 def chunk(bounds):
+    minx = 635579.19
+    maxx = 639003.73
+    miny = 848887.49
+    maxy = 853534.37
     return Chunk(minx, maxx, miny, maxy, bounds)
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope='function')
 def bounds():
+    res = 100
+    gs = 16
+    srs = 2992
+    minx = 635579.19
+    maxx = 639003.73
+    miny = 848887.49
+    maxy = 853534.37
     return Bounds(minx,maxx,miny,maxy,res,gs,srs)

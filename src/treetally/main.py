@@ -11,6 +11,7 @@ from .shatter import shatter
 from .extract import extract
 
 def main():
+
     parser = argparse.ArgumentParser()
     parser.add_argument("filename", type=str)
     parser.add_argument("--out_file", type=str)
@@ -23,6 +24,7 @@ def main():
     parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--debug", type=bool, default=False)
     parser.add_argument("--watch", type=bool, default=False)
+    parser.add_argument("--attributes", type=list[str], default=None)
 
     args = parser.parse_args()
 
@@ -30,11 +32,11 @@ def main():
 
     #defaults file stem or data directory name
     if 'ept.json' in filename:
-        short= path.basename(path.dirname(filename))
+        short = path.basename(path.dirname(filename))
     elif '.copc.' in filename:
-        short= path.splitext(path.splitext(path.basename(filename))[0])[0]
+        short = path.splitext(path.splitext(path.basename(filename))[0])[0]
     else:
-        short= path.splitext(path.basename(filename))[0]
+        short = path.splitext(path.basename(filename))[0]
 
     tdb_dir = args.tdb_dir
     if not tdb_dir:
@@ -53,10 +55,11 @@ def main():
 
     debug = args.debug
     watch = args.watch
+    atts = args.attributes
 
     if debug:
         dask.config.set(scheduler="single-threaded")
-        shatter(filename, tdb_dir, group_size, res, debug, polygon=poly)
+        shatter(filename, tdb_dir, group_size, res, debug, polygon=poly, atts=atts)
         extract(tdb_dir, out_file)
     else:
         with Client(n_workers=workers, threads_per_worker=threads) as client:
@@ -64,7 +67,7 @@ def main():
             client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter(filename, tdb_dir, group_size, res, debug, client, poly)
+            shatter(filename, tdb_dir, group_size, res, debug, client, poly, atts)
             extract(tdb_dir, out_file)
 
 if __name__ == "__main__":

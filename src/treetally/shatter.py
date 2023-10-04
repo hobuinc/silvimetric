@@ -51,7 +51,7 @@ def write_tdb(tdb, res):
     tdb[dx, dy] = dd
 
 @dask.delayed
-def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, tdb=None):
+def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=None):
 
     chunk = Chunk(*bounds, root=root_bounds)
     points = get_data(pipeline, chunk)
@@ -60,8 +60,11 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, tdb=None):
 
     data = get_atts(points, chunk, root_bounds)
     dd = {}
-    for att in ['Z', 'HeightAboveGround']:
-        dd[att] = np.array([col[att] for col in data], object)
+    for att in atts:
+        try:
+            dd[att] = np.array([col[att] for col in data], object)
+        except Exception as e:
+            raise(f"Missing attribute {att}: {e}")
     counts = np.array([z.size for z in dd['Z']], np.int32)
     dd['count'] = counts
     dx = chunk.indices['x']
@@ -82,58 +85,47 @@ def create_pipeline(filename):
     hag = pdal.Filter.hag_nn()
     return reader | class_zero | rn | nor | smrf | hag
 
-def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
-            debug: bool, client=None, polygon=None):
-
-    client: Client = client
-    # read pointcloud
-    pipeline = create_pipeline(filename)
-    reader = pipeline.stages[0]
-    bounds = create_bounds(reader, res, group_size, polygon)
-
-    # set up tiledb
-    config = create_tiledb(bounds, tdb_dir)
-
-    # Begin main operations
-    with tiledb.open(tdb_dir, "w", config=config) as tdb:
-        start = time.perf_counter_ns()
-
+def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
+    with tiledb.open(tdb_dir, "w", config=tdb_config) as tdb:
         # debug uses single threaded dask
         if debug:
-            c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy,
-                bounds)
-            f = c.filter(filename)
-
             leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in
-                get_leaves(f)])[0]
-            l = [arrange_data(pipeline, ch, bounds, tdb) for leaf in leaf_procs
-                for ch in leaf]
-            dask.compute(*l, optimize_graph=True)
+                get_leaves(filter_res)])[0]
+            dask.compute([arrange_data(pipeline, ch, bounds, atts, tdb) for leaf in leaf_procs
+                for ch in leaf], optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
-                print('Filtering out empty chunks...')
                 t = client.scatter(tdb)
                 b = client.scatter(bounds)
 
-                c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy,
-                    bounds)
-                f = c.filter(filename)
-
                 leaf_procs = client.compute([node.get_leaf_children() for node
-                    in get_leaves(f)])
+                    in get_leaves(filter_res)])
 
-                print('Fetching and arranging data...')
                 data_futures = client.compute([
-                    arrange_data(pipeline, ch, b, t)
+                    arrange_data(pipeline, ch, b, atts, t)
                     for leaf in leaf_procs for ch in leaf
                 ])
 
                 progress(data_futures)
                 client.gather(data_futures)
 
-        end = time.perf_counter_ns()
-        print("Done in", (end-start)/10**9, "seconds")
-        return
+def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
+            debug: bool, client=None, polygon=None, atts=None):
+
+    # read pointcloud
+    pipeline = create_pipeline(filename)
+    reader = pipeline.stages[0]
+    bounds = create_bounds(reader, res, group_size, polygon)
+    c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
+    print('Filtering out empty chunks...')
+    f = c.filter(filename)
+
+    # set up tiledb
+    config = create_tiledb(bounds, tdb_dir)
+
+    # Begin main operations
+    print('Fetching and arranging data...')
+    run(pipeline, bounds, config, f, tdb_dir, atts, client, debug)
 
 
 def create_tiledb(bounds: Bounds, dirname):

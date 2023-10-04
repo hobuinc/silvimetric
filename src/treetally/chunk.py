@@ -10,6 +10,7 @@ import numpy as np
 from .bounds import Bounds
 
 class Chunk(object):
+
     def __init__(self, minx, maxx, miny, maxy, root: Bounds):
         cell_size = root.cell_size
         self.x1 = math.floor((minx - root.minx) / cell_size)
