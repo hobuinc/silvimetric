@@ -7,12 +7,11 @@ from treetally import Chunk, Bounds
 from treetally.shatter import create_pipeline
 
 
+@pytest.fixture(scope="session", autouse=True)
+def configure_dask():
+    dask.config.set(scheduler="Threads")
 
 @pytest.fixture(scope='session')
-def test_point_count():
-    return 1065
-
-@pytest.fixture(scope='function')
 def test_pointcloud() -> str:
     path = os.path.join(
             os.path.dirname(__file__),
@@ -22,24 +21,13 @@ def test_pointcloud() -> str:
     assert os.path.exists(path)
     return os.path.abspath(path)
 
-@pytest.fixture(scope="session")
-def autzen_classified() -> str:
-    path = os.path.join(
-            os.path.dirname(__file__),
-            "data",
-            "autzen_test.copc.laz"
-    )
-    assert os.path.exists(path)
-    return os.path.abspath(path)
-
-@pytest.fixture(scope="session", autouse=True)
-def configure_dask():
-    dask.config.set(scheduler="Threads")
-
 @pytest.fixture(scope='session')
-def pipeline(autzen_classified) -> pdal.Pipeline:
-    return create_pipeline(autzen_classified)
+def pipeline(test_pointcloud) -> pdal.Pipeline:
+    return create_pipeline(test_pointcloud)
 
+@pytest.fixture(scope='function')
+def test_point_count():
+    return 1065
 
 @pytest.fixture(scope='function')
 def chunk(bounds):
