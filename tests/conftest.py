@@ -43,19 +43,20 @@ def pipeline(autzen_classified) -> pdal.Pipeline:
 
 @pytest.fixture(scope='function')
 def chunk(bounds):
-    minx = 635579.19
-    maxx = 639003.73
-    miny = 848887.49
-    maxy = 853534.37
+    minx = 635619.85
+    maxx = 638982.55
+    miny = 848899.7
+    maxy = 853535.43
     return Chunk(minx, maxx, miny, maxy, bounds)
 
 @pytest.fixture(scope='function')
 def bounds():
     res = 100
     gs = 16
-    srs = 2992
-    minx = 635579.19
-    maxx = 639003.73
-    miny = 848887.49
-    maxy = 853534.37
+    srs = 2991
+    minx = 635619.85
+    maxx = 638982.55
+    miny = 848899.7
+    maxy = 853535.43
+
     return Bounds(minx,maxx,miny,maxy,res,gs,srs)

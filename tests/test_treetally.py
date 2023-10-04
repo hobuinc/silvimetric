@@ -43,9 +43,9 @@ def test_chunking(chunk):
 
     check_for_holes(leaves, chunk)
 
-def test_filtering(autzen_classified, chunk):
+def test_filtering(test_pointcloud, chunk):
 
-    f = chunk.filter(autzen_classified, 3000)
+    f = chunk.filter(test_pointcloud, 3000)
 
     leaf_list = get_leaves(f)
 
