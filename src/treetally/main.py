@@ -24,7 +24,7 @@ def main():
     parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--debug", type=bool, default=False)
     parser.add_argument("--watch", type=bool, default=False)
-    parser.add_argument("--attributes", type=list[str], default=None)
+    parser.add_argument("--attributes", nargs="+", default="Z")
 
     args = parser.parse_args()
 

@@ -3,14 +3,14 @@ import numpy as np
 import dask.array as da
 from osgeo import gdal
 
-def extract(tdb_dir, out_file):
+def extract(tdb_dir, out_file, atts):
     # dd = da.from_tiledb(tdb_dir,'Z')
     # print(dd)
     with tiledb.open(tdb_dir, "r") as tdb:
         x1 = tdb.domain.dim("X")
         y1 = tdb.domain.dim("Y")
         shape = (int(y1.tile + 1),int(x1.tile + 1))
-        q = tdb.query(attrs=('Z', 'HeightAboveGround'))[:]
+        q = tdb.query(attrs=atts)[:]
         xs = q['X']
         ys = q['Y']
         zs = q['Z']

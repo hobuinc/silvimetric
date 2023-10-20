@@ -1,15 +1,11 @@
 import math
 
-import dask
-
-import numpy as np
-import dask.array as da
 from pyproj import CRS
 from shapely import from_wkt
 
 class Bounds(object):
 
-    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size = 3, srs=None):
+    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size=16, srs=None, atts=None):
         self.minx = float(minx)
         self.miny = float(miny)
         self.maxx = float(maxx)

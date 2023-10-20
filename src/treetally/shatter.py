@@ -1,6 +1,3 @@
-import time
-import types
-
 import tiledb
 import pdal
 import numpy as np
@@ -24,13 +21,15 @@ def floor_y(points: da.Array, bounds: Bounds):
     return da.array(da.floor((bounds.maxy - points) / bounds.cell_size),
         np.int32)
 
+#TODO move pruning of attributes to this method so we're not grabbing everything
 def get_atts(points, chunk, bounds):
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
     att_data = [da.array(points[:][cell_indices(xis,
-        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices ]
-    return dask.compute(att_data, scheduler="Threads")[0]
+        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
+    asdf = dask.compute(*att_data, scheduler="Threads")
+    return asdf
 
 def get_data(pipeline, chunk):
     for stage in pipeline.stages:
@@ -59,16 +58,27 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=N
         return np.array([0], np.int32)
 
     data = get_atts(points, chunk, root_bounds)
+
     dd = {}
     for att in atts:
         try:
             dd[att] = np.array([col[att] for col in data], object)
         except Exception as e:
             raise(f"Missing attribute {att}: {e}")
+
+    ## if no points were applied to any of these boxes... seems weird
+    if not np.array([dd[n].any() for n in dd]).any():
+        return np.array([0], np.int32)
     counts = np.array([z.size for z in dd['Z']], np.int32)
+
+    ## remove empty indices and create final tiledb inputs
+    empties = np.where(counts == 0)
     dd['count'] = counts
-    dx = chunk.indices['x']
-    dy = chunk.indices['y']
+    for att in dd:
+        dd[att] = np.delete(dd[att], empties)
+    dx = np.delete(chunk.indices['x'], empties)
+    dy = np.delete(chunk.indices['y'], empties)
+
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
     del data, dd, points, chunk
@@ -81,9 +91,9 @@ def create_pipeline(filename):
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    smrf = pdal.Filter.smrf()
-    hag = pdal.Filter.hag_nn()
-    return reader | class_zero | rn | nor | smrf | hag
+    # smrf = pdal.Filter.smrf()
+    # hag = pdal.Filter.hag_nn()
+    return reader | class_zero | rn | nor #| smrf | hag
 
 def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
     with tiledb.open(tdb_dir, "w", config=tdb_config) as tdb:
@@ -110,8 +120,7 @@ def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
                 client.gather(data_futures)
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
-            debug: bool, client=None, polygon=None, atts=None):
-
+            debug: bool, client=None, polygon=None, atts=['Z']):
     # read pointcloud
     pipeline = create_pipeline(filename)
     reader = pipeline.stages[0]
@@ -121,14 +130,14 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     f = c.filter(filename)
 
     # set up tiledb
-    config = create_tiledb(bounds, tdb_dir)
+    config = create_tiledb(bounds, tdb_dir, atts)
 
     # Begin main operations
     print('Fetching and arranging data...')
     run(pipeline, bounds, config, f, tdb_dir, atts, client, debug)
 
-
-def create_tiledb(bounds: Bounds, dirname):
+def create_tiledb(bounds: Bounds, dirname: str, atts: list[str]):
+    dims = { d['name']: d['dtype'] for d in pdal.dimensions }
     if tiledb.object_type(dirname) == "array":
         with tiledb.open(dirname, "d") as A:
             A.query(cond="X>=0").submit()
@@ -138,15 +147,14 @@ def create_tiledb(bounds: Bounds, dirname):
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        # names = atts.names
-        # tdb_atts = [tiledb.Attr(name=name, dtype=names[name], var=True, fill=np.dtype()) for name in names]
+        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True) for name in atts]
 
-        z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
-        hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32, var=True)
-        atts = [count_att, z_att, hag_att]
+        # z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
+        # hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32, var=True)
+        # atts = [count_att, z_att, hag_att]
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(atts)*bounds.xi*bounds.yi, attrs=[count_att, z_att, hag_att], allows_duplicates=True)
+            capacity=len(atts)*bounds.xi*bounds.yi, attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
         tiledb.SparseArray.create(dirname, schema)
 
