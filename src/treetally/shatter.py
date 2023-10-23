@@ -2,6 +2,7 @@ import tiledb
 import pdal
 import numpy as np
 
+from copy import deepcopy
 import dask
 import dask.array as da
 from dask.diagnostics import ProgressBar
@@ -26,6 +27,14 @@ def get_atts(points, chunk, bounds):
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
+    for xx in xis.compute():
+        if xx not in chunk.indices['x']:
+            print('x nope')
+
+    for yy in yis.compute():
+        if yy not in chunk.indices['y']:
+            print('y nope')
+
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
     asdf = dask.compute(*att_data, scheduler="Threads")
@@ -53,9 +62,9 @@ def write_tdb(tdb, res):
 def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=None):
 
     chunk = Chunk(*bounds, root=root_bounds)
-    points = get_data(pipeline, chunk)
+    points = get_data(deepcopy(pipeline), chunk)
     if not points.size:
-        return np.array([0], np.int32)
+        return 0
 
     data = get_atts(points, chunk, root_bounds)
 
@@ -67,8 +76,8 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=N
             raise(f"Missing attribute {att}: {e}")
 
     ## if no points were applied to any of these boxes... seems weird
-    if not np.array([dd[n].any() for n in dd]).any():
-        return np.array([0], np.int32)
+    if not np.any([np.any(np.any(dd[n][m] for m in dd[n])) == 0 for n in dd])==0:
+        return 0
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices and create final tiledb inputs
@@ -82,7 +91,7 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=N
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
     del data, dd, points, chunk
-    return counts
+    return counts.sum()
 
 def create_pipeline(filename):
     reader = pdal.Reader(filename, tag='reader')
@@ -101,7 +110,7 @@ def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
         if debug:
             leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in
                 get_leaves(filter_res)])[0]
-            dask.compute([arrange_data(pipeline, ch, bounds, atts, tdb) for leaf in leaf_procs
+            data_futures = dask.compute([arrange_data(pipeline, ch, bounds, atts, tdb) for leaf in leaf_procs
                 for ch in leaf], optimize_graph=True)
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
@@ -118,6 +127,10 @@ def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
 
                 progress(data_futures)
                 client.gather(data_futures)
+        c = 0
+        for f in data_futures:
+            c += sum(f)
+        return c
 
 def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
             debug: bool, client=None, polygon=None, atts=['Z']):

@@ -19,8 +19,8 @@ class Bounds(object):
 
         self.rangex = self.maxx - self.minx
         self.rangey = self.maxy - self.miny
-        self.xi = math.ceil(self.rangex / cell_size)
-        self.yi = math.ceil(self.rangey / cell_size)
+        self.xi = math.ceil(self.rangex / cell_size) + 1
+        self.yi = math.ceil(self.rangey / cell_size) + 1
         self.cell_size = cell_size
         self.group_size = group_size
 
