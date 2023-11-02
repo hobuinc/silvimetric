@@ -4,14 +4,8 @@ import dask
 import pdal
 from shutil import rmtree
 
-from treetally import Chunk, Bounds
+from treetally import Bounds
 from treetally.shatter import create_pipeline, shatter
-
-# @pytest.fixture(scope='session', autouse=True)
-# def term_handler():
-#     orig = signal.signal(signal.SIGTERM, signal.getsignal(signal.SIGINT))
-#     yield
-#     signal.signal(signal.SIGTERM, orig)
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
@@ -23,6 +17,13 @@ def filepath() -> str:
             "1.2-with-color.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
+
+@pytest.fixture(scope='function')
+def bounds(resolution, group_size, minx, maxx, miny, maxy, srs):
+    res = resolution
+    gs = group_size
+
+    yield Bounds(minx,miny,maxx,maxy,res,gs,srs)
 
 @pytest.fixture(scope='session')
 def pipeline(filepath) -> pdal.Pipeline:
@@ -41,21 +42,21 @@ def test_point_count():
     yield 1065
 
 @pytest.fixture(scope='function')
-def chunk(bounds):
-    minx = 635619.85
-    maxx = 638982.55
-    miny = 848899.7
-    maxy = 853535.43
-    yield Chunk(minx, maxx, miny, maxy, bounds)
+def minx():
+    yield 635619.85
 
 @pytest.fixture(scope='function')
-def bounds(resolution, group_size):
-    res = resolution
-    gs = group_size
-    srs = 2991
-    minx = 635619.85
-    maxx = 638982.55
-    miny = 848899.7
-    maxy = 853535.43
+def miny():
+    yield 848899.7
 
-    yield Bounds(minx,maxx,miny,maxy,res,gs,srs)
+@pytest.fixture(scope='function')
+def maxx():
+    yield 638982.55
+
+@pytest.fixture(scope='function')
+def maxy():
+    yield 853535.43
+
+@pytest.fixture(scope="function")
+def srs():
+    yield 2991

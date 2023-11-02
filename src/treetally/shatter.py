@@ -9,7 +9,7 @@ from dask.diagnostics import ProgressBar
 from dask.distributed import performance_report, progress, Client
 
 from .bounds import Bounds, create_bounds
-from .chunk import Chunk, get_leaves
+# from .chunk import Chunk, get_leaves
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -23,7 +23,8 @@ def floor_y(points: da.Array, bounds: Bounds):
         np.int32)
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
-def get_atts(points, chunk, bounds):
+def get_atts(points, chunk):
+    bounds = chunk.root_bounds
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
@@ -59,14 +60,13 @@ def write_tdb(tdb, res):
     tdb[dx, dy] = dd
 
 @dask.delayed
-def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=None):
+def arrange_data(pipeline, chunk: Bounds, atts, tdb=None):
 
-    chunk = Chunk(*bounds, root=root_bounds)
     points = get_data(deepcopy(pipeline), chunk)
     if not points.size:
         return 0
 
-    data = get_atts(points, chunk, root_bounds)
+    data = get_atts(points, chunk)
 
     dd = {}
     for att in atts:
@@ -75,12 +75,13 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=N
         except Exception as e:
             raise(f"Missing attribute {att}: {e}")
 
-    ## if no points were applied to any of these boxes... seems weird
-    if not np.any([np.any(np.any(dd[n][m] for m in dd[n])) == 0 for n in dd])==0:
-        return 0
     counts = np.array([z.size for z in dd['Z']], np.int32)
+    # if this trips, something is wrong with the the matchup between indices
+    # and bounds of the chunk
+    assert points.size == counts.sum(), "\
+        Data read size doesn't match attribute counts"
 
-    ## remove empty indices and create final tiledb inputs
+    ## remove empty indices and create final sparse tiledb inputs
     empties = np.where(counts == 0)
     dd['count'] = counts
     for att in dd:
@@ -90,8 +91,9 @@ def arrange_data(pipeline, bounds: list[float], root_bounds: Bounds, atts, tdb=N
 
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
+    sum = counts.sum()
     del data, dd, points, chunk
-    return counts.sum()
+    return sum
 
 def create_pipeline(filename):
     reader = pdal.Reader(filename, tag='reader')

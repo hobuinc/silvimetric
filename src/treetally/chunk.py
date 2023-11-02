@@ -16,14 +16,14 @@ class Chunk(object):
         self.x1 = math.floor((minx - root.minx) / cell_size)
         self.y1 = math.floor((root.maxy - maxy) / cell_size)
 
-        self.x2 = math.floor(((maxx - root.minx) / cell_size))
-        self.y2 = math.floor(((root.maxy - miny) / cell_size))
+        self.x2 = math.floor((maxx - root.minx) / cell_size)
+        self.y2 = math.floor((root.maxy - miny) / cell_size)
 
         # make bounds in scale with the desired resolution
         self.minx = (self.x1 * cell_size) + root.minx
-        self.miny = root.maxy - (self.y2 * cell_size)
+        self.maxx = ((self.x2 + 1) * cell_size) + root.minx
 
-        self.maxx = (self.x2 * cell_size) + root.minx
+        self.miny = root.maxy - ((self.y2 + 1) * cell_size)
         self.maxy = root.maxy - (self.y1 * cell_size)
 
         self.midx = self.minx + ((self.maxx - self.minx)/ 2)
@@ -31,7 +31,6 @@ class Chunk(object):
 
         self.root_bounds = root
         group_size = root.group_size
-
 
         self.bounds = Bounds(self.minx, self.miny, self.maxx, self.maxy,
                              cell_size, group_size, root.srs.to_wkt())
@@ -96,36 +95,16 @@ class Chunk(object):
         gs = self.root_bounds.group_size
         xnum, ynum = self.find_dims(gs)
 
-        dx = (np.array([
-            [x, min(x+xnum, self.x2)]
-            for x in range(self.x1, self.x2, int(xnum))
-        ], dtype=np.float64) * res) + self.root_bounds.minx
+        local_xs = res * np.array([
+                [x, min(x+xnum, self.x2+1)]
+                for x in range(self.x1, self.x2, int(xnum))
+            ], dtype=np.float64)
+        dx = local_xs + self.root_bounds.minx
 
-        dy = self.root_bounds.maxy - (
-            np.array([
-                [min(y+ynum, self.y2), y]
+        local_ys = res * np.array([
+                [min(y+ynum, self.y2+1), y]
                 for y in range(self.y1, self.y2, int(ynum))
-            ],
-            dtype=np.float64) * res)
+            ], dtype=np.float64)
+        dy = self.root_bounds.maxy - local_ys
 
         return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
-
-def flatten(il):
-    ol = []
-    for s in il:
-        if isinstance(s, list):
-            ol.append(flatten(il))
-        ol.append(s)
-    return ol
-
-def get_leaves(c):
-    l = []
-    while True:
-        try:
-            n = next(c)
-            if isinstance(n, types.GeneratorType):
-                l += flatten(get_leaves(n))
-            elif isinstance(n, Chunk):
-                l.append(n)
-        except StopIteration:
-            return l
