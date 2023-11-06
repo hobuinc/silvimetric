@@ -56,7 +56,7 @@ class TestChunk(object):
 
 
     def test_indexing(self, filepath, bounds):
-        leaf_list = bounds.chunk(filepath, 10000)
+        leaf_list = bounds.chunk(filepath, 3000)
 
         # gather indices from the chunks to match with bounds
         indices = np.array([], dtype=bounds.indices.dtype)
@@ -115,11 +115,6 @@ class TestChunk(object):
 
 
     def test_pointcount(self, pipeline, bounds, filepath, test_point_count):
-        # filtered products
-        # f = chunk.filter(filepath)
-        # leaf_list = get_leaves(f)
-        # leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in
-        #                            leaf_list])[0]
 
         filtered = bounds.chunk(filepath, 3000)
 
@@ -130,12 +125,15 @@ class TestChunk(object):
         l2 = [arrange_data(pipeline, leaf, ['Z']) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 
-        assert sum(unfiltered_counts) == sum(filtered_counts), f"\
-            Filtered and unfiltered point counts don't match.\
-            Filtered: {filtered_counts}, Unfiltered: {unfiltered_counts}"
-        assert sum(filtered_counts) == test_point_count, f"\
-            Point counts don't match.\
-            Expected {test_point_count}, got {sum(filtered_counts)}"
-        assert sum(unfiltered_counts) == test_point_count, f"\
-            Point counts don't match.\
-            Expected {test_point_count}, got {sum(unfiltered_counts)}"
+        fc = sum(filtered_counts)
+        ufc = sum(unfiltered_counts)
+
+        assert fc == ufc, f"""
+            Filtered and unfiltered point counts don't match.
+            Filtered: {fc}, Unfiltered: {ufc}"""
+        assert test_point_count == fc, f"""
+            Filtered point counts don't match.
+            Expected {test_point_count}, got {fc}"""
+        assert test_point_count == ufc, f"""
+            Unfiltered point counts don't match.
+            Expected {test_point_count}, got {ufc}"""

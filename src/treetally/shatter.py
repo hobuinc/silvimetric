@@ -9,7 +9,6 @@ from dask.diagnostics import ProgressBar
 from dask.distributed import performance_report, progress, Client
 
 from .bounds import Bounds, create_bounds
-# from .chunk import Chunk, get_leaves
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -24,7 +23,7 @@ def floor_y(points: da.Array, bounds: Bounds):
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
 def get_atts(points, chunk):
-    bounds = chunk.root_bounds
+    bounds = chunk.root
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds)
     yis = floor_y(xypoints['Y'], bounds)
@@ -46,7 +45,7 @@ def get_data(pipeline, chunk):
         if 'readers' in stage.type:
             reader = stage
             break
-    reader._options['bounds'] = str(chunk.bounds)
+    reader._options['bounds'] = str(chunk)
 
     try:
         pipeline.execute()
@@ -140,15 +139,14 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     pipeline = create_pipeline(filename)
     reader = pipeline.stages[0]
     bounds = create_bounds(reader, res, group_size, polygon)
-    c = Chunk(bounds.minx, bounds.maxx, bounds.miny, bounds.maxy, bounds)
     print('Filtering out empty chunks...')
-    f = c.filter(filename)
 
     # set up tiledb
     config = create_tiledb(bounds, tdb_dir, atts)
 
     # Begin main operations
     print('Fetching and arranging data...')
+    f = bounds.chunk(filename)
     run(pipeline, bounds, config, f, tdb_dir, atts, client, debug)
 
 def create_tiledb(bounds: Bounds, dirname: str, atts: list[str]):

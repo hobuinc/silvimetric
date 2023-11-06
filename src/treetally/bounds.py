@@ -106,13 +106,8 @@ class Bounds(object):
                 except StopIteration:
                     return l
 
-        leaves = get_leaves(filtered)
-        yield from [
-            Bounds(coords[0], coords[2], coords[1], coords[3], self.cell_size,
-                   self.group_size, self.srs.to_wkt(), True, self.root)
-            for leaf in leaves
-            for coords in leaf.get_leaf_children()
-        ]
+        leaves: list[Bounds] = get_leaves(filtered)
+        yield from [bounds for leaf in leaves for bounds in leaf.get_leaf_children()]
 
     def split(self):
         yield from [
@@ -130,7 +125,7 @@ class Bounds(object):
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
     def filter(self, filename, threshold=1000):
-        reader = pdal.Reader(filename)
+        reader: pdal.Reader = pdal.Reader(filename)
         reader._options['bounds'] = str(self)
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
@@ -177,7 +172,13 @@ class Bounds(object):
             ], dtype=np.float64)
         dy = self.root.maxy - local_ys
 
-        return np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
+        coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
+        yield from [
+            Bounds(coords[0], coords[2], coords[1], coords[3], self.cell_size,
+                   self.group_size, self.srs.to_wkt(), True, self.root)
+            for coords in coords_list
+        ]
+
 
     def __repr__(self):
         if self.srs:
