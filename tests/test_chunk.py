@@ -3,6 +3,7 @@ import dask
 
 from treetally.bounds import Bounds
 from treetally.shatter import arrange_data, shatter
+from itertools import chain
 
 def check_for_holes(leaves, chunk):
     c = np.copy(leaves)
@@ -30,6 +31,55 @@ def check_for_holes(leaves, chunk):
         if idx + 1 < len(yrange):
             assert minmax[1] == yrange[idx + 1][0], f"Hole in derived bounds between {minmax[1]} {yrange[idx][0]}"
 
+def check_indexing(bounds, leaf_list):
+    # gather indices from the chunks to match with bounds
+    indices = np.array([], dtype=bounds.indices.dtype)
+    b_indices = bounds.indices
+    count = 0
+
+    #check that mins and maxes are correct first
+
+    for ch in leaf_list:
+        if not np.any(indices['x']):
+            indices = ch.indices
+        else:
+            indices = np.append(indices, ch.indices)
+        count += 1
+
+    assert b_indices['x'].min() == indices['x'].min(), f"""X Minimum indices do not match. \
+    Min derived: {indices['x'].min()}
+    Min base: {b_indices['x'].min()}
+    """
+
+    assert b_indices['x'].max() == indices['x'].max(), f"""X Maximum indices do not match. \
+    Max derived: {indices['x'].max()}
+    Max base: {b_indices['x'].max()}
+    """
+
+    assert b_indices['y'].min() == indices['y'].min(), f"""Y Minimum indices do not match. \
+    Min derived: {indices['y'].min()}
+    Min base: {b_indices['y'].min()}
+    """
+
+    assert b_indices['y'].max() == indices['y'].max(), f"""Y Maximum indices do not match. \
+    Max derived: {indices['y'].max()}
+    Max base: {b_indices['y'].max()}
+    """
+
+    # check that all original indices are in derived indices
+    for xy in b_indices:
+        assert xy in indices, f"Derived indices missing index: {xy}"
+
+    for xy in indices:
+        assert xy in b_indices, f"Derived indices created index outside of bounds: {xy}"
+
+    u, c = np.unique(np.array(indices), return_counts=True)
+    dup = u[c > 1]
+    b = np.any([dup['x'], dup['y']])
+
+    assert b == False, f"Indices duplicated: {dup}"
+
+
 class TestChunk(object):
 
     # def compare_bounds(self, b0, b1):
@@ -54,34 +104,12 @@ class TestChunk(object):
     #     # assert chunks[2].bounds == c2b
     #     # assert chunks[3].bounds == c3b
 
-
     def test_indexing(self, filepath, bounds):
-        leaf_list = bounds.chunk(filepath, 3000)
+        leaf_list = list(bounds.chunk(filepath, 100))
+        unfiltered = list(bounds.root_chunk.get_leaf_children())
+        check_indexing(bounds, leaf_list)
+        check_indexing(bounds, unfiltered)
 
-        # gather indices from the chunks to match with bounds
-        indices = np.array([], dtype=bounds.indices.dtype)
-        count = 0
-
-        for ch in leaf_list:
-            if not np.any(indices['x']):
-                indices = ch.indices
-            else:
-                indices = np.append(indices, ch.indices)
-            count += 1
-
-        # check that all original indices are in derived indices
-        b_indices = bounds.indices
-        for xy in b_indices:
-            assert xy in indices, f"Derived indices missing index: {xy}"
-
-        for xy in indices:
-            assert xy in b_indices, f"Derived indices created index outside of bounds: {xy}"
-
-        u, c = np.unique(np.array(indices), return_counts=True)
-        dup = u[c > 1]
-        b = np.any([dup['x'], dup['y']])
-
-        assert b == False, f"Indices duplicated: {dup}"
 
     # sub chunks should all add up to exactly what their parent is
     # original chunk will be expanded to fit the cell size
@@ -113,15 +141,14 @@ class TestChunk(object):
 
     #     assert cpc == bpc, f"Points found with original bounds({chunk.root_bounds}): {bpc} does not match points found with adjusted chunk bounds({chunk.bounds}): {cpc}"
 
-
     def test_pointcount(self, pipeline, bounds, filepath, test_point_count):
 
-        filtered = bounds.chunk(filepath, 3000)
+        filtered = list(bounds.chunk(filepath, 100))
 
         l1 = [arrange_data(pipeline, leaf, ['Z']) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        unfiltered = bounds.root_chunk.get_leaf_children()
+        unfiltered = list(bounds.root_chunk.get_leaf_children())
         l2 = [arrange_data(pipeline, leaf, ['Z']) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 

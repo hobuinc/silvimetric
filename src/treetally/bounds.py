@@ -8,7 +8,6 @@ from shapely import from_wkt
 
 class Bounds(object):
 
-    #TODO change either this or chunk to have the same min/max/x/y ordering
     def __init__(self, minx, miny, maxx, maxy, cell_size, group_size=16,
                  srs=None, is_chunk=False, root=None):
 
@@ -38,10 +37,14 @@ class Bounds(object):
                 raise("Chunked bounds are required to have a root")
             self.x1 = math.floor((minx - root.minx) / cell_size)
             self.y1 = math.floor((root.maxy - maxy) / cell_size)
-            # max - 1 because the upper bounds match the cell lines
-            self.x2 = math.floor((maxx - root.minx) / cell_size) - 1
-            self.y2 = math.floor((root.maxy - miny) / cell_size) - 1
+            self.x2 = math.floor((maxx - root.minx) / cell_size)
+            self.y2 = math.floor((root.maxy - miny) / cell_size)
             self.root = root
+            self.indices = np.array(
+                [(i,j) for i in range(self.x1, self.x2)
+                for j in range(self.y1, self.y2)],
+                dtype=[('x', np.int32), ('y', np.int32)]
+            )
 
         else:
             self.root = self
@@ -49,12 +52,12 @@ class Bounds(object):
             self.x2 = math.floor(self.rangex / cell_size)
             self.y1 = 0
             self.y2 = math.floor(self.rangey / cell_size)
+            self.indices = np.array(
+                [(i,j) for i in range(self.x1, self.x2 + 1)
+                for j in range(self.y1, self.y2 + 1)],
+                dtype=[('x', np.int32), ('y', np.int32)]
+            )
 
-        self.indices = np.array(
-            [(i,j) for i in range(self.x1, self.x2 + 1)
-            for j in range(self.y1, self.y2 + 1)],
-            dtype=[('x', np.int32), ('y', np.int32)]
-        )
 
     def __eq__(self, other):
         if self.minx != other.minx:
@@ -69,7 +72,7 @@ class Bounds(object):
             return False
         return True
 
-    def chunk(self, filename:str, threshold=1000):
+    def chunk(self, filename:str, threshold=1000) :
         if self.is_chunk:
             raise Exception("Cannot perform chunk on a previously chunked bounds")
         self.is_chunk = True
@@ -82,7 +85,7 @@ class Bounds(object):
 
         chunk = Bounds(minx, miny, maxx, maxy, self.cell_size, self.group_size,
                        self.srs.to_wkt(), is_chunk=True, root=self)
-        self.root_chunk = chunk
+        self.root_chunk: Bounds = chunk
 
         filtered = chunk.filter(filename, threshold)
 
@@ -160,23 +163,23 @@ class Bounds(object):
         res = self.cell_size
         xnum, ynum = self.find_dims()
 
-        local_xs = res * np.array([
-                [x, min(x+xnum, self.x2+1)]
+        local_xs = np.array([
+                [x, min(x+xnum, self.x2)]
                 for x in range(self.x1, self.x2, int(xnum))
             ], dtype=np.float64)
-        dx = local_xs + self.root.minx
+        dx = (res * local_xs) + self.root.minx
 
-        local_ys = res * np.array([
-                [min(y+ynum, self.y2+1), y]
+        local_ys = np.array([
+                [min(y+ynum, self.y2), y]
                 for y in range(self.y1, self.y2, int(ynum))
             ], dtype=np.float64)
-        dy = self.root.maxy - local_ys
+        dy = self.root.maxy - (res * local_ys)
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
-            Bounds(coords[0], coords[2], coords[1], coords[3], self.cell_size,
+            Bounds(minx, miny, maxx, maxy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root)
-            for coords in coords_list
+            for minx,maxx,miny,maxy in coords_list
         ]
 
 

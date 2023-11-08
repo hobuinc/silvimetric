@@ -91,13 +91,12 @@ def arrange_data(pipeline, chunk: Bounds, atts, tdb=None):
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
     sum = counts.sum()
-    del data, dd, points, chunk
+    # del data, dd, points, chunk
     return sum
 
 def create_pipeline(filename):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
-    reader._options['resolution'] = 1
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
