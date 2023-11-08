@@ -77,6 +77,9 @@ class Bounds(object):
             raise Exception("Cannot perform chunk on a previously chunked bounds")
         self.is_chunk = True
 
+        # buffers are only applied if the bounds do not fit on the cell line
+        # x_buf = 1 if self.maxx % self.cell_size != 0 else 0
+        # y_buf = 1 if self.maxy % self.cell_size != 0 else 0
         # make bounds in scale with the desired resolution
         minx = self.minx + (self.x1 * self.cell_size)
         maxx = self.minx + ((self.x2 + 1) * self.cell_size)

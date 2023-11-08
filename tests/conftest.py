@@ -43,19 +43,19 @@ def test_point_count() -> int:
 
 @pytest.fixture(scope='function')
 def minx() -> float:
-    yield 0
+    yield 300
 
 @pytest.fixture(scope='function')
 def miny() -> float:
-    yield 0
+    yield 300
 
 @pytest.fixture(scope='function')
 def maxx() -> float:
-    yield 300
+    yield 600
 
 @pytest.fixture(scope='function')
 def maxy() -> float:
-    yield 300
+    yield 600
 
 @pytest.fixture(scope="function")
 def srs():

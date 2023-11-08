@@ -1,7 +1,7 @@
 import pdal
 import numpy as np
 import pyproj
-from math import sqrt, ceil, floor
+from math import sqrt, ceil
 
 
 # Create a pointcloud dataset that follows expected paramters for data testing
@@ -10,10 +10,9 @@ from math import sqrt, ceil, floor
 # - have intensional holes? Maybe should make a second for this
 # - have expected attributes (XYZ)
 # - have nice round bounds
-# - be in CRS 3857
+# - be in CRS 5070
 
 filename = './data/test_data.copc.laz'
-crs = pyproj.CRS.from_epsg(3857)
 cell_size = 30
 
 # has a nice square root of 300
@@ -22,32 +21,42 @@ split = sqrt(num_points)
 interval = 1
 
 # making it square
-minx = 0
+minx = 300
 maxx = minx + split
 miny = minx
 maxy = maxx
 
-print(f'num_points: {num_points}')
-print(f'split: {split}')
-print(f'minx: {minx}')
-print(f'maxx: {maxx}')
-print(f'miny: {miny}')
-print(f'maxy: {maxy}')
+# print(f'num_points: {num_points}')
+# print(f'split: {split}')
+# print(f'minx: {minx}')
+# print(f'maxx: {maxx}')
+# print(f'miny: {miny}')
+# print(f'maxy: {maxy}')
 
 
-positions = np.arange(minx, maxx, interval, dtype=np.float32)
-positions = positions[np.where(positions % cell_size != 0)]
-mod_size = 4
-data = np.array([ (x, y, ceil(y/cell_size), ceil(y/cell_size), ceil(y/cell_size), ceil(y/cell_size)) for x in positions for y in positions ],
-    dtype= [
+pos = np.arange(minx, maxx, interval, dtype=np.float32)
+positions = pos[np.where(pos % cell_size != 0)]
+
+data = np.array([(x, y, ceil(y/cell_size), ceil(y/cell_size),
+                   ceil(y/cell_size), ceil(y/cell_size))
+                   for x in positions for y in positions ],
+    dtype=[
         ('X', np.float32),
         ('Y', np.float32),
         ('Z', np.float32),
-        ('Intensity', np.int16),
-        ('NumberOfReturns', np.int8),
-        ('ReturnNumber', np.int8)
+        ('Intensity', np.uint16),
+        ('NumberOfReturns', np.uint8),
+        ('ReturnNumber', np.uint8)
     ]
 )
 
-p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(filename, a_srs='EPSG:5070')
+xypoints = data[['X', 'Y']].view()
+xis = np.logical_and(data['X'] > 510, data['X'] < 540)
+yis = np.logical_and(data['Y'] > 300, data['Y'] < 360)
+xyis = np.logical_and(xis==True, yis==True)
+
+print(f'writing out to {filename}')
+print('points found in bounds ([510,540],[300,360]): ', data[xyis].size)
+
+p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(filename, a_srs='EPSG:5070', scale_x=0.01, scale_y=0.01, scale_z=0.01)
 p.execute()

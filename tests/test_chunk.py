@@ -1,35 +1,33 @@
 import numpy as np
 import dask
+import pdal
 
 from treetally.bounds import Bounds
 from treetally.shatter import arrange_data, shatter
-from itertools import chain
 
-def check_for_holes(leaves, chunk):
-    c = np.copy(leaves)
-    dx = c[:, 0:2]
-    dy = c[:, 2:4]
+def check_for_holes(leaves: list[Bounds], chunk: Bounds):
+    ind = np.array([], dtype=chunk.indices.dtype)
+    for leaf in leaves:
+        if ind.size == 0:
+            ind = leaf.indices
+        else:
+            ind = np.concatenate([ind, leaf.indices])
+    dx = ind['x']
+    dy = ind['y']
 
     ux = np.unique(dx, axis=0)
     uy = np.unique(dy, axis=0)
 
-    #check that edges are the same
-    assert ux.min() == chunk.minx, f"Derived minx ({ux.min()}) doesn't match bounds minx ({chunk.minx})."
-    assert ux.max() >= chunk.maxx, f"Derived maxx ({ux.max()}) doesn't match bounds maxx ({chunk.maxx})."
-
-    assert uy.min() <= chunk.miny, f"Derived miny ({uy.min()}) doesn't match bounds miny ({chunk.miny})."
-    assert uy.max() == chunk.maxy, f"Derived maxy ({uy.max()}) doesn't match bounds maxy ({chunk.maxy})."
-
     #if min of this index doesn't fit max of next then there are holes
-    xrange = np.sort(ux, axis=0)
+    xrange = np.sort(ux)
     for idx, minmax in enumerate(xrange):
         if idx + 1 < len(xrange):
-            assert minmax[1] == xrange[idx + 1][0], f"Hole in derived bounds between {minmax[1]} {xrange[idx][0]}"
+            assert minmax + 1 == xrange[idx + 1], f"Hole in derived bounds between {minmax} {xrange[idx + 1]}"
 
-    yrange = np.sort(uy, axis=0)
+    yrange = np.sort(uy)
     for idx, minmax in enumerate(yrange):
         if idx + 1 < len(yrange):
-            assert minmax[1] == yrange[idx + 1][0], f"Hole in derived bounds between {minmax[1]} {yrange[idx][0]}"
+            assert minmax + 1 == yrange[idx + 1], f"Hole in derived bounds between {minmax} {yrange[idx + 1]}"
 
 def check_indexing(bounds, leaf_list):
     # gather indices from the chunks to match with bounds
@@ -80,66 +78,34 @@ def check_indexing(bounds, leaf_list):
     assert b == False, f"Indices duplicated: {dup}"
 
 
-class TestChunk(object):
-
-    # def compare_bounds(self, b0, b1):
-    #     assert b0.minx == b1.minx
-    #     assert b0.maxx == b1.maxx
-    #     assert b0.miny == b1.miny
-    #     assert b0.maxy == b1.maxy
-
-    # def test_split(self, chunk, resolution, group_size, srs):
-    #     c0b = Bounds(chunk.minx, chunk.miny, chunk.midx, chunk.midy, resolution, group_size, srs)
-    #     c1b = Bounds(chunk.midx, chunk.miny, chunk.maxx, chunk.midy, resolution, group_size, srs)
-    #     c2b = Bounds(chunk.minx, chunk.midy, chunk.midx, chunk.maxy, resolution, group_size, srs)
-    #     c3b = Bounds(chunk.midx, chunk.midy, chunk.maxx, chunk.maxy, resolution, group_size, srs)
-    #     chunks = [ch for ch in chunk.split()]
-
-    #     self.compare_bounds(chunks[0], c0b)
-    #     self.compare_bounds(chunks[1], c1b)
-    #     self.compare_bounds(chunks[2], c2b)
-    #     self.compare_bounds(chunks[3], c3b)
-    #     # assert chunks[0].bounds == c0b
-    #     # assert chunks[1].bounds == c1b
-    #     # assert chunks[2].bounds == c2b
-    #     # assert chunks[3].bounds == c3b
+class TestBounds(object):
 
     def test_indexing(self, filepath, bounds):
         leaf_list = list(bounds.chunk(filepath, 100))
         unfiltered = list(bounds.root_chunk.get_leaf_children())
         check_indexing(bounds, leaf_list)
+        check_for_holes(leaf_list, bounds.root_chunk)
         check_indexing(bounds, unfiltered)
 
-
-    # sub chunks should all add up to exactly what their parent is
-    # original chunk will be expanded to fit the cell size
-    # def test_chunking(self, bounds):
-    #     leaves = chunk.get_leaf_children()
-
-    #     check_for_holes(leaves, chunk)
-
-    # def test_filtering(self, filepath, chunk):
-
-    #     f = chunk.filter(filepath, 3000)
-
-    #     leaf_list = get_leaves(f)
-
-    #     leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in leaf_list])[0]
-    #     leaves = np.array([ch for leaf in leaf_procs for ch in leaf], dtype=np.float64)
-    #     check_for_holes(leaves, chunk)
-
-    # def test_bounds_to_chunk(self, chunk, filepath):
-    #     import pdal
-
-    #     bounds_reader = pdal.Reader(filepath)
-    #     bounds_reader._options['bounds'] = str(chunk.root_bounds)
-    #     bpc = bounds_reader.pipeline().execute()
-
-    #     chunk_reader = pdal.Reader(filepath)
-    #     chunk_reader._options['bounds'] = str(chunk.bounds)
-    #     cpc = chunk_reader.pipeline().execute()
-
-    #     assert cpc == bpc, f"Points found with original bounds({chunk.root_bounds}): {bpc} does not match points found with adjusted chunk bounds({chunk.bounds}): {cpc}"
+    def test_cells(self, filepath, bounds, group_size, resolution):
+        leaf_list = list(bounds.chunk(filepath, 100))
+        flag = False
+        bad_chunks = []
+        for leaf in leaf_list:
+            reader = pdal.Reader(filepath)
+            reader._options['bounds'] = str(leaf)
+            count = reader.pipeline().execute()
+            xs = np.unique(leaf.indices['x'])
+            ys = np.unique(leaf.indices['y'])
+            chunk_pc = (resolution - 1)**2 * xs.size * ys.size
+            if count == 0:
+                continue
+            if count == chunk_pc:
+                continue
+            else:
+                flag = True
+                bad_chunks.append(leaf)
+        assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
     def test_pointcount(self, pipeline, bounds, filepath, test_point_count):
 
