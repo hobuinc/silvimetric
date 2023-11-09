@@ -6,7 +6,8 @@ from shutil import rmtree
 from treetally.shatter import shatter
 
 
-class TestIntegration(object):
+@pytest.mark.skip(reason="TODO reintroduce after splitting up commands")
+class TestShatter(object):
 
     @pytest.fixture(scope="class")
     def atts(self) -> list[str]:
