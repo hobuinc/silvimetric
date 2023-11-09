@@ -5,7 +5,7 @@ import pdal
 from shutil import rmtree
 
 from treetally import Bounds
-from treetally.shatter import create_pipeline, shatter
+from treetally.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
@@ -14,12 +14,12 @@ def configure_dask():
 @pytest.fixture(scope='session')
 def filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
-            "1.2-with-color.copc.laz")
+            "test_data.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
-@pytest.fixture(scope='function')
-def bounds(resolution, group_size, minx, maxx, miny, maxy, srs):
+@pytest.fixture(scope='class')
+def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
     res = resolution
     gs = group_size
 
@@ -31,32 +31,32 @@ def pipeline(filepath) -> pdal.Pipeline:
 
 @pytest.fixture(scope='session')
 def resolution() -> int:
-    yield 100
+    yield 30
 
 @pytest.fixture(scope='session')
 def group_size() -> int:
-    yield 16
+    yield 4
 
-@pytest.fixture(scope='function')
-def test_point_count():
-    yield 1065
+@pytest.fixture(scope='class')
+def test_point_count() -> int:
+    yield 84100
 
-@pytest.fixture(scope='function')
-def minx():
-    yield 635619.85
+@pytest.fixture(scope='class')
+def minx() -> float:
+    yield 300
 
-@pytest.fixture(scope='function')
-def miny():
-    yield 848899.7
+@pytest.fixture(scope='class')
+def miny() -> float:
+    yield 300
 
-@pytest.fixture(scope='function')
-def maxx():
-    yield 638982.55
+@pytest.fixture(scope='class')
+def maxx() -> float:
+    yield 600
 
-@pytest.fixture(scope='function')
-def maxy():
-    yield 853535.43
+@pytest.fixture(scope='class')
+def maxy() -> float:
+    yield 600
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def srs():
-    yield 2991
+    yield 5070

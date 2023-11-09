@@ -5,8 +5,7 @@ import numpy as np
 from copy import deepcopy
 import dask
 import dask.array as da
-from dask.diagnostics import ProgressBar
-from dask.distributed import performance_report, progress, Client
+from dask.distributed import performance_report, progress
 
 from .bounds import Bounds, create_bounds
 
@@ -45,7 +44,8 @@ def get_data(pipeline, chunk):
         if 'readers' in stage.type:
             reader = stage
             break
-    reader._options['bounds'] = str(chunk)
+    # reader._options['bounds'] = str(chunk)
+    pipeline = pipeline | pdal.Filter.crop(bounds=str(chunk))
 
     try:
         pipeline.execute()
@@ -91,13 +91,12 @@ def arrange_data(pipeline, chunk: Bounds, atts, tdb=None):
     if tdb != None:
         write_tdb(tdb, [ dx, dy, dd ])
     sum = counts.sum()
-    del data, dd, points, chunk
+    # del data, dd, points, chunk
     return sum
 
 def create_pipeline(filename):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
-    reader._options['resolution'] = 1
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
