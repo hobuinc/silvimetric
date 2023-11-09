@@ -8,6 +8,7 @@ import dask.array as da
 from dask.distributed import performance_report, progress
 
 from .bounds import Bounds, create_bounds
+from .storage import Storage
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -54,12 +55,9 @@ def get_data(pipeline, chunk):
 
     return da.array(pipeline.arrays[0])
 
-def write_tdb(tdb, res):
-    dx, dy, dd = res
-    tdb[dx, dy] = dd
 
 @dask.delayed
-def arrange_data(pipeline, chunk: Bounds, atts, tdb=None):
+def arrange_data(pipeline, chunk: Bounds, atts, storage=None):
 
     points = get_data(deepcopy(pipeline), chunk)
     if not points.size:
@@ -88,8 +86,8 @@ def arrange_data(pipeline, chunk: Bounds, atts, tdb=None):
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    if tdb != None:
-        write_tdb(tdb, [ dx, dy, dd ])
+    if storage != None:
+        storage.write(dx, dy, dd)
     sum = counts.sum()
     # del data, dd, points, chunk
     return sum
@@ -141,38 +139,10 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     print('Filtering out empty chunks...')
 
     # set up tiledb
-    config = create_tiledb(bounds, tdb_dir, atts)
+    storage = Storage(tdb_dir, filename, atts)
+    config = storage.init(bounds, tdb_dir, atts)
 
     # Begin main operations
     print('Fetching and arranging data...')
     f = bounds.chunk(filename)
     run(pipeline, bounds, config, f, tdb_dir, atts, client, debug)
-
-def create_tiledb(bounds: Bounds, dirname: str, atts: list[str]):
-    dims = { d['name']: d['dtype'] for d in pdal.dimensions }
-    if tiledb.object_type(dirname) == "array":
-        with tiledb.open(dirname, "d") as A:
-            A.query(cond="X>=0").submit()
-    else:
-        dim_row = tiledb.Dim(name="X", domain=(0,bounds.xi), dtype=np.float64)
-        dim_col = tiledb.Dim(name="Y", domain=(0,bounds.yi), dtype=np.float64)
-        domain = tiledb.Domain(dim_row, dim_col)
-
-        count_att = tiledb.Attr(name="count", dtype=np.int32)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True) for name in atts]
-
-        # z_att = tiledb.Attr(name="Z", dtype=np.float64, var=True)
-        # hag_att = tiledb.Attr(name="HeightAboveGround", dtype=np.float32, var=True)
-        # atts = [count_att, z_att, hag_att]
-
-        schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(atts)*bounds.xi*bounds.yi, attrs=[count_att, *tdb_atts], allows_duplicates=True)
-        schema.check()
-        tiledb.SparseArray.create(dirname, schema)
-
-    return tiledb.Config({
-        "sm.check_coord_oob": False,
-        "sm.check_global_order": False,
-        "sm.check_coord_dedups": False,
-        "sm.dedup_coords": False
-    })
