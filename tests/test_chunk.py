@@ -1,6 +1,7 @@
 import numpy as np
 import dask
 import pdal
+import pytest
 
 from treetally.bounds import Bounds
 from treetally.shatter import arrange_data, shatter
@@ -79,22 +80,28 @@ def check_indexing(bounds, leaf_list):
 
 
 class TestBounds(object):
+    @pytest.fixture(scope='class', autouse=True)
+    def filtered(self, filepath, bounds):
+        return list(bounds.chunk(filepath, 100))
 
-    def test_indexing(self, filepath, bounds):
-        leaf_list = list(bounds.chunk(filepath, 100))
-        unfiltered = list(bounds.root_chunk.get_leaf_children())
-        check_indexing(bounds, leaf_list)
-        check_for_holes(leaf_list, bounds.root_chunk)
+    @pytest.fixture(scope='class')
+    def unfiltered(self, filtered, bounds):
+        return list(bounds.root_chunk.get_leaf_children())
+
+    def test_indexing(self, bounds, filtered, unfiltered):
+        check_indexing(bounds, filtered)
+        check_for_holes(filtered, bounds)
         check_indexing(bounds, unfiltered)
+        check_for_holes(unfiltered, bounds)
 
-    def test_cells(self, filepath, bounds, group_size, resolution):
-        leaf_list = list(bounds.chunk(filepath, 100))
+    def test_cells(self, filepath, filtered, resolution):
         flag = False
         bad_chunks = []
-        for leaf in leaf_list:
+        for leaf in filtered:
             reader = pdal.Reader(filepath)
-            reader._options['bounds'] = str(leaf)
-            count = reader.pipeline().execute()
+            crop = pdal.Filter.crop(bounds=str(leaf))
+            p = reader | crop
+            count = p.execute()
             xs = np.unique(leaf.indices['x'])
             ys = np.unique(leaf.indices['y'])
             chunk_pc = (resolution - 1)**2 * xs.size * ys.size
@@ -107,14 +114,11 @@ class TestBounds(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, pipeline, bounds, filepath, test_point_count):
-
-        filtered = list(bounds.chunk(filepath, 100))
+    def test_pointcount(self, pipeline, filtered, unfiltered, test_point_count):
 
         l1 = [arrange_data(pipeline, leaf, ['Z']) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        unfiltered = list(bounds.root_chunk.get_leaf_children())
         l2 = [arrange_data(pipeline, leaf, ['Z']) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 

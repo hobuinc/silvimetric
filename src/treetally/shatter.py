@@ -45,7 +45,8 @@ def get_data(pipeline, chunk):
         if 'readers' in stage.type:
             reader = stage
             break
-    reader._options['bounds'] = str(chunk)
+    # reader._options['bounds'] = str(chunk)
+    pipeline = pipeline | pdal.Filter.crop(bounds=str(chunk))
 
     try:
         pipeline.execute()

@@ -18,7 +18,7 @@ def filepath() -> str:
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
     res = resolution
     gs = group_size
@@ -37,26 +37,26 @@ def resolution() -> int:
 def group_size() -> int:
     yield 4
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def test_point_count() -> int:
     yield 84100
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def minx() -> float:
     yield 300
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def miny() -> float:
     yield 300
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def maxx() -> float:
     yield 600
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope='class')
 def maxy() -> float:
     yield 600
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="class")
 def srs():
     yield 5070
