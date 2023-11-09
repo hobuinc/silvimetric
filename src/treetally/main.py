@@ -1,6 +1,5 @@
 import argparse
 import webbrowser
-import atexit
 
 from os import path
 

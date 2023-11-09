@@ -5,7 +5,7 @@ import pdal
 from shutil import rmtree
 
 from treetally import Bounds
-from treetally.shatter import create_pipeline, shatter
+from treetally.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():

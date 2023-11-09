@@ -5,8 +5,7 @@ import numpy as np
 from copy import deepcopy
 import dask
 import dask.array as da
-from dask.diagnostics import ProgressBar
-from dask.distributed import performance_report, progress, Client
+from dask.distributed import performance_report, progress
 
 from .bounds import Bounds, create_bounds
 

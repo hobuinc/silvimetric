@@ -1,6 +1,5 @@
 import pdal
 import numpy as np
-import pyproj
 from math import sqrt, ceil
 
 
@@ -26,14 +25,6 @@ maxx = minx + split
 miny = minx
 maxy = maxx
 
-# print(f'num_points: {num_points}')
-# print(f'split: {split}')
-# print(f'minx: {minx}')
-# print(f'maxx: {maxx}')
-# print(f'miny: {miny}')
-# print(f'maxy: {maxy}')
-
-
 pos = np.arange(minx, maxx, interval, dtype=np.float32)
 positions = pos[np.where(pos % cell_size != 0)]
 
@@ -50,13 +41,7 @@ data = np.array([(x, y, ceil(y/cell_size), ceil(y/cell_size),
     ]
 )
 
-xypoints = data[['X', 'Y']].view()
-xis = np.logical_and(data['X'] > 510, data['X'] < 540)
-yis = np.logical_and(data['Y'] > 300, data['Y'] < 360)
-xyis = np.logical_and(xis==True, yis==True)
-
 print(f'writing out to {filename}')
-print('points found in bounds ([510,540],[300,360]): ', data[xyis].size)
 
 p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(filename, a_srs='EPSG:5070', scale_x=0.01, scale_y=0.01, scale_z=0.01)
 p.execute()
