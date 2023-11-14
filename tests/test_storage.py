@@ -1,7 +1,7 @@
 import pytest
 import tiledb
 
-from treetally.storage import Storage
+from silvistat.storage import Storage
 
 class Test_Storage(object):
     @pytest.fixture(scope="class")

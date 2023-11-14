@@ -1,4 +1,4 @@
-## TreeTally
+## SilviStat
 This software is built with the intention of processing pointcloud data and inserting it into a TileDB data structure as a base, so that future processing can look at this TileDB structure and compute stats based on the data present.
 
 ### Process
@@ -12,7 +12,7 @@ This software is built with the intention of processing pointcloud data and inse
 ### Usage
 
 ```
-treetally [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
+silvistat [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
 [--group_size GROUP_SIZE] [--resolution RESOLUTION] [--polygon POLYGON]
 [--debug DEBUG] [--watch WATCH] filename
 ```
@@ -35,7 +35,7 @@ treetally [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
 
 ### Example
 ```
-treetally \
+silvistat \
 https://github.com/PDAL/data/raw/master/autzen/autzen-classified.copc.laz \
 --tdb_dir autzen_class --threads 6 --workers 10 --group_size 16 \
 --resolution 100 --watch True

@@ -3,8 +3,8 @@ import dask
 import pdal
 import pytest
 
-from treetally.bounds import Bounds
-from treetally.shatter import arrange_data, shatter
+from silvistat.bounds import Bounds
+from silvistat.shatter import arrange_data, shatter
 
 def check_for_holes(leaves: list[Bounds], chunk: Bounds):
     ind = np.array([], dtype=chunk.indices.dtype)

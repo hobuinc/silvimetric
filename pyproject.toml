@@ -1,5 +1,5 @@
 [project]
-name = "treetally"
+name = "silvistat"
 requires-python = ">=3.9"
 description = "A forestry LiDAR processing package"
 readme = "README.md"
@@ -25,21 +25,21 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/hobuinc/treetally"
-repository = "https://github.com/hobuinc/treetally"
+homepage = "https://github.com/hobuinc/silvistat"
+repository = "https://github.com/hobuinc/silvistat"
 
 [tool.setuptools]
 package-dir = {"" =  "src"}
 
 [tool.setuptools.dynamic]
-version = { attr = "treetally.__version__" }
+version = { attr = "silvistat.__version__" }
 
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-treetally = "treetally.main:main"
+silvistat = "silvistat.main:main"
 
 [tool.black]
 line-length = 88
