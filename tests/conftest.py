@@ -2,7 +2,6 @@ import pytest
 import os
 import dask
 import pdal
-from shutil import rmtree
 
 from silvistat import Bounds
 from silvistat.shatter import create_pipeline
@@ -18,22 +17,32 @@ def filepath() -> str:
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
+@pytest.fixture(scope='session')
+def tdb_filepath(tmp_path_factory) -> str:
+    path = tmp_path_factory.mktemp("test_tdb")
+    yield os.path.abspath(path)
+
 @pytest.fixture(scope='class')
 def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
-    res = resolution
-    gs = group_size
+    yield Bounds(minx,miny,maxx,maxy,resolution,group_size,srs)
 
-    yield Bounds(minx,miny,maxx,maxy,res,gs,srs)
+@pytest.fixture(scope="session")
+def attrs() -> list[str]:
+    yield [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
+def dims(attrs):
+    yield { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in attrs }
+
+@pytest.fixture(scope='class')
 def pipeline(filepath) -> pdal.Pipeline:
     yield create_pipeline(filepath)
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='class')
 def resolution() -> int:
     yield 30
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='class')
 def group_size() -> int:
     yield 4
 

@@ -30,16 +30,3 @@ class TestShatter(object):
             #sum(len(sub_array) for sub_array in array)
             count = len(list(chain(tdb[:]['Z'])))
             assert(count == test_point_count)
-
-    def test_attributes(self, tdb_dir, atts):
-        schema = tiledb.ArraySchema.load(tdb_dir)
-        attr_num = schema.nattr
-        atts = [ *atts, "count" ]
-        for i in range(attr_num):
-            a = schema.attr(i)
-            assert(a.name in atts)
-
-        for i in atts:
-            schema.attr(i)
-
-

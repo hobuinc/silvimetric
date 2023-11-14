@@ -3,6 +3,6 @@
 # class Pointcloud(object):
 #     """ Handle data ingesting and arrangement. """
 
-#     def __init__(self, filename: str, storage:):
+#     def __init__(self, filename: str, storage: Storage):
 #         self.filename = filename
-#         self.storage =
+#         self.storage = storage
