@@ -36,7 +36,7 @@ jobs:
           auto-update-conda: false
           python-version: "3.11"
           use-mamba: true
-          activate-environment: fusion-py
+          activate-environment: silvistat
       - name: "Install Test Framework"
         run: pip install pytest
       - name: "Install Package"
@@ -54,7 +54,7 @@ jobs:
       - name: Run Tests
         run: |
           pytest
-  
+
   analyze:
     name: analyze
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
           auto-update-conda: false
           python-version: "3.11"
           use-mamba: true
-          activate-environment: fusion-py
+          activate-environment: silvistat
       - name: Config CodeQL
         run: |
           echo "CODEQL_PYTHON=$(which python)" >> $GITHUB_ENV

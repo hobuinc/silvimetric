@@ -1,4 +1,4 @@
-name: fusion-py
+name: silvistat
 channels:
   - conda-forge
 dependencies:
