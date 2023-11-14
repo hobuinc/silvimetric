@@ -39,7 +39,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-silvistat = "silvistat.main:main"
+silvistat = "silvistat.cli.__main__:cli"
 
 [tool.black]
 line-length = 88
