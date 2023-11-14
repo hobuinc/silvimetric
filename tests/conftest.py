@@ -4,8 +4,8 @@ import dask
 import pdal
 from shutil import rmtree
 
-from treetally import Bounds
-from treetally.shatter import create_pipeline
+from silvistat import Bounds
+from silvistat.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
