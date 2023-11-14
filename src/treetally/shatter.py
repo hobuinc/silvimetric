@@ -55,7 +55,6 @@ def get_data(pipeline, chunk):
 
     return da.array(pipeline.arrays[0])
 
-
 @dask.delayed
 def arrange_data(pipeline, chunk: Bounds, atts, storage=None):
 
