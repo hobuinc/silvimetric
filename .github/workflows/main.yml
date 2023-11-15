@@ -38,7 +38,7 @@ jobs:
           use-mamba: true
           activate-environment: silvistat
       - name: "Install Test Framework"
-        run: pip install pytest
+        run: pip install pytest pytest-click
       - name: "Install Package"
         run: pip install .
       - name: "Debug Info"
