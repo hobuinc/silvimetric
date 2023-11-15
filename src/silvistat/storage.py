@@ -13,6 +13,7 @@ class Storage(object):
 
         self.schema = None
         self.tdb = None
+        self.path = None
 
     def __make_schema(self, atts: list[str], resolution: float, bounds: list[float]) -> tiledb.ArraySchema:
         """
@@ -57,6 +58,7 @@ class Storage(object):
             capacity=len(atts) * xi * yi,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
+        self.schema = schema
         return schema
 
     def create(self, atts:list[str], resolution: float, bounds: list[float], dirname: str):
@@ -74,6 +76,7 @@ class Storage(object):
         dirname : str
             Path to where TileDB should be created
         """
+        self.path = dirname
         if tiledb.object_type(dirname) == "array":
             self.tdb = tiledb.open(dirname, "w")
         else:

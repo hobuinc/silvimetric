@@ -17,11 +17,6 @@ def filepath() -> str:
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
-@pytest.fixture(scope='session')
-def tdb_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tdb")
-    yield os.path.abspath(path)
-
 @pytest.fixture(scope='class')
 def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
     yield Bounds(minx,miny,maxx,maxy,resolution,group_size,srs)
