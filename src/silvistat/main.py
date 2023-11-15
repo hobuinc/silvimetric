@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--tdb_dir", type=str)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--workers", type=int, default=12)
-    parser.add_argument("--group_size", type=int, default=12)
+    parser.add_argument("--group_size", type=int, default=16)
     parser.add_argument("--resolution", type=float, default=30)
     parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--debug", type=bool, default=False)

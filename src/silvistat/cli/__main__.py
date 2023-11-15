@@ -1,6 +1,6 @@
 import click
 import logging
-import pathlib
+import json
 
 from silvistat.app import Application
 
@@ -41,12 +41,33 @@ def info(app):
 
 @cli.command('initialize')
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
-@click.option("--bounds", type=Bounds, help="Bounds to limit all Silvistat processing")
+@click.option("--attributes", help="List of attributes to include in Database",
+              default='["Z","NumberOfReturns","ReturnNumber","HeightAboveGround","Intensity"]')
+#TODO support more bounds types in future
+@click.option("--bounds", help="""Bounds to limit all Silvistat processing. \
+              '[minx,miny(,minz),maxx,maxy(,maxz)]'""", required=True)
 @click.pass_obj
-def initialize(app, resolution, bounds):
-    """Initialize Silvistats DATABASE"""
+def initialize(app: Application, resolution: float, bounds: str, attributes: str):
+    """Initialize Silvistats DATABASE
+
+    :param resolution: Resolution of a cell in dataset units, default to 30.0
+    :type resolution: float, optional
+    """
+    try:
+        b = json.loads(bounds)
+    except json.JSONDecodeError:
+        raise Exception(f"""Invalid bounding box {bounds}. Must be in shape\
+                         '[minx,miny(,minz),maxx,maxy(,maxz)]'""")
+
+    try:
+        a = json.loads(attributes)
+    except json.JSONDecodeError:
+        raise Exception(f"""Invalid attributes list {attributes}. Must be in \
+                        form '["Att1","Att2"(, ...)]'""")
+
+    print(app.database)
     from silvistat.cli.initialize import initialize as initializeFunction
-    initializeFunction(app)
+    initializeFunction(app, resolution, b, a)
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)

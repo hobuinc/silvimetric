@@ -6,50 +6,44 @@ from math import floor
 from . import Bounds
 
 class Storage(object):
-    """ Handles storage of shattered data in a TileDB structure. """
-    def __init__(self, dirname, filename, config= None, cell_size=30,
-                 chunk_size=16):
-        self.dirname = dirname
-        self.src_file = filename
-        self.config = config
-        self.cell_size = cell_size
-        self.chunk_size = chunk_size
-        ## TODO insert config here
+    """ Handles storage of shattered data in a TileDB Database. """
+
+    def __init__(self):
         self.ctx = tiledb.default_ctx()
 
-        self.atts = None
         self.schema = None
         self.tdb = None
-        self.bounds = None
 
-    def __inspect_file(self):
-        """
-        Does pdal quick info on source file for making informed decisions on
-        storage, adding available attributes and bounds if not supplied by user.
-        """
-        r = pdal.Reader(self.src_file)
-        info = r.pipeline().quickinfo[r.type]
-        if not self.atts:
-            self.atts=info['dimensions']
-        if not self.bounds:
-            b = info['bounds']
-            srs = info['srs']['wkt']
-            self.bounds = Bounds(b['minx'], b['miny'], b['maxx'], b['maxy'], self.cell_size,
-                                  self.chunk_size, srs)
-
-    def __make_schema(self, atts: list[str] = None) -> tiledb.ArraySchema:
+    def __make_schema(self, atts: list[str], resolution: float, bounds: list[float]) -> tiledb.ArraySchema:
         """
         Creates TileDB schema for Storage class.
 
-        :param atts: list[str]
-            The list of attributes to be included in TileDB
-        :rtype: tiledb.ArraySchema
-        :return schema
+        Parameters
+        ----------
+        atts : list[str]
+            List of PDAL attributes
+        resolution : float
+            Resolution of a cell
+        bounds : list[float]
+            Bounding box of dataset. [minx, minz(, minz), maxx, maxy(, maxz)]
+
+        Returns
+        -------
+        tiledb.ArraySchema
+            Schema associated with generated TileDB database
         """
-        self.__inspect_file()
-        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in self.atts }
-        xi = floor((self.bounds.maxx - self.bounds.minx) / self.bounds.cell_size)
-        yi = floor((self.bounds.maxy - self.bounds.miny) / self.bounds.cell_size)
+
+        if len(bounds) == 4:
+            minx, miny, maxx, maxy = bounds
+        elif len(bounds) == 6:
+            minx, miny, minz, maxx, maxy, maxz = bounds
+        else:
+            raise Exception(f"Bounding box must have either 4 or 6 entities. {bounds}")
+
+
+        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in atts }
+        xi = floor((maxx - minx) / resolution)
+        yi = floor((maxy - miny) / resolution)
 
         dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64, ctx=self.ctx)
         dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64, ctx=self.ctx)
@@ -65,32 +59,41 @@ class Storage(object):
         schema.check()
         return schema
 
-    def create(self, atts:list[str] = None) -> tiledb.Config:
+    def create(self, atts:list[str], resolution: float, bounds: list[float], dirname: str):
         """
         Creates TileDB storage.
 
-        :param atts: list[str]
-            The list of attributes to be included in TileDB
+        Parameters
+        ----------
+        atts : list[str]
+            List of PDAL attributes
+        resolution : float
+            Resolution of a cell
+        bounds : list[float]
+            Bounding box of dataset. [minx, minz(, minz), maxx, maxy(, maxz)]
+        dirname : str
+            Path to where TileDB should be created
         """
-        if tiledb.object_type(self.dirname) == "array":
-            self.tdb = tiledb.open(self.dirname, "w")
+        if tiledb.object_type(dirname) == "array":
+            self.tdb = tiledb.open(dirname, "w")
         else:
-            schema = self.__make_schema(atts)
-            tiledb.SparseArray.create(self.dirname, schema)
-            self.tdb = tiledb.open(self.dirname, "w")
+            schema = self.__make_schema(atts, resolution, bounds)
+            tiledb.SparseArray.create(dirname, schema)
+            self.tdb = tiledb.open(dirname, "w")
 
-    def write(self, xs, ys, data) -> None:
+    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
-        Writes to local TileDB storage.
+        Write data to TileDB database
 
-        :param xs: ndarray(dtype=np.int32)
-            List of X indices
-        :param ys: ndarray(dtype=np.int32)
-            List of Y indices
-        :param data: ndarray(dtype=object)
-            Object storage of ndarrays storing data from pointcloud
+        Parameters
+        ----------
+        xs : np.ndarray
+            X cell indices
+        ys : np.ndarray
+            Y cell indices
+        data : np.ndarray
+            Numpy object of data values for attributes in each index pairing
         """
-
         if not self.tdb:
             self.tdb = tiledb.open(self.dirname, "w")
         self.tdb[xs, ys] = data
