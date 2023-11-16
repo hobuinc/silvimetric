@@ -5,6 +5,7 @@ import json
 from silvistat.app import Application
 
 from silvistat.bounds import Bounds
+from silvistat.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,9 @@ def cli(ctx, database, log_level, threads, progress):
 @click.pass_obj
 def info(app):
     """Print info about Silvistats database"""
+    with Storage(app.database) as tdb:
+        print(json.dumps(tdb.getMetadata(), indent=2))
+
     pass
 
 @cli.command('initialize')
@@ -46,8 +50,9 @@ def info(app):
 #TODO support more bounds types in future
 @click.option("--bounds", help="""Bounds to limit all Silvistat processing. \
               '[minx,miny(,minz),maxx,maxy(,maxz)]'""", required=True)
+@click.option("--crs", help="Coordinate reference system of the data", required=True)
 @click.pass_obj
-def initialize(app: Application, resolution: float, bounds: str, attributes: str):
+def initialize(app: Application, resolution: float, bounds: str, attributes: str, crs: str):
     """Initialize Silvistats DATABASE
 
     :param resolution: Resolution of a cell in dataset units, default to 30.0
@@ -64,10 +69,9 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
     except json.JSONDecodeError:
         raise Exception(f"""Invalid attributes list {attributes}. Must be in \
                         form '["Att1","Att2"(, ...)]'""")
-
-    print(app.database)
+    print(f"Creating database at {app.database}")
     from silvistat.cli.initialize import initialize as initializeFunction
-    initializeFunction(app, resolution, b, a)
+    initializeFunction(app, resolution, b, a, crs)
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)

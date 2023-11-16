@@ -31,7 +31,7 @@ class Storage(object):
 
     @staticmethod
     def create(atts:list[str], resolution: float, bounds: list[float],
-               dirpath: pathlib.Path, crs: str, ctx:tiledb.Ctx=None):
+               dirname: str, crs: str, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
@@ -58,8 +58,6 @@ class Storage(object):
         Exception
             Raises bounding box errors if not of lengths 4 or 6
         """
-
-        dirname = str(dirpath)
 
         if not ctx:
             ctx = tiledb.default_ctx()

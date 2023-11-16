@@ -1,11 +1,12 @@
 import logging
+import pathlib
 
 from silvistat.app import Application
 from silvistat.storage import Storage
 
 logger = logging.getLogger(__name__)
 
-def initialize(application: Application, resolution: int, bounds: list[float], atts: list[str]):
+def initialize(application: Application, resolution: int, bounds: list[float], atts: list[str], crs: str):
     """
     Initialize a Silvistats TileDB instance for a given Application instance
 
@@ -24,5 +25,4 @@ def initialize(application: Application, resolution: int, bounds: list[float], a
     """
 
     logger.debug(f"Initializing application with {application} settings")
-    storage = Storage()
-    storage.create(atts, resolution, bounds, application.database)
+    Storage.create(atts, resolution, bounds, application.database, crs)
