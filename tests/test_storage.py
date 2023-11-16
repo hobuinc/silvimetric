@@ -6,6 +6,7 @@ import click
 
 
 from silvistat.storage import Storage
+from silvistat.bounds import Bounds
 from silvistat.cli import initialize
 
 @pytest.fixture(scope='class')
@@ -29,22 +30,22 @@ class Test_Storage(object):
             assert s.has_attr(a)
             assert s.attr(a).dtype == dims[a]
 
-    def test_metadata(self, storage: Storage):
+    def test_metadata(self, storage: Storage, resolution: float, bounds: Bounds):
         """Check that instantiation metadata is properly written"""
         metadata = storage.getMetadata()
-        assert metadata['resolution'] == 30.0
-
-
+        assert metadata['resolution'] == resolution
+        assert metadata['bounds'] == (bounds.minx, bounds.miny, bounds.maxx,
+                                      bounds.maxy)
 
     def test_local(self, storage: Storage, attrs: list[str], dims):
-        s = tiledb.ArraySchema.load(storage.tdb_dir)
+        with storage as st:
+            sc = st.schema
+            assert sc.has_attr('count')
+            assert sc.attr('count').dtype == np.int32
 
-        assert s.has_attr('count')
-        assert s.attr('count').dtype == np.int32
-
-        for a in attrs:
-            assert s.has_attr(a)
-            assert s.attr(a).dtype == dims[a]
+            for a in attrs:
+                assert sc.has_attr(a)
+                assert sc.attr(a).dtype == dims[a]
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")

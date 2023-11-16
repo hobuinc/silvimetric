@@ -3,13 +3,14 @@ import tiledb
 import numpy as np
 from math import floor
 import pathlib
+import json
 
 from . import Bounds
 
 class Storage(object):
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None):
+    def __init__(self, tdb_dir: str, mode: str='r', ctx:tiledb.Ctx=None):
         if not ctx:
             self.ctx = tiledb.default_ctx()
         else:
@@ -21,17 +22,17 @@ class Storage(object):
         self.tdb_dir = tdb_dir
 
         #TODO create boths streams at startup
-        self.open()
+        self.open(mode)
 
         self.schema = self.tdb.schema
 
 
     #TODO enter and exit methods to close read and write streams
 
-    def __enter__(self):
-        return zip(self.tdb)
+    def __enter__(self) -> tiledb.SparseArray:
+        return self.tdb
 
-    def __exit__(self):
+    def __exit__(self, t, v, tb):
         self.tdb.close()
 
     @staticmethod
@@ -96,7 +97,7 @@ class Storage(object):
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
-        tiledb.SparseArray.create(dirname, schema)  
+        tiledb.SparseArray.create(dirname, schema)
         with tiledb.SparseArray(dirname, "w", ctx=ctx) as A:
             metadata = {'resolution': resolution}
             metadata['bounds'] = [minx, miny, maxx, maxy]
@@ -106,13 +107,52 @@ class Storage(object):
 
         return s
 
-    def saveMetadata(self, metadata):
-        self.tdb.meta.update( metadata )
-    
-    def getMetadata(self):
-        return self.tdb.meta
+    def saveMetadata(self, metadata: dict) -> None:
+        """
+        Save metadata to the Database
 
-    def open(self, mode='r'):
+        Parameters
+        ----------
+        metadata : dict
+            Metadata key-value pairs to be saved
+        """
+        self.tdb.meta.update(metadata)
+
+    def getMetadata(self) -> dict:
+        """
+        Get the metadata from the database
+
+        Returns
+        -------
+        dict
+            Dictionary of key-value pairs of database metadata
+        """
+        return dict(self.tdb.meta)
+
+    def dumpMetadata(self) -> None:
+        """
+        Print the database metadata to terminal
+        """
+        print(json.dumps(self.getMetadata(), 2))
+
+    def open(self, mode:str='r') -> None:
+        """
+        Open either a read or write stream for TileDB database
+
+        Parameters
+        ----------
+        mode : str, optional
+            Stream mode. Valid options are 'r' and 'w', by default 'r'
+
+        Raises
+        ------
+        Exception
+            Incorrect Mode was given, only valid modes are 'w' and 'r'
+        Exception
+            Path exists and is not a TileDB array
+        Exception
+            Path does not exist
+        """
         if tiledb.object_type(self.tdb_dir) == "array":
             if mode == 'w':
                 self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
@@ -121,8 +161,8 @@ class Storage(object):
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.tdb_dir).exists():
-            raise Exception(f"""Path {self.tdb_dir} already exists and is not initialized\
-                             for TileDB access.""")
+            raise Exception(f"Path {self.tdb_dir} already exists and is not" +
+                            " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.tdb_dir} does not exist")
 
