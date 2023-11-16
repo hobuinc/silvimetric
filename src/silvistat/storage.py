@@ -3,41 +3,42 @@ import tiledb
 import numpy as np
 from math import floor
 import pathlib
-import json
+import pyproj
 
 from . import Bounds
 
 class Storage(object):
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, tdb_dir: str, mode: str='r', ctx:tiledb.Ctx=None):
+    def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None):
         if not ctx:
             self.ctx = tiledb.default_ctx()
         else:
             self.ctx = ctx
 
+        self.tdb = None
+        self.schema = None
+        self.mode = None
+
         if not pathlib.Path(tdb_dir).exists():
             raise Exception(f"Given database directory '{tdb_dir}' does not exist")
 
-        self.tdb_dir = tdb_dir
-
-        #TODO create boths streams at startup
-        self.open(mode)
-
-        self.schema = self.tdb.schema
+        self.tdb_dir: str = tdb_dir
 
 
     #TODO enter and exit methods to close read and write streams
 
-    def __enter__(self) -> tiledb.SparseArray:
+    def __enter__(self):
         return self.tdb
 
-    def __exit__(self, t, v, tb):
-        self.tdb.close()
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        if self.tdb is not None:
+            self.tdb.close()
+
 
     @staticmethod
     def create(atts:list[str], resolution: float, bounds: list[float],
-               dirpath: pathlib.Path, ctx:tiledb.Ctx=None):
+               dirpath: pathlib.Path, crs: str, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
@@ -101,6 +102,7 @@ class Storage(object):
         with tiledb.SparseArray(dirname, "w", ctx=ctx) as A:
             metadata = {'resolution': resolution}
             metadata['bounds'] = [minx, miny, maxx, maxy]
+            metadata['crs'] = crs
             A.meta.update(metadata)
 
         s = Storage(dirname, ctx=ctx)
@@ -116,6 +118,9 @@ class Storage(object):
         metadata : dict
             Metadata key-value pairs to be saved
         """
+        # reopen in write mode if current mode is read
+        if self.tdb is None or self.mode == 'r':
+            self.open('w')
         self.tdb.meta.update(metadata)
 
     def getMetadata(self) -> dict:
@@ -127,15 +132,12 @@ class Storage(object):
         dict
             Dictionary of key-value pairs of database metadata
         """
+        # reopen in read mode if current mode is write
+        if self.tdb is None or self.mode == 'w':
+            self.open('r')
         return dict(self.tdb.meta)
 
-    def dumpMetadata(self) -> None:
-        """
-        Print the database metadata to terminal
-        """
-        print(json.dumps(self.getMetadata(), 2))
-
-    def open(self, mode:str='r') -> None:
+    def open(self, mode:str='r') -> tiledb.SparseArray:
         """
         Open either a read or write stream for TileDB database
 
@@ -153,6 +155,11 @@ class Storage(object):
         Exception
             Path does not exist
         """
+
+        #open new stream
+        if self.tdb is not None:
+            self.tdb.close()
+
         if tiledb.object_type(self.tdb_dir) == "array":
             if mode == 'w':
                 self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
@@ -160,11 +167,14 @@ class Storage(object):
                 self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
+            self.schema: tiledb.ArraySchema = self.tdb.schema
+            self.mode=mode
         elif pathlib.Path(self.tdb_dir).exists():
             raise Exception(f"Path {self.tdb_dir} already exists and is not" +
                             " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.tdb_dir} does not exist")
+        return self.tdb
 
     #TODO what are we reading? queries are probably going to be specific
     def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
