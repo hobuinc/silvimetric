@@ -7,26 +7,26 @@ import dask
 import dask.array as da
 from dask.distributed import performance_report, progress
 
-from .bounds import Bounds, create_bounds
+from .bounds import Extents, Bounds, create_extents
 from .storage import Storage
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def floor_x(points: da.Array, bounds: Bounds):
-    return da.array(da.floor((points - bounds.minx) / bounds.cell_size),
+def floor_x(points: da.Array, extents: Extents):
+    return da.array(da.floor((points - extents.minx) / extents.cell_size),
         np.int32)
 
-def floor_y(points: da.Array, bounds: Bounds):
-    return da.array(da.floor((bounds.maxy - points) / bounds.cell_size),
+def floor_y(points: da.Array, extents: Extents):
+    return da.array(da.floor((extents.maxy - points) / extents.cell_size),
         np.int32)
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
 def get_atts(points, chunk):
-    bounds = chunk.root
+    extents = chunk.root
     xypoints = points[['X','Y']].view()
-    xis = floor_x(xypoints['X'], bounds)
-    yis = floor_y(xypoints['Y'], bounds)
+    xis = floor_x(xypoints['X'], extents)
+    yis = floor_y(xypoints['Y'], extents)
     for xx in xis.compute():
         if xx not in chunk.indices['x']:
             print('x nope')
@@ -56,7 +56,7 @@ def get_data(pipeline, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(pipeline, chunk: Bounds, atts, storage=None):
+def arrange_data(pipeline, chunk: Extents, atts, storage=None):
 
     points = get_data(deepcopy(pipeline), chunk)
     if not points.size:
@@ -101,26 +101,29 @@ def create_pipeline(filename):
     # hag = pdal.Filter.hag_nn()
     return reader | class_zero | rn | nor #| smrf | hag
 
-def run(pipeline, bounds, tdb_config, filter_res, tdb_dir, atts, client, debug):
-    with tiledb.open(tdb_dir, "w", config=tdb_config) as tdb:
+def run(pipeline, filename, tdb_dir, chunk_size, client, debug):
+    #TODO use information from metadata to generate bounds and extents
+    storage = Storage(tdb_dir)
+    meta = storage.getMetadata()
+    bounds = Bounds(*meta['bounds'])
+    crs = meta['crs']
+    res = meta['resolution']
+    atts = storage.getAttributes()
+
+    extents = Extents(bounds, res, chunk_size, crs)
+
+    with storage.open('w') as tdb:
         # debug uses single threaded dask
         if debug:
-            leaf_procs = dask.compute([leaf.get_leaf_children() for leaf in
-                get_leaves(filter_res)])[0]
-            data_futures = dask.compute([arrange_data(pipeline, ch, bounds, atts, tdb) for leaf in leaf_procs
-                for ch in leaf], optimize_graph=True)
+            leaves = extents.chunk(filename, 200)
+            data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
         else:
             with performance_report(f'{tdb_dir}-dask-report.html'):
                 t = client.scatter(tdb)
-                b = client.scatter(bounds)
+                b = client.scatter(extents)
 
-                leaf_procs = client.compute([node.get_leaf_children() for node
-                    in get_leaves(filter_res)])
-
-                data_futures = client.compute([
-                    arrange_data(pipeline, ch, b, atts, t)
-                    for leaf in leaf_procs for ch in leaf
-                ])
+                leaves = extents.chunk(filename, 200)
+                data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
 
                 progress(data_futures)
                 client.gather(data_futures)
@@ -134,14 +137,14 @@ def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
     # read pointcloud
     pipeline = create_pipeline(filename)
     reader = pipeline.stages[0]
-    bounds = create_bounds(reader, res, group_size, polygon)
+    extents = create_extents(reader, res, group_size, polygon)
     print('Filtering out empty chunks...')
 
     # set up tiledb
     storage = Storage(tdb_dir, filename, atts)
-    config = storage.init(bounds, tdb_dir, atts)
+    config = storage.init(extents, tdb_dir, atts)
 
     # Begin main operations
     print('Fetching and arranging data...')
-    f = bounds.chunk(filename)
-    run(pipeline, bounds, config, f, tdb_dir, atts, client, debug)
+    f = extents.chunk(filename)
+    run(pipeline, extents, config, f, tdb_dir, atts, client, debug)

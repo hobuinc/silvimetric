@@ -87,11 +87,16 @@ class Storage(object):
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
+        try:
+            proj_crs = pyproj.CRS.from_user_input(crs)
+        except:
+            raise Exception(f"Invalid CRS ingested, {crs}")
+
         tiledb.SparseArray.create(dirname, schema)
         with tiledb.SparseArray(dirname, "w", ctx=ctx) as A:
             metadata = {'resolution': resolution}
             metadata['bounds'] = [minx, miny, maxx, maxy]
-            metadata['crs'] = crs
+            metadata['crs'] = proj_crs.to_string()
             A.meta.update(metadata)
 
         s = Storage(dirname, ctx=ctx)
@@ -124,6 +129,14 @@ class Storage(object):
         with self.open('r') as a:
             data = dict(a.meta)
         return data
+
+    def getAttributes(self) -> list[str]:
+        with self.open('r') as a:
+            s = a.schema
+            att_list = []
+            for idx in range(s.nattr):
+                att_list.append(s.attr(idx).name)
+        return att_list
 
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """

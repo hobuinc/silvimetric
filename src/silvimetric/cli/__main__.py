@@ -3,7 +3,7 @@ import logging
 import json
 
 from silvimetric.app import Application
-from silvimetric.bounds import Bounds
+from silvimetric.bounds import Extents
 from silvimetric.storage import Storage
 
 logger = logging.getLogger(__name__)

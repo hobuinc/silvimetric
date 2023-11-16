@@ -1,11 +1,13 @@
-# from . import Storage
+import pdal
 
-# class Pointcloud(object):
-#     """ Handle data ingesting and arrangement. """
 
-#     def __init__(self, filename: str, storage: Storage):
-#         self.filename = filename
-#         self.storage = storage
+class Pointcloud(object):
+    """ Handle data ingesting and arrangement. """
+
+    def __init__(self, filename: str):
+        self.filename = filename
+
+
     # def __inspect_file(self):
     #     """
     #     Does pdal quick info on source file for making informed decisions on

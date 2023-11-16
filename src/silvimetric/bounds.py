@@ -1,5 +1,6 @@
 import math
 import types
+import json
 
 import pdal
 import numpy as np
@@ -7,24 +8,44 @@ from pyproj import CRS
 from shapely import from_wkt
 
 class Bounds(object):
+    def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
+        self.minx = minx
+        self.miny = miny
+        self.maxx = maxx
+        self.maxy = maxy
 
-    def __init__(self, minx, miny, maxx, maxy, cell_size, group_size=16,
+    @staticmethod
+    def from_string(bbox_str: str):
+        #TODO accept more forms of bounds than just bbox array
+        bbox = json.loads(bbox_str)
+        if len(bbox) == 4:
+            return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[2]),
+                            float(bbox[3]))
+        elif len(bbox) == 6:
+            return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[3]),
+                            float(bbox[4]))
+        else:
+            raise("Bounding boxes must have either 4 or 6 elements")
+
+class Extents(object):
+
+    #TODO take in bounds instead of minx,miny,maxx,maxy
+    def __init__(self, bounds: Bounds, cell_size, group_size=16,
                  srs=None, is_chunk=False, root=None):
+
 
         self.is_chunk=is_chunk
 
-        self.minx = float(minx)
-        self.miny = float(miny)
-        self.maxx = float(maxx)
-        self.maxy = float(maxy)
-        self.midx = self.minx + ((self.maxx - self.minx)/ 2)
-        self.midy = self.miny + ((self.maxy - self.miny)/ 2)
+        self.minx = float(bounds.minx)
+        self.miny = float(bounds.miny)
+        self.maxx = float(bounds.maxx)
+        self.maxy = float(bounds.maxy)
 
         if not srs:
             raise Exception("Missing SRS for bounds")
         self.srs = CRS.from_user_input(srs)
         if self.srs.is_geographic:
-            raise Exception(f"Bounds SRS({srs}) is geographic.")
+            raise Exception(f"Extents SRS({srs}) is geographic.")
         self.epsg = self.srs.to_epsg()
 
         self.rangex = self.maxx - self.minx
@@ -35,10 +56,10 @@ class Bounds(object):
         if is_chunk:
             if not root:
                 raise("Chunked bounds are required to have a root")
-            self.x1 = math.floor((minx - root.minx) / cell_size)
-            self.y1 = math.floor((root.maxy - maxy) / cell_size)
-            self.x2 = math.floor((maxx - root.minx) / cell_size)
-            self.y2 = math.floor((root.maxy - miny) / cell_size)
+            self.x1 = math.floor((self.minx - root.minx) / cell_size)
+            self.y1 = math.floor((root.maxy - self.maxy) / cell_size)
+            self.x2 = math.floor((self.maxx - root.minx) / cell_size)
+            self.y2 = math.floor((root.maxy - self.miny) / cell_size)
             self.root = root
             self.indices = np.array(
                 [(i,j) for i in range(self.x1, self.x2)
@@ -86,9 +107,9 @@ class Bounds(object):
         miny = self.maxy - ((self.y2 + 1) * self.cell_size)
         maxy = self.maxy - (self.y1 * self.cell_size)
 
-        chunk = Bounds(minx, miny, maxx, maxy, self.cell_size, self.group_size,
+        chunk = Extents(minx, miny, maxx, maxy, self.cell_size, self.group_size,
                        self.srs.to_wkt(), is_chunk=True, root=self)
-        self.root_chunk: Bounds = chunk
+        self.root_chunk: Extents = chunk
 
         filtered = chunk.filter(filename, threshold)
 
@@ -107,23 +128,25 @@ class Bounds(object):
                     n = next(c)
                     if isinstance(n, types.GeneratorType):
                         l += flatten(get_leaves(n))
-                    elif isinstance(n, Bounds):
+                    elif isinstance(n, Extents):
                         l.append(n)
                 except StopIteration:
                     return l
 
-        leaves: list[Bounds] = get_leaves(filtered)
+        leaves: list[Extents] = get_leaves(filtered)
         yield from [bounds for leaf in leaves for bounds in leaf.get_leaf_children()]
 
     def split(self):
+        midx = self.minx + ((self.maxx - self.minx)/ 2)
+        midy = self.miny + ((self.maxy - self.miny)/ 2)
         yield from [
-            Bounds(self.minx, self.miny, self.midx, self.midy, self.cell_size,
+            Extents(self.minx, self.miny, midx, midy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root), #lower left
-            Bounds(self.midx, self.miny, self.maxx, self.midy, self.cell_size,
+            Extents(midx, self.miny, self.maxx, midy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root), #lower right
-            Bounds(self.minx, self.midy, self.midx, self.maxy, self.cell_size,
+            Extents(self.minx, midy, midx, self.maxy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root), #top left
-            Bounds(self.midx, self.midy, self.maxx, self.maxy, self.cell_size,
+            Extents(midx, midy, self.maxx, self.maxy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root)  #top right
         ]
 
@@ -180,7 +203,7 @@ class Bounds(object):
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
-            Bounds(minx, miny, maxx, maxy, self.cell_size,
+            Extents(minx, miny, maxx, maxy, self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
@@ -192,7 +215,7 @@ class Bounds(object):
         else:
             return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
 
-def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
+def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
     # grab our bounds
     if polygon:
         p = from_wkt(polygon)
@@ -217,7 +240,7 @@ def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
         if not srs:
             raise Exception("No SRS found in data.")
 
-        bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
+        bounds = Extents(minx, miny, maxx, maxy, cell_size=cell_size,
                          group_size=group_size, srs=srs)
 
         reader._options['bounds'] = str(bounds)
@@ -236,7 +259,7 @@ def create_bounds(reader, cell_size, group_size, polygon=None) -> Bounds:
         maxx = bbox['maxx']
         miny = bbox['miny']
         maxy = bbox['maxy']
-        bounds = Bounds(minx, miny, maxx, maxy, cell_size=cell_size,
+        bounds = Extents(minx, miny, maxx, maxy, cell_size=cell_size,
                     group_size=group_size, srs=srs)
 
     if not pc:
