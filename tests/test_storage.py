@@ -50,9 +50,7 @@ class Test_Storage(object):
         assert metadata['crs'] == bounds.srs
 
         storage.saveMetadata({'foo': 'bar'})
-        assert storage.mode == 'w'
-        metadata =  storage.getMetadata()
-        assert storage.mode == 'r'
+        metadata = storage.getMetadata()
         assert metadata['foo'] == 'bar'
 
 

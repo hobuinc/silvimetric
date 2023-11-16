@@ -16,24 +16,17 @@ class Storage(object):
         else:
             self.ctx = ctx
 
-        self.tdb = None
-        self.schema = None
-        self.mode = None
-
         if not pathlib.Path(tdb_dir).exists():
             raise Exception(f"Given database directory '{tdb_dir}' does not exist")
 
         self.tdb_dir: str = tdb_dir
 
 
-    #TODO enter and exit methods to close read and write streams
-
     def __enter__(self):
-        return self.tdb
+        return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
-        if self.tdb is not None:
-            self.tdb.close()
+        return
 
 
     @staticmethod
@@ -65,8 +58,6 @@ class Storage(object):
         Exception
             Raises bounding box errors if not of lengths 4 or 6
         """
-
-        #TODO pathlib.path for dirname
 
         dirname = str(dirpath)
 
@@ -119,9 +110,8 @@ class Storage(object):
             Metadata key-value pairs to be saved
         """
         # reopen in write mode if current mode is read
-        if self.tdb is None or self.mode == 'r':
-            self.open('w')
-        self.tdb.meta.update(metadata)
+        with self.open('w') as a:
+            a.meta.update(metadata)
 
     def getMetadata(self) -> dict:
         """
@@ -133,9 +123,9 @@ class Storage(object):
             Dictionary of key-value pairs of database metadata
         """
         # reopen in read mode if current mode is write
-        if self.tdb is None or self.mode == 'w':
-            self.open('r')
-        return dict(self.tdb.meta)
+        with self.open('r') as a:
+            data = dict(a.meta)
+        return data
 
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """
@@ -156,25 +146,19 @@ class Storage(object):
             Path does not exist
         """
 
-        #open new stream
-        if self.tdb is not None:
-            self.tdb.close()
-
         if tiledb.object_type(self.tdb_dir) == "array":
             if mode == 'w':
-                self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
             elif mode == 'r':
-                self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
-            self.schema: tiledb.ArraySchema = self.tdb.schema
-            self.mode=mode
         elif pathlib.Path(self.tdb_dir).exists():
             raise Exception(f"Path {self.tdb_dir} already exists and is not" +
                             " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.tdb_dir} does not exist")
-        return self.tdb
+        return tdb
 
     #TODO what are we reading? queries are probably going to be specific
     def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
