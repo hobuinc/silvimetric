@@ -174,7 +174,9 @@ class Storage(object):
         np.ndarray
             Items found at the indicated cell
         """
-        return self.tdb[xs, ys]
+        with self.open('r') as tdb:
+            data = tdb[xs, ys]
+        return data
 
     def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
@@ -189,4 +191,5 @@ class Storage(object):
         data : np.ndarray
             Numpy object of data values for attributes in each index pairing
         """
-        self.tdb[xs, ys] = data
+        with self.open('w') as tdb:
+            tdb[xs, ys] = data
