@@ -1,6 +1,13 @@
 on:
+  pull_request:
+    branches:
+    - '*'
+  push:
+    branches:
+    - '*'
   release:
-    types: [published]
+    types:
+      - published
 
 jobs:
   pypi-publish:
