@@ -15,27 +15,28 @@ class Storage(object):
         else:
             self.ctx = ctx
 
-        #TODO check paths with pathlib
+        if not pathlib.Path(tdb_dir).exists():
+            raise Exception(f"Given database directory '{tdb_dir}' does not exist")
+
         self.tdb_dir = tdb_dir
 
         #TODO create boths streams at startup
-        self.__open()
-        self.write_flag = False
+        self.open()
 
-        self.schema = self.tdb_r.schema
+        self.schema = self.tdb.schema
+
 
     #TODO enter and exit methods to close read and write streams
 
     def __enter__(self):
-        return zip(self.tdb_r, self.tdb_w)
+        return zip(self.tdb)
 
     def __exit__(self):
-        self.tdb_r.close()
-        self.tdb_w.close()
+        self.tdb.close()
 
     @staticmethod
     def create(atts:list[str], resolution: float, bounds: list[float],
-               dirname: str, ctx:tiledb.Ctx=None):
+               dirpath: pathlib.Path, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
@@ -64,6 +65,9 @@ class Storage(object):
         """
 
         #TODO pathlib.path for dirname
+
+        dirname = str(dirpath)
+
         if not ctx:
             ctx = tiledb.default_ctx()
 
@@ -92,16 +96,31 @@ class Storage(object):
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
-        tiledb.SparseArray.create(dirname, schema)
+        tiledb.SparseArray.create(dirname, schema)  
+        with tiledb.SparseArray(dirname, "w", ctx=ctx) as A:
+            metadata = {'resolution': resolution}
+            metadata['bounds'] = [minx, miny, maxx, maxy]
+            A.meta.update(metadata)
 
-        return Storage(dirname, ctx)
+        s = Storage(dirname, ctx=ctx)
 
-    def __open(self):
-        p = pathlib.Path(self.tdb_dir)
+        return s
+
+    def saveMetadata(self, metadata):
+        self.tdb.meta.update( metadata )
+    
+    def getMetadata(self):
+        return self.tdb.meta
+
+    def open(self, mode='r'):
         if tiledb.object_type(self.tdb_dir) == "array":
-            self.tdb_w: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
-            self.tdb_r: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
-        elif p.exists():
+            if mode == 'w':
+                self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
+            elif mode == 'r':
+                self.tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
+            else:
+                raise Exception(f"Given open mode '{mode}' is not valid")
+        elif pathlib.Path(self.tdb_dir).exists():
             raise Exception(f"""Path {self.tdb_dir} already exists and is not initialized\
                              for TileDB access.""")
         else:
@@ -123,9 +142,7 @@ class Storage(object):
         np.ndarray
             Items found at the indicated cell
         """
-        if self.write_flag:
-            self.tdb_r.reopen()
-        return self.tdb_r[xs, ys]
+        return self.tdb[xs, ys]
 
     def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
@@ -140,5 +157,4 @@ class Storage(object):
         data : np.ndarray
             Numpy object of data values for attributes in each index pairing
         """
-        self.tdb_w[xs, ys] = data
-        self.write_flag = True
+        self.tdb[xs, ys] = data

@@ -29,6 +29,12 @@ class Test_Storage(object):
             assert s.has_attr(a)
             assert s.attr(a).dtype == dims[a]
 
+    def test_metadata(self, storage: Storage):
+        """Check that instantiation metadata is properly written"""
+        metadata = storage.getMetadata()
+        assert metadata['resolution'] == 30.0
+
+
 
     def test_local(self, storage: Storage, attrs: list[str], dims):
         s = tiledb.ArraySchema.load(storage.tdb_dir)
