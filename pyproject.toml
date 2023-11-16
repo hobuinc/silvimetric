@@ -1,5 +1,5 @@
 [project]
-name = "silvistat"
+name = "silvimetric"
 requires-python = ">=3.9"
 description = "A forestry LiDAR processing package"
 readme = "README.md"
@@ -25,21 +25,21 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-homepage = "https://github.com/hobuinc/silvistat"
-repository = "https://github.com/hobuinc/silvistat"
+homepage = "https://github.com/hobuinc/silvimetric"
+repository = "https://github.com/hobuinc/silvimetric"
 
 [tool.setuptools]
 package-dir = {"" =  "src"}
 
 [tool.setuptools.dynamic]
-version = { attr = "silvistat.__version__" }
+version = { attr = "silvimetric.__version__" }
 
 [build-system]
 requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-silvistat = "silvistat.cli.__main__:cli"
+silvimetric = "silvimetric.cli.__main__:cli"
 
 [tool.black]
 line-length = 88

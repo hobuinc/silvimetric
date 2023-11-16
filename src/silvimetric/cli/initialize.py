@@ -1,14 +1,14 @@
 import logging
 import pathlib
 
-from silvistat.app import Application
-from silvistat.storage import Storage
+from silvimetric.app import Application
+from silvimetric.storage import Storage
 
 logger = logging.getLogger(__name__)
 
 def initialize(application: Application, resolution: int, bounds: list[float], atts: list[str], crs: str):
     """
-    Initialize a Silvistats TileDB instance for a given Application instance
+    Initialize a Silvimetric TileDB instance for a given Application instance
 
     Parameters
     ----------

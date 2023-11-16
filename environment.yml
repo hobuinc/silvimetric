@@ -1,4 +1,4 @@
-name: silvistat
+name: silvimetric
 channels:
   - conda-forge
 dependencies:

@@ -3,7 +3,7 @@ import tiledb
 import os
 from shutil import rmtree
 
-from silvistat.shatter import shatter
+from silvimetric.shatter import shatter
 
 
 @pytest.mark.skip(reason="TODO reintroduce after splitting up commands")

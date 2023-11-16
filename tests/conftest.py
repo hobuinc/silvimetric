@@ -3,8 +3,8 @@ import os
 import dask
 import pdal
 
-from silvistat import Bounds
-from silvistat.shatter import create_pipeline
+from silvimetric import Bounds
+from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():

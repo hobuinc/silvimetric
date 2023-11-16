@@ -36,7 +36,7 @@ jobs:
           auto-update-conda: false
           python-version: "3.11"
           use-mamba: true
-          activate-environment: silvistat
+          activate-environment: silvimetric
       - name: "Install Test Framework"
         run: pip install pytest pytest-click
       - name: "Install Package"
@@ -74,7 +74,7 @@ jobs:
           auto-update-conda: false
           python-version: "3.11"
           use-mamba: true
-          activate-environment: silvistat
+          activate-environment: silvimetric
       - name: Config CodeQL
         run: |
           echo "CODEQL_PYTHON=$(which python)" >> $GITHUB_ENV

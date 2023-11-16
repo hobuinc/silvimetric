@@ -2,10 +2,9 @@ import click
 import logging
 import json
 
-from silvistat.app import Application
-
-from silvistat.bounds import Bounds
-from silvistat.storage import Storage
+from silvimetric.app import Application
+from silvimetric.bounds import Bounds
+from silvimetric.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ def cli(ctx, database, log_level, threads, progress):
 @cli.command("info")
 @click.pass_obj
 def info(app):
-    """Print info about Silvistats database"""
+    """Print info about Silvimetric database"""
     with Storage(app.database) as tdb:
         print(json.dumps(tdb.getMetadata(), indent=2))
 
@@ -48,12 +47,12 @@ def info(app):
 @click.option("--attributes", help="List of attributes to include in Database",
               default='["Z","NumberOfReturns","ReturnNumber","HeightAboveGround","Intensity"]')
 #TODO support more bounds types in future
-@click.option("--bounds", help="""Bounds to limit all Silvistat processing. \
+@click.option("--bounds", help="""Bounds to limit all Silvimetric processing. \
               '[minx,miny(,minz),maxx,maxy(,maxz)]'""", required=True)
 @click.option("--crs", help="Coordinate reference system of the data", required=True)
 @click.pass_obj
 def initialize(app: Application, resolution: float, bounds: str, attributes: str, crs: str):
-    """Initialize Silvistats DATABASE
+    """Initialize silvimetrics DATABASE
 
     :param resolution: Resolution of a cell in dataset units, default to 30.0
     :type resolution: float, optional
@@ -70,7 +69,7 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
         raise Exception(f"""Invalid attributes list {attributes}. Must be in \
                         form '["Att1","Att2"(, ...)]'""")
     print(f"Creating database at {app.database}")
-    from silvistat.cli.initialize import initialize as initializeFunction
+    from silvimetric.cli.initialize import initialize as initializeFunction
     initializeFunction(app, resolution, b, a, crs)
 
 @cli.command('shatter')
@@ -80,7 +79,7 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
 @click.option("--attributes",  multiple=True, default = ["all"])
 @click.pass_obj
 def shatter(app, pointcloud, workers, groupsize, attributes):
-    """Insert data provided by POINTCLOUD into the Silvistat DATABASE"""
+    """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     pass
 
 
@@ -88,7 +87,7 @@ def shatter(app, pointcloud, workers, groupsize, attributes):
 @click.option("--attributes", type=str, multiple=True, default = ["all"])
 @click.pass_obj
 def extract(app, attributes, ):
-    """Extract Silvistat metrics from DATABASE """
+    """Extract silvimetric metrics from DATABASE """
     pass
 
 if __name__ == "__main__":

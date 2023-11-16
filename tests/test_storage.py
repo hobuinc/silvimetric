@@ -5,9 +5,9 @@ import os
 import click
 
 
-from silvistat.storage import Storage
-from silvistat.bounds import Bounds
-from silvistat.cli import initialize
+from silvimetric.storage import Storage
+from silvimetric.bounds import Bounds
+from silvimetric.cli import initialize
 
 @pytest.fixture(scope='class')
 def tdb_filepath(tmp_path_factory) -> str:
