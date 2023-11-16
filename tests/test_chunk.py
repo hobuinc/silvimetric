@@ -3,8 +3,8 @@ import dask
 import pdal
 import pytest
 
-from silvistat.bounds import Bounds
-from silvistat.shatter import arrange_data, shatter
+from silvimetric.bounds import Bounds
+from silvimetric.shatter import arrange_data, shatter
 
 def check_for_holes(leaves: list[Bounds], chunk: Bounds):
     ind = np.array([], dtype=chunk.indices.dtype)

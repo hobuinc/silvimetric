@@ -19,7 +19,7 @@ class Application:
         Parameters
         ----------
         database : str
-            Tiledb Silvistat database location
+            Tiledb Silvimetric database location
         log_level : logging.Level, optional
             Logging level to set doppkit application to, by default logging.INFO
         threads : int, optional
@@ -33,6 +33,6 @@ class Application:
 
     def __repr__(self) -> str:
         return (
-            "Silvistat Application\n"
+            "Silvimetric Application\n"
             f"Database location {self.database}\n"
         )

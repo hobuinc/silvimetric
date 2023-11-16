@@ -2,10 +2,9 @@ import pytest
 import os
 import dask
 import pdal
-from shutil import rmtree
 
-from silvistat import Bounds
-from silvistat.shatter import create_pipeline
+from silvimetric import Bounds
+from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
@@ -20,20 +19,25 @@ def filepath() -> str:
 
 @pytest.fixture(scope='class')
 def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
-    res = resolution
-    gs = group_size
+    yield Bounds(minx,miny,maxx,maxy,resolution,group_size,srs)
 
-    yield Bounds(minx,miny,maxx,maxy,res,gs,srs)
+@pytest.fixture(scope="session")
+def attrs() -> list[str]:
+    yield [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
+def dims(attrs):
+    yield { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in attrs }
+
+@pytest.fixture(scope='class')
 def pipeline(filepath) -> pdal.Pipeline:
     yield create_pipeline(filepath)
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='class')
 def resolution() -> int:
     yield 30
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='class')
 def group_size() -> int:
     yield 4
 
