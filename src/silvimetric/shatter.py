@@ -38,8 +38,7 @@ def get_atts(points, chunk):
 
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
-    asdf = dask.compute(*att_data, scheduler="Threads")
-    return asdf
+    return dask.compute(*att_data, scheduler="Threads")
 
 def get_data(pipeline, chunk):
     for stage in pipeline.stages:
@@ -69,9 +68,9 @@ def arrange_data(pipeline, chunk: Extents, atts: list[str],
     dd = {}
     for att in atts:
         try:
-            dd[att] = np.array([col[att] for col in data], object)
+            dd[att] = np.array([*np.array([col[att] for col in data], object), None], object)[:-1]
         except Exception as e:
-            raise(f"Missing attribute {att}: {e}")
+            raise Exception(f"Missing attribute {att}: {e}")
 
     counts = np.array([z.size for z in dd['Z']], np.int32)
     # if this trips, something is wrong with the the matchup between indices
@@ -99,19 +98,17 @@ def create_pipeline(filename):
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    # smrf = pdal.Filter.smrf()
-    # hag = pdal.Filter.hag_nn()
-    return reader | class_zero | rn | nor #| smrf | hag
+    smrf = pdal.Filter.smrf()
+    hag = pdal.Filter.hag_nn()
+    return reader | class_zero | rn | nor | smrf | hag
 
 def run(pipeline, atts, leaves, tdb: tiledb.SparseArray, client, debug):
     # debug uses single threaded dask
     if debug:
         data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
     else:
-        with performance_report(f'{tdb}-dask-report.html'):
-            t = client.scatter(tdb)
-
-            data_futures = dask.compute([arrange_data(pipeline, leaf, atts, t) for leaf in leaves])
+        with performance_report(f'dask-report.html'):
+            data_futures = dask.compute([arrange_data(pipeline, leaf, atts, tdb) for leaf in leaves])
 
             progress(data_futures)
             client.gather(data_futures)
@@ -126,12 +123,15 @@ def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, clie
     print('Filtering out empty chunks...')
 
     # set up tiledb
-    storage = Storage(tdb_dir, filename, atts)
+    storage = Storage(tdb_dir)
     atts = storage.getAttributes()
+    atts.remove('count')
     extents = Extents.from_storage(storage, tile_size)
     leaves = extents.chunk(filename, 200)
 
     # Begin main operations
     with storage.open('w') as tdb:
         print('Fetching and arranging data...')
-        run(pipeline, atts, leaves, tdb, client, debug)
+        pc = run(pipeline, atts, leaves, tdb, client, debug)
+        storage.saveMetadata({'point_count': pc.item()})
+

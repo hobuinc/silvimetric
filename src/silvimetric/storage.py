@@ -157,9 +157,9 @@ class Storage(object):
 
         if tiledb.object_type(self.tdb_dir) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'w', ctx=self.ctx)
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'r', ctx=self.ctx)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.tdb_dir).exists():

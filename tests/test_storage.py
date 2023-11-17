@@ -22,7 +22,7 @@ class Test_Storage(object):
 
     def test_schema(self, storage: Storage, attrs: list[str], dims):
         with storage.open('r') as st:
-            s = st.schema
+            s:tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
             assert s.attr('count').dtype == np.int32
 
