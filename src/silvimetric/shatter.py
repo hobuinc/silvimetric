@@ -13,20 +13,20 @@ from .storage import Storage
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def floor_x(points: da.Array, extents: Extents):
-    return da.array(da.floor((points - extents.minx) / extents.cell_size),
+def floor_x(points: da.Array, bounds: Bounds, resolution: float):
+    return da.array(da.floor((points - bounds.minx) / resolution),
         np.int32)
 
-def floor_y(points: da.Array, extents: Extents):
-    return da.array(da.floor((extents.maxy - points) / extents.cell_size),
+def floor_y(points: da.Array, bounds: Bounds, resolution: float):
+    return da.array(da.floor((bounds.maxy - points) / resolution),
         np.int32)
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
 def get_atts(points, chunk):
-    extents = chunk.root
+    bounds = chunk.root
     xypoints = points[['X','Y']].view()
-    xis = floor_x(xypoints['X'], extents)
-    yis = floor_y(xypoints['Y'], extents)
+    xis = floor_x(xypoints['X'], bounds, chunk.resolution)
+    yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
     for xx in xis.compute():
         if xx not in chunk.indices['x']:
             print('x nope')

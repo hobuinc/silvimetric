@@ -33,7 +33,7 @@ class Bounds(object):
 class Extents(object):
 
     #TODO take in bounds instead of minx,miny,maxx,maxy
-    def __init__(self, bounds: Bounds, cell_size: float, group_size: int=16,
+    def __init__(self, bounds: Bounds, resolution: float, group_size: int=16,
                  srs: str=None, is_chunk: bool=False, root: Bounds=None):
 
         self.is_chunk=is_chunk
@@ -51,16 +51,16 @@ class Extents(object):
 
         self.rangex = maxx - minx
         self.rangey = maxy - miny
-        self.cell_size = cell_size
+        self.resolution = resolution
         self.group_size = group_size
 
         if is_chunk:
             if not root:
                 raise("Chunked bounds are required to have a root")
-            self.x1 = math.floor((minx - root.minx) / cell_size)
-            self.y1 = math.floor((root.maxy - maxy) / cell_size)
-            self.x2 = math.floor((maxx - root.minx) / cell_size)
-            self.y2 = math.floor((root.maxy - miny) / cell_size)
+            self.x1 = math.floor((minx - root.minx) / resolution)
+            self.y1 = math.floor((root.maxy - maxy) / resolution)
+            self.x2 = math.floor((maxx - root.minx) / resolution)
+            self.y2 = math.floor((root.maxy - miny) / resolution)
             self.root = root
             self.indices = np.array(
                 [(i,j) for i in range(self.x1, self.x2)
@@ -71,9 +71,9 @@ class Extents(object):
         else:
             self.root = self
             self.x1 = 0
-            self.x2 = math.floor(self.rangex / cell_size)
+            self.x2 = math.floor(self.rangex / resolution)
             self.y1 = 0
-            self.y2 = math.floor(self.rangey / cell_size)
+            self.y2 = math.floor(self.rangey / resolution)
             self.indices = np.array(
                 [(i,j) for i in range(self.x1, self.x2 + 1)
                 for j in range(self.y1, self.y2 + 1)],
@@ -87,15 +87,15 @@ class Extents(object):
         bminx, bminy, bmaxx, bmaxy = self.bounds.get()
 
         # buffers are only applied if the bounds do not fit on the cell line
-        # x_buf = 1 if self.maxx % self.cell_size != 0 else 0
-        # y_buf = 1 if self.maxy % self.cell_size != 0 else 0
+        # x_buf = 1 if self.maxx % self.resolution != 0 else 0
+        # y_buf = 1 if self.maxy % self.resolution != 0 else 0
         # make bounds in scale with the desired resolution
-        minx = bminx + (self.x1 * self.cell_size)
-        maxx = bminx + ((self.x2 + 1) * self.cell_size)
-        miny = bmaxy - ((self.y2 + 1) * self.cell_size)
-        maxy = bmaxy - (self.y1 * self.cell_size)
+        minx = bminx + (self.x1 * self.resolution)
+        maxx = bminx + ((self.x2 + 1) * self.resolution)
+        miny = bmaxy - ((self.y2 + 1) * self.resolution)
+        maxy = bmaxy - (self.y1 * self.resolution)
 
-        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.cell_size, self.group_size,
+        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.group_size,
                        self.srs.to_wkt(), is_chunk=True, root=self.bounds)
         self.root_chunk: Extents = chunk
 
@@ -129,13 +129,13 @@ class Extents(object):
         midx = minx + ((maxx - minx)/ 2)
         midy = miny + ((maxy - miny)/ 2)
         yield from [
-            Extents(Bounds(minx, miny, midx, midy), self.cell_size,
+            Extents(Bounds(minx, miny, midx, midy), self.resolution,
                     self.group_size, self.srs.to_wkt(), True, self.root), #lower left
-            Extents(Bounds(midx, miny, maxx, midy), self.cell_size,
+            Extents(Bounds(midx, miny, maxx, midy), self.resolution,
                    self.group_size, self.srs.to_wkt(), True, self.root), #lower right
-            Extents(Bounds(minx, midy, midx, maxy), self.cell_size,
+            Extents(Bounds(minx, midy, midx, maxy), self.resolution,
                    self.group_size, self.srs.to_wkt(), True, self.root), #top left
-            Extents(Bounds(midx, midy, maxx, maxy), self.cell_size,
+            Extents(Bounds(midx, midy, maxx, maxy), self.resolution,
                    self.group_size, self.srs.to_wkt(), True, self.root)  #top right
         ]
 
@@ -176,7 +176,7 @@ class Extents(object):
         return [x, y]
 
     def get_leaf_children(self):
-        res = self.cell_size
+        res = self.resolution
         xnum, ynum = self.find_dims()
 
         local_xs = np.array([
@@ -193,7 +193,7 @@ class Extents(object):
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
-            Extents(Bounds(minx, miny, maxx, maxy), self.cell_size,
+            Extents(Bounds(minx, miny, maxx, maxy), self.resolution,
                    self.group_size, self.srs.to_wkt(), True, self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
@@ -206,7 +206,7 @@ class Extents(object):
         else:
             return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}])"
 
-def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
+def create_extents(reader, resolution, group_size, polygon=None) -> Extents:
     # grab our bounds
     if polygon:
         p = from_wkt(polygon)
@@ -231,7 +231,7 @@ def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
         if not srs:
             raise Exception("No SRS found in data.")
 
-        bounds = Extents(Bounds(minx, miny, maxx, maxy), cell_size=cell_size,
+        bounds = Extents(Bounds(minx, miny, maxx, maxy), resolution=resolution,
                          group_size=group_size, srs=srs)
 
         reader._options['bounds'] = str(bounds)
@@ -250,7 +250,7 @@ def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
         maxx = bbox['maxx']
         miny = bbox['miny']
         maxy = bbox['maxy']
-        bounds = Extents(Bounds(minx, miny, maxx, maxy), cell_size=cell_size,
+        bounds = Extents(Bounds(minx, miny, maxx, maxy), resolution=resolution,
                     group_size=group_size, srs=srs)
 
     if not pc:

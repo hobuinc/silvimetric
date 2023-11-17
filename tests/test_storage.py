@@ -41,20 +41,17 @@ class Test_Storage(object):
                 assert sc.has_attr(a)
                 assert sc.attr(a).dtype == dims[a]
 
-    def test_metadata(self, storage: Storage, resolution: float, extents: Extents):
+    def test_metadata(self, storage: Storage, extents: Extents):
+        minx, miny, maxx, maxy = extents.bounds.get()
         """Check that instantiation metadata is properly written"""
         metadata = storage.getMetadata()
-        assert metadata['resolution'] == resolution
-        assert metadata['bounds'] == (extents.minx, extents.miny, extents.maxx,
-                                      extents.maxy)
+        assert metadata['resolution'] == extents.resolution
+        assert metadata['bounds'] == (minx, miny, maxx, maxy)
         assert metadata['crs'] == extents.srs
 
         storage.saveMetadata({'foo': 'bar'})
         metadata = storage.getMetadata()
         assert metadata['foo'] == 'bar'
-
-
-
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")
