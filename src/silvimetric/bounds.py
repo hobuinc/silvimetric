@@ -9,10 +9,10 @@ from shapely import from_wkt
 
 class Bounds(object):
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
-        self.minx = minx
-        self.miny = miny
-        self.maxx = maxx
-        self.maxy = maxy
+        self.minx = float(minx)
+        self.miny = float(miny)
+        self.maxx = float(maxx)
+        self.maxy = float(maxy)
 
     @staticmethod
     def from_string(bbox_str: str):
@@ -27,19 +27,20 @@ class Bounds(object):
         else:
             raise("Bounding boxes must have either 4 or 6 elements")
 
+    def get(self):
+        return [self.minx, self.miny, self.maxx, self.maxy]
+
 class Extents(object):
 
     #TODO take in bounds instead of minx,miny,maxx,maxy
-    def __init__(self, bounds: Bounds, cell_size, group_size=16,
-                 srs=None, is_chunk=False, root=None):
-
+    def __init__(self, bounds: Bounds, cell_size: float, group_size: int=16,
+                 srs: str=None, is_chunk: bool=False, root: Bounds=None):
 
         self.is_chunk=is_chunk
-
-        self.minx = float(bounds.minx)
-        self.miny = float(bounds.miny)
-        self.maxx = float(bounds.maxx)
-        self.maxy = float(bounds.maxy)
+        self.bounds = bounds
+        if not root:
+            root=bounds
+        minx, miny, maxx, maxy = self.bounds.get()
 
         if not srs:
             raise Exception("Missing SRS for bounds")
@@ -48,18 +49,18 @@ class Extents(object):
             raise Exception(f"Extents SRS({srs}) is geographic.")
         self.epsg = self.srs.to_epsg()
 
-        self.rangex = self.maxx - self.minx
-        self.rangey = self.maxy - self.miny
+        self.rangex = maxx - minx
+        self.rangey = maxy - miny
         self.cell_size = cell_size
         self.group_size = group_size
 
         if is_chunk:
             if not root:
                 raise("Chunked bounds are required to have a root")
-            self.x1 = math.floor((self.minx - root.minx) / cell_size)
-            self.y1 = math.floor((root.maxy - self.maxy) / cell_size)
-            self.x2 = math.floor((self.maxx - root.minx) / cell_size)
-            self.y2 = math.floor((root.maxy - self.miny) / cell_size)
+            self.x1 = math.floor((minx - root.minx) / cell_size)
+            self.y1 = math.floor((root.maxy - maxy) / cell_size)
+            self.x2 = math.floor((maxx - root.minx) / cell_size)
+            self.y2 = math.floor((root.maxy - miny) / cell_size)
             self.root = root
             self.indices = np.array(
                 [(i,j) for i in range(self.x1, self.x2)
@@ -79,36 +80,23 @@ class Extents(object):
                 dtype=[('x', np.int32), ('y', np.int32)]
             )
 
-
-    def __eq__(self, other):
-        if self.minx != other.minx:
-            return False
-        if self.maxx != other.maxx:
-            return False
-        if self.miny != other.miny:
-            return False
-        if self.maxy != other.maxy:
-            return False
-        if self.srs != other.srs:
-            return False
-        return True
-
     def chunk(self, filename:str, threshold=1000) :
         if self.is_chunk:
             raise Exception("Cannot perform chunk on a previously chunked bounds")
         self.is_chunk = True
+        bminx, bminy, bmaxx, bmaxy = self.bounds.get()
 
         # buffers are only applied if the bounds do not fit on the cell line
         # x_buf = 1 if self.maxx % self.cell_size != 0 else 0
         # y_buf = 1 if self.maxy % self.cell_size != 0 else 0
         # make bounds in scale with the desired resolution
-        minx = self.minx + (self.x1 * self.cell_size)
-        maxx = self.minx + ((self.x2 + 1) * self.cell_size)
-        miny = self.maxy - ((self.y2 + 1) * self.cell_size)
-        maxy = self.maxy - (self.y1 * self.cell_size)
+        minx = bminx + (self.x1 * self.cell_size)
+        maxx = bminx + ((self.x2 + 1) * self.cell_size)
+        miny = bmaxy - ((self.y2 + 1) * self.cell_size)
+        maxy = bmaxy - (self.y1 * self.cell_size)
 
-        chunk = Extents(minx, miny, maxx, maxy, self.cell_size, self.group_size,
-                       self.srs.to_wkt(), is_chunk=True, root=self)
+        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.cell_size, self.group_size,
+                       self.srs.to_wkt(), is_chunk=True, root=self.bounds)
         self.root_chunk: Extents = chunk
 
         filtered = chunk.filter(filename, threshold)
@@ -137,16 +125,17 @@ class Extents(object):
         yield from [bounds for leaf in leaves for bounds in leaf.get_leaf_children()]
 
     def split(self):
-        midx = self.minx + ((self.maxx - self.minx)/ 2)
-        midy = self.miny + ((self.maxy - self.miny)/ 2)
+        minx, miny, maxx, maxy = self.bounds.get()
+        midx = minx + ((maxx - minx)/ 2)
+        midy = miny + ((maxy - miny)/ 2)
         yield from [
-            Extents(self.minx, self.miny, midx, midy, self.cell_size,
-                   self.group_size, self.srs.to_wkt(), True, self.root), #lower left
-            Extents(midx, self.miny, self.maxx, midy, self.cell_size,
+            Extents(Bounds(minx, miny, midx, midy), self.cell_size,
+                    self.group_size, self.srs.to_wkt(), True, self.root), #lower left
+            Extents(Bounds(midx, miny, maxx, midy), self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root), #lower right
-            Extents(self.minx, midy, midx, self.maxy, self.cell_size,
+            Extents(Bounds(minx, midy, midx, maxy), self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root), #top left
-            Extents(midx, midy, self.maxx, self.maxy, self.cell_size,
+            Extents(Bounds(midx, midy, maxx, maxy), self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root)  #top right
         ]
 
@@ -159,13 +148,14 @@ class Extents(object):
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
         pc = qi['num_points']
+        minx, miny, maxx, maxy = self.bounds.get()
 
         # is it empty?
         if not pc:
             yield None
         else:
             # has it hit the threshold yet?
-            area = (self.maxx - self.minx) * (self.maxy - self.miny)
+            area = (maxx - minx) * (maxy - miny)
             t = threshold**2
             if area < t:
                 yield self
@@ -203,17 +193,18 @@ class Extents(object):
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
-            Extents(minx, miny, maxx, maxy, self.cell_size,
+            Extents(Bounds(minx, miny, maxx, maxy), self.cell_size,
                    self.group_size, self.srs.to_wkt(), True, self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
 
 
     def __repr__(self):
+        minx, miny, maxx, maxy = self.bounds.get()
         if self.srs:
-            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}]) / EPSG:{self.epsg}"
+            return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}]) / EPSG:{self.epsg}"
         else:
-            return f"([{self.minx:.2f},{self.maxx:.2f}],[{self.miny:.2f},{self.maxy:.2f}])"
+            return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}])"
 
 def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
     # grab our bounds
@@ -240,7 +231,7 @@ def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
         if not srs:
             raise Exception("No SRS found in data.")
 
-        bounds = Extents(minx, miny, maxx, maxy, cell_size=cell_size,
+        bounds = Extents(Bounds(minx, miny, maxx, maxy), cell_size=cell_size,
                          group_size=group_size, srs=srs)
 
         reader._options['bounds'] = str(bounds)
@@ -259,7 +250,7 @@ def create_extents(reader, cell_size, group_size, polygon=None) -> Extents:
         maxx = bbox['maxx']
         miny = bbox['miny']
         maxy = bbox['maxy']
-        bounds = Extents(minx, miny, maxx, maxy, cell_size=cell_size,
+        bounds = Extents(Bounds(minx, miny, maxx, maxy), cell_size=cell_size,
                     group_size=group_size, srs=srs)
 
     if not pc:
