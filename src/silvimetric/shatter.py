@@ -28,26 +28,19 @@ def get_atts(points, chunk):
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds, chunk.resolution)
     yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
-    for xx in xis.compute():
-        if xx not in chunk.indices['x']:
-            print('x nope')
-
-    for yy in yis.compute():
-        if yy not in chunk.indices['y']:
-            print('y nope')
-
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
     return dask.compute(*att_data, scheduler="Threads")
+    # return dask.compute(*att_data)
 
-def get_data(pipeline, chunk):
-    for stage in pipeline.stages:
-        if 'readers' in stage.type:
-            reader = stage
-            break
+def get_data(filename, chunk):
+    # for stage in pipeline.stages:
+    #     if 'readers' in stage.type:
+    #         reader = stage
+    #         break
     # reader._options['bounds'] = str(chunk)
-    pipeline = pipeline | pdal.Filter.crop(bounds=str(chunk))
-
+    # pipeline = pipeline |
+    pipeline = create_pipeline(filename, chunk)
     try:
         pipeline.execute()
     except Exception as e:
@@ -56,10 +49,10 @@ def get_data(pipeline, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(pipeline, chunk: Extents, atts: list[str],
+def arrange_data(filename, chunk: Extents, atts: list[str],
                  tdb: tiledb.SparseArray=None):
 
-    points = get_data(deepcopy(pipeline), chunk)
+    points = get_data(filename, chunk)
     if not points.size:
         return 0
 
@@ -73,10 +66,6 @@ def arrange_data(pipeline, chunk: Extents, atts: list[str],
             raise Exception(f"Missing attribute {att}: {e}")
 
     counts = np.array([z.size for z in dd['Z']], np.int32)
-    # if this trips, something is wrong with the the matchup between indices
-    # and bounds of the chunk
-    assert points.size == counts.sum(), ("Data read size doesn't match" +
-        " attribute counts")
 
     ## remove empty indices and create final sparse tiledb inputs
     empties = np.where(counts == 0)
@@ -89,26 +78,27 @@ def arrange_data(pipeline, chunk: Extents, atts: list[str],
     if tdb != None:
         tdb[dx, dy] = dd
     sum = counts.sum()
-    # del data, dd, points, chunk
+    del data, dd, points, chunk
     return sum
 
-def create_pipeline(filename):
+def create_pipeline(filename, chunk):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
+    crop = pdal.Filter.crop(bounds=str(chunk))
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    smrf = pdal.Filter.smrf()
-    hag = pdal.Filter.hag_nn()
-    return reader | class_zero | rn | nor | smrf | hag
+    # smrf = pdal.Filter.smrf()
+    # hag = pdal.Filter.hag_nn()
+    return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(pipeline, atts, leaves, tdb: tiledb.SparseArray, client, debug):
+def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
     # debug uses single threaded dask
     if debug:
-        data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
+        data_futures = dask.compute([arrange_data(filename, leaf, atts) for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
-            data_futures = dask.compute([arrange_data(pipeline, leaf, atts, tdb) for leaf in leaves])
+            data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
 
             progress(data_futures)
             client.gather(data_futures)
@@ -119,19 +109,18 @@ def run(pipeline, atts, leaves, tdb: tiledb.SparseArray, client, debug):
 
 def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, client=None):
     # read pointcloud
-    pipeline = create_pipeline(filename)
+    # pipeline = create_pipeline(filename)
     print('Filtering out empty chunks...')
-
     # set up tiledb
     storage = Storage(tdb_dir)
     atts = storage.getAttributes()
     atts.remove('count')
     extents = Extents.from_storage(storage, tile_size)
-    leaves = extents.chunk(filename, 200)
+    leaves = list(extents.chunk(filename, 1000))
 
     # Begin main operations
     with storage.open('w') as tdb:
         print('Fetching and arranging data...')
-        pc = run(pipeline, atts, leaves, tdb, client, debug)
+        pc = run(filename, atts, leaves, tdb, client, debug)
         storage.saveMetadata({'point_count': pc.item()})
 

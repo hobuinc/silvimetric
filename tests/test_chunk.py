@@ -114,12 +114,12 @@ class TestExtents(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, pipeline, filtered, unfiltered, test_point_count):
+    def test_pointcount(self, filepath, filtered, unfiltered, test_point_count):
 
-        l1 = [arrange_data(pipeline, leaf, ['Z']) for leaf in filtered]
+        l1 = [arrange_data(filepath, leaf, ['Z']) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        l2 = [arrange_data(pipeline, leaf, ['Z']) for leaf in unfiltered]
+        l2 = [arrange_data(filepath, leaf, ['Z']) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 
         fc = sum(filtered_counts)

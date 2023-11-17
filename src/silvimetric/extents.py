@@ -12,9 +12,8 @@ from .storage import Storage
 class Extents(object):
 
     def __init__(self, bounds: Bounds, resolution: float, tile_size: int=16,
-                 srs: str=None, is_chunk: bool=False, root: Bounds=None):
+                 srs: str=None, root: Bounds=None):
 
-        self.is_chunk=is_chunk
         self.bounds = bounds
         if root is None:
             root = bounds
@@ -44,9 +43,6 @@ class Extents(object):
         )
 
     def chunk(self, filename:str, threshold=1000) :
-        if self.is_chunk:
-            raise Exception("Cannot perform chunk on a previously chunked bounds")
-        self.is_chunk = True
         bminx, bminy, bmaxx, bmaxy = self.bounds.get()
 
         # buffers are only applied if the bounds do not fit on the cell line
@@ -60,7 +56,7 @@ class Extents(object):
         maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.tile_size,
-                       self.srs.to_wkt(), is_chunk=True, root=self.bounds)
+                       self.srs.to_wkt(), root=self.bounds)
         self.root_chunk: Extents = chunk
 
         filtered = chunk.filter(filename, threshold)
@@ -94,13 +90,13 @@ class Extents(object):
         midy = miny + ((maxy - miny)/ 2)
         yield from [
             Extents(Bounds(minx, miny, midx, midy), self.resolution,
-                    self.tile_size, self.srs.to_wkt(), True, self.root), #lower left
+                    self.tile_size, self.srs.to_wkt(), self.root), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), True, self.root), #lower right
+                   self.tile_size, self.srs.to_wkt(), self.root), #lower right
             Extents(Bounds(minx, midy, midx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), True, self.root), #top left
+                   self.tile_size, self.srs.to_wkt(), self.root), #top left
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), True, self.root)  #top right
+                   self.tile_size, self.srs.to_wkt(), self.root)  #top right
         ]
 
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
@@ -158,7 +154,7 @@ class Extents(object):
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
             Extents(Bounds(minx, miny, maxx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), True, self.root)
+                   self.tile_size, self.srs.to_wkt(), self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
 
@@ -228,7 +224,7 @@ class Extents(object):
 
     def __repr__(self):
         minx, miny, maxx, maxy = self.bounds.get()
-        if self.srs:
-            return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}]) / EPSG:{self.epsg}"
-        else:
-            return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}])"
+        # if self.srs:
+        #     return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}]) / EPSG:{self.epsg}"
+        # else:
+        return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}])"

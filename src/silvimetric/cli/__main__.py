@@ -3,6 +3,7 @@ import logging
 import json
 import dask
 from dask.distributed import Client
+import webbrowser
 
 from silvimetric.app import Application
 from silvimetric.storage import Storage
@@ -13,10 +14,9 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
 @click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
-@click.option("--threads", default=4, type=int, help="Application thread count")
 @click.option("--progress", default=True, type=bool, help="Report progress")
 @click.pass_context
-def cli(ctx, database, log_level, threads, progress):
+def cli(ctx, database, log_level, progress):
 
     # Set up logging
     numeric_level = getattr(logging, log_level.upper(), None)
@@ -28,7 +28,6 @@ def cli(ctx, database, log_level, threads, progress):
 
     app = Application(
         log_level=log_level,
-        threads=threads,
         progress = progress,
         database = database,
     )
@@ -47,7 +46,7 @@ def info(app):
 
 @cli.command('initialize')
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
-@click.option("--attributes", multiple=True,
+@click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in Database",
               default=["Z","NumberOfReturns","ReturnNumber","HeightAboveGround","Intensity"])
 #TODO support more bounds types in future
@@ -56,11 +55,17 @@ def info(app):
 @click.option("--crs", help="Coordinate reference system of the data", required=True)
 @click.pass_obj
 def initialize(app: Application, resolution: float, bounds: str, attributes: str, crs: str):
+    import pyproj
     """Initialize silvimetrics DATABASE
 
     :param resolution: Resolution of a cell in dataset units, default to 30.0
     :type resolution: float, optional
     """
+    try:
+        pyproj.CRS.from_user_input(crs)
+    except BaseException as e:
+        raise Exception(f"Invalid CRS entered. {crs}")
+
     try:
         b = json.loads(bounds)
     except json.JSONDecodeError:
@@ -75,11 +80,14 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
 @click.option("--tilesize", type=int, default=16)
+@click.option("--threads", default=4, type=int)
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize):
+def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-    with Client(n_workers=workers, threads_per_worker=app.threads) as client:
-        dask.config.set(scheduler="processes")
+    with Client(n_workers=workers, threads_per_worker=threads) as client:
+        client.get_versions(check=True)
+        webbrowser.open(client.cluster.dashboard_link)
+        # dask.config.set(scheduler="processes")
         shatter(pointcloud, app.database, tilesize, client=client)
 
 
