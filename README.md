@@ -13,7 +13,7 @@ This software is built with the intention of processing pointcloud data and inse
 
 ```
 silvimetric [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
-[--group_size GROUP_SIZE] [--resolution RESOLUTION] [--polygon POLYGON]
+[--tile_size tile_size] [--resolution RESOLUTION] [--polygon POLYGON]
 [--debug DEBUG] [--watch WATCH] filename
 ```
 
@@ -25,7 +25,7 @@ silvimetric [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
    - default: 4
  - `--workers`: Number of workers (int)
    - default: 12
- - `--group_size`: Number of cells in a chunk
+ - `--tile_size`: Number of cells in a chunk
    - default: 12
  - `--resolution`: Width of a cell
    - default: 30
@@ -37,7 +37,7 @@ silvimetric [-h] [--tdb_dir TDB_DIR] [--threads THREADS] [--workers WORKERS]
 ```
 silvimetric \
 https://github.com/PDAL/data/raw/master/autzen/autzen-classified.copc.laz \
---tdb_dir autzen_class --threads 6 --workers 10 --group_size 16 \
+--tdb_dir autzen_class --threads 6 --workers 10 --tile_size 16 \
 --resolution 100 --watch True
 ```
 

@@ -5,8 +5,7 @@ import os
 import click
 
 
-from silvimetric.storage import Storage
-from silvimetric.bounds import Extents
+from silvimetric import Storage, Extents
 from silvimetric.cli import initialize
 
 @pytest.fixture(scope='class')

@@ -5,8 +5,6 @@ from math import floor
 import pathlib
 import pyproj
 
-from . import Bounds
-
 class Storage(object):
     """ Handles storage of shattered data in a TileDB Database. """
 

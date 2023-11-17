@@ -7,7 +7,8 @@ import dask
 import dask.array as da
 from dask.distributed import performance_report, progress
 
-from .bounds import Extents, Bounds, create_extents
+from .bounds import Bounds
+from .extents import Extents
 from .storage import Storage
 
 def cell_indices(xpoints, ypoints, x, y):
@@ -56,7 +57,8 @@ def get_data(pipeline, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(pipeline, chunk: Extents, atts, storage=None):
+def arrange_data(pipeline, chunk: Extents, atts: list[str],
+                 tdb: tiledb.SparseArray=None):
 
     points = get_data(deepcopy(pipeline), chunk)
     if not points.size:
@@ -74,8 +76,8 @@ def arrange_data(pipeline, chunk: Extents, atts, storage=None):
     counts = np.array([z.size for z in dd['Z']], np.int32)
     # if this trips, something is wrong with the the matchup between indices
     # and bounds of the chunk
-    assert points.size == counts.sum(), "\
-        Data read size doesn't match attribute counts"
+    assert points.size == counts.sum(), ("Data read size doesn't match" +
+        " attribute counts")
 
     ## remove empty indices and create final sparse tiledb inputs
     empties = np.where(counts == 0)
@@ -85,8 +87,8 @@ def arrange_data(pipeline, chunk: Extents, atts, storage=None):
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    if storage != None:
-        storage.write(dx, dy, dd)
+    if tdb != None:
+        tdb[dx, dy] = dd
     sum = counts.sum()
     # del data, dd, points, chunk
     return sum
@@ -101,50 +103,35 @@ def create_pipeline(filename):
     # hag = pdal.Filter.hag_nn()
     return reader | class_zero | rn | nor #| smrf | hag
 
-def run(pipeline, filename, tdb_dir, chunk_size, client, debug):
-    #TODO use information from metadata to generate bounds and extents
-    storage = Storage(tdb_dir)
-    meta = storage.getMetadata()
-    bounds = Bounds(*meta['bounds'])
-    crs = meta['crs']
-    res = meta['resolution']
-    atts = storage.getAttributes()
+def run(pipeline, atts, leaves, tdb: tiledb.SparseArray, client, debug):
+    # debug uses single threaded dask
+    if debug:
+        data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
+    else:
+        with performance_report(f'{tdb}-dask-report.html'):
+            t = client.scatter(tdb)
 
-    extents = Extents(bounds, res, chunk_size, crs)
+            data_futures = dask.compute([arrange_data(pipeline, leaf, atts, t) for leaf in leaves])
 
-    with storage.open('w') as tdb:
-        # debug uses single threaded dask
-        if debug:
-            leaves = extents.chunk(filename, 200)
-            data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
-        else:
-            with performance_report(f'{tdb_dir}-dask-report.html'):
-                t = client.scatter(tdb)
-                b = client.scatter(extents)
+            progress(data_futures)
+            client.gather(data_futures)
+    c = 0
+    for f in data_futures:
+        c += sum(f)
+    return c
 
-                leaves = extents.chunk(filename, 200)
-                data_futures = dask.compute([arrange_data(pipeline, leaf, atts) for leaf in leaves])
-
-                progress(data_futures)
-                client.gather(data_futures)
-        c = 0
-        for f in data_futures:
-            c += sum(f)
-        return c
-
-def shatter(filename: str, tdb_dir: str, group_size: int, res: float,
-            debug: bool, client=None, polygon=None, atts=['Z']):
+def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, client=None):
     # read pointcloud
     pipeline = create_pipeline(filename)
-    reader = pipeline.stages[0]
-    extents = create_extents(reader, res, group_size, polygon)
     print('Filtering out empty chunks...')
 
     # set up tiledb
     storage = Storage(tdb_dir, filename, atts)
-    config = storage.init(extents, tdb_dir, atts)
+    atts = storage.getAttributes()
+    extents = Extents.from_storage(storage, tile_size)
+    leaves = extents.chunk(filename, 200)
 
     # Begin main operations
-    print('Fetching and arranging data...')
-    f = extents.chunk(filename)
-    run(pipeline, extents, config, f, tdb_dir, atts, client, debug)
+    with storage.open('w') as tdb:
+        print('Fetching and arranging data...')
+        run(pipeline, atts, leaves, tdb, client, debug)
