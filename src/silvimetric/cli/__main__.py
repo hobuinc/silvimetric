@@ -8,6 +8,7 @@ import webbrowser
 from silvimetric.app import Application
 from silvimetric.storage import Storage
 from silvimetric.shatter import shatter
+from silvimetric.extract import extract
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,9 @@ def info(app):
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in Database",
-              default=["Z","NumberOfReturns","ReturnNumber","HeightAboveGround","Intensity"])
+              default=["Z","NumberOfReturns","ReturnNumber", "Intensity"])
+            #   default=["Z","NumberOfReturns","ReturnNumber",
+            #            "HeightAboveGround","Intensity"])
 #TODO support more bounds types in future
 @click.option("--bounds", help="""Bounds to limit all Silvimetric processing. \
               '[minx,miny(,minz),maxx,maxy(,maxz)]'""", required=True)
@@ -92,11 +95,19 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
 
 
 @cli.command('extract')
-@click.option("--attributes", type=str, multiple=True, default = ["all"])
+# @click.option("--attributes", type=str, multiple=True,
+#               default=["Z","NumberOfReturns","ReturnNumber",
+#                        "HeightAboveGround","Intensity"])
+@click.option("--attributes", "-a", multiple=True,
+              help="List of attributes to include in Database",
+              default=["Z","NumberOfReturns","ReturnNumber", "Intensity"])
+@click.option("--outdir", "-o", type=str, required=True)
 @click.pass_obj
-def extract(app, attributes):
+def extract_cmd(app, attributes, outdir):
     """Extract silvimetric metrics from DATABASE """
-    pass
+
+    extract(app.database, outdir, attributes)
+
 
 if __name__ == "__main__":
     cli()

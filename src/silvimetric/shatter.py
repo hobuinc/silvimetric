@@ -75,7 +75,10 @@ def arrange_data(filename, chunk: Extents, atts: list[str],
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    if tdb != None:
+    if tdb is not None:
+        print(dx)
+        print(dy)
+        print(dd)
         tdb[dx, dy] = dd
     sum = counts.sum()
     del data, dd, points, chunk
@@ -88,14 +91,14 @@ def create_pipeline(filename, chunk):
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    # smrf = pdal.Filter.smrf()
+    # smrf = pdal.Filter.smrf(
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
 def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
     # debug uses single threaded dask
     if debug:
-        data_futures = dask.compute([arrange_data(filename, leaf, atts) for leaf in leaves])
+        data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
             data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
@@ -107,9 +110,10 @@ def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
         c += sum(f)
     return c
 
+#TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
+# into things like get_data, get_atts, arrange_data so that they aren't waiting
+# on each other to compute and still using the resources.
 def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, client=None):
-    # read pointcloud
-    # pipeline = create_pipeline(filename)
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage(tdb_dir)
@@ -123,4 +127,5 @@ def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, clie
         print('Fetching and arranging data...')
         pc = run(filename, atts, leaves, tdb, client, debug)
         storage.saveMetadata({'point_count': pc.item()})
+    # storage.consolidate()
 
