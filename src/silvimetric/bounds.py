@@ -61,4 +61,4 @@ class Bounds(dict): #for JSON serializing
     def to_string(self):
         return self.__repr__()
     def to_json(self):
-        return self.get()
+        return json.dumps(self.get())

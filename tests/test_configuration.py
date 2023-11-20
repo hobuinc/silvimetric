@@ -27,6 +27,5 @@ class Test_Configuration(object):
         j = config.to_json()
         j = json.dumps(j)
 
-
         c = Configuration.from_json(j)
         assert c.resolution == float('30.0')

@@ -33,7 +33,7 @@ class Configuration:
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)
         d['crs'] = json.loads(self.crs.to_json())
-        d['bounds'] = self.bounds.to_json()
+        d['bounds'] = json.loads(self.bounds.to_json())
         j = json.dumps(d)
         return json.loads(j)
 
