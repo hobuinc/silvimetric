@@ -30,12 +30,10 @@ class Bounds(dict): #for JSON serializing
             maxx = t[0][1]
             miny = t[1][0]
             maxy = t[1][1]
-            if len(t) == 3:
-                minz = t[2][0]
-                maxz = t[2][1]
             return Bounds(minx, miny, maxx, maxy)
             
             
+        # parse explicit style
         if 'minx' in bbox:
             minx = float(bbox['minx'])
             miny = float(bbox['miny'])
@@ -43,6 +41,7 @@ class Bounds(dict): #for JSON serializing
             maxy = float(bbox['maxy'])
             return Bounds(minx, miny, maxx, maxy)
             
+        # parse GeoJSON array style
         if len(bbox) == 4:
             return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[2]),
                             float(bbox[3]))
@@ -60,5 +59,5 @@ class Bounds(dict): #for JSON serializing
 
     def to_string(self):
         return self.__repr__()
-    def to_json(self):
+    def to_json(self) -> str:
         return json.dumps(self.get())
