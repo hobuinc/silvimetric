@@ -7,7 +7,7 @@ import webbrowser
 import pyproj
 
 from silvimetric.app import Application
-from silvimetric.storage import Storage
+from silvimetric.storage import Storage, Configuration
 from silvimetric.shatter import shatter
 from silvimetric.extract import extract
 from silvimetric.bounds import Bounds
@@ -32,7 +32,7 @@ def cli(ctx, database, log_level, progress):
     app = Application(
         log_level=log_level,
         progress = progress,
-        database = database,
+        tdb_dir = database,
     )
     ctx.obj = app
 
@@ -86,9 +86,10 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
     # :type resolution: float, optional
     # """
 
-    print(f"Creating database at {app.database}")
+    print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
-    initializeFunction(app, resolution, bounds, attributes, crs)
+    config = Configuration(app.tdb_dir, resolution, bounds, attributes, crs)
+    initializeFunction(config)
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
