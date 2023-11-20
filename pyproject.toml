@@ -6,11 +6,10 @@ readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [
   { name = "Kyle Mann", email = "kyle@hobu.co" },
-  { name = "Howard Butler", email = "howard@hobu.co" },
-  { name = "Bahirah Adewunmi" }
+  { name = "Howard Butler", email = "howard@hobu.co" }
 ]
 maintainers = [
-    { name = "Ognyan Moore", email = "ogi@hobu.co" }
+    { name = "Kyle Mann", email = "kyle@hobu.co" }
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -41,33 +40,6 @@ build-backend = "setuptools.build_meta"
 [project.scripts]
 silvimetric = "silvimetric.cli.__main__:cli"
 
-[tool.black]
-line-length = 88
-target-version = ['py39']
-include = '\.py(i|t)?$'
-exclude = '''
-(
-  /(
-      \.eggs         # exclude a few common directories in the
-    | \.git          # root of the project
-    | \.hg
-    | \.mypy_cache
-    | \.tox
-    | \.venv*
-    | _build
-    | buck-out
-    | build
-    | dist
-  )/
-)
-'''
-
-[tool.mypy]
-python_version = 3.9
-warn_return_any = true
-disallow_untyped_defs = true
-disallow_untyped_calls = true
-disallow_incomplete_defs = true
 
 [tool.pytest.ini_options]
 testpaths = [
