@@ -9,7 +9,7 @@ class Bounds(dict): #for JSON serializing
         self.maxy = float(maxy)
 
     @staticmethod
-    def loads(bbox_str: str):
+    def from_string(bbox_str: str):
         """Accepts bounds from strings in the form:
         
         "([1,101],[2,102],[3,103])"
@@ -51,13 +51,13 @@ class Bounds(dict): #for JSON serializing
         else:
             raise Exception("Bounding boxes must have either 4 or 6 elements")
 
-    def get(self):
+    def get(self) -> list[float]:
         return [self.minx, self.miny, self.maxx, self.maxy]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.get())
 
-    def to_string(self):
+    def to_string(self) -> str:
         return self.__repr__()
     def to_json(self) -> str:
         return json.dumps(self.get())
