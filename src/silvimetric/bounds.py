@@ -1,7 +1,7 @@
 import json
 import ast
 
-class Bounds(object):
+class Bounds(dict): #for JSON serializing
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
         self.minx = float(minx)
         self.miny = float(miny)
@@ -60,3 +60,5 @@ class Bounds(object):
 
     def to_string(self):
         return self.__repr__()
+    def to_json(self):
+        return self.get()

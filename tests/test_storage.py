@@ -15,7 +15,7 @@ def tdb_filepath(tmp_path_factory) -> str:
 @pytest.fixture(scope="class")
 def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Storage:
     b = Bounds(minx, miny, maxx, maxy)
-    config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
+    config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
     yield Storage.create(config)
 
 

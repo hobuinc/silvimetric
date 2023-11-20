@@ -5,25 +5,7 @@ from math import floor
 import pathlib
 import pyproj
 
-class Configuration:
-
-    def __init__(self, 
-                 tdb_dir, 
-                 resolution, 
-                 bounds, attrs:list[str]=[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ], 
-                 crs=None, 
-                 **kwargs):
-
-        self.tdb_dir = tdb_dir
-        self.resolution = float(resolution)
-        if isinstance(crs, pyproj.CRS):
-            self.crs = crs
-        else:
-            self.crs = pyproj.CRS.from_user_input(crs)
-        self.bounds = bounds
-        self.attrs = attrs
-        for k in kwargs:
-            self.__dict__[k] = kwargs[k]
+from .config import Configuration
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -71,7 +53,6 @@ class Storage:
 
         if not ctx:
             ctx = tiledb.default_ctx()
-
 
         dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
