@@ -3,10 +3,13 @@ import pathlib
 
 from silvimetric.app import Application
 from silvimetric.storage import Storage
+from silvimetric.bounds import Bounds
+from silvimetric.initialize import InitCommand 
+from pyproj import CRS
 
 logger = logging.getLogger(__name__)
 
-def initialize(application: Application, resolution: int, bounds: list[float], atts: list[str], crs: str):
+def initialize(application: Application, resolution: int, bounds: Bounds, atts: list[str], crs: CRS):
     """
     Initialize a Silvimetric TileDB instance for a given Application instance
 
@@ -25,4 +28,5 @@ def initialize(application: Application, resolution: int, bounds: list[float], a
     """
 
     logger.debug(f"Initializing application with {application} settings")
-    Storage.create(atts, resolution, bounds, application.database, crs)
+
+    return Storage.create(atts, resolution, bounds, application.database, crs)

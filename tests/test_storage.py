@@ -2,10 +2,9 @@ import pytest
 import tiledb
 import numpy as np
 import os
-import click
 
 
-from silvimetric import Storage, Extents
+from silvimetric import Storage, Extents, Bounds, Configuration
 from silvimetric.cli import initialize
 
 @pytest.fixture(scope='class')
@@ -14,9 +13,11 @@ def tdb_filepath(tmp_path_factory) -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope="class")
-def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, srs) -> Storage:
-    yield Storage.create(attrs, resolution, [minx, miny, maxx, maxy],
-                         tdb_filepath, srs)
+def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Storage:
+    b = Bounds(minx, miny, maxx, maxy)
+    config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
+    yield Storage.create(config)
+
 
 class Test_Storage(object):
 

@@ -6,6 +6,7 @@ from typing import Union, Optional
 from urllib.parse import urlparse
 
 
+
 class Application:
     def __init__(
             self,
