@@ -3,10 +3,10 @@ import dask
 import pdal
 import pytest
 
-from silvimetric.bounds import Bounds
+from silvimetric.extents import Extents
 from silvimetric.shatter import arrange_data, shatter
 
-def check_for_holes(leaves: list[Bounds], chunk: Bounds):
+def check_for_holes(leaves: list[Extents], chunk: Extents):
     ind = np.array([], dtype=chunk.indices.dtype)
     for leaf in leaves:
         if ind.size == 0:
@@ -23,17 +23,17 @@ def check_for_holes(leaves: list[Bounds], chunk: Bounds):
     xrange = np.sort(ux)
     for idx, minmax in enumerate(xrange):
         if idx + 1 < len(xrange):
-            assert minmax + 1 == xrange[idx + 1], f"Hole in derived bounds between {minmax} {xrange[idx + 1]}"
+            assert minmax + 1 == xrange[idx + 1], f"Hole in derived extents between {minmax} {xrange[idx + 1]}"
 
     yrange = np.sort(uy)
     for idx, minmax in enumerate(yrange):
         if idx + 1 < len(yrange):
-            assert minmax + 1 == yrange[idx + 1], f"Hole in derived bounds between {minmax} {yrange[idx + 1]}"
+            assert minmax + 1 == yrange[idx + 1], f"Hole in derived extents between {minmax} {yrange[idx + 1]}"
 
-def check_indexing(bounds, leaf_list):
-    # gather indices from the chunks to match with bounds
-    indices = np.array([], dtype=bounds.indices.dtype)
-    b_indices = bounds.indices
+def check_indexing(extents, leaf_list):
+    # gather indices from the chunks to match with extents
+    indices = np.array([], dtype=extents.indices.dtype)
+    b_indices = extents.indices
     count = 0
 
     #check that mins and maxes are correct first
@@ -79,20 +79,20 @@ def check_indexing(bounds, leaf_list):
     assert b == False, f"Indices duplicated: {dup}"
 
 
-class TestBounds(object):
+class TestExtents(object):
     @pytest.fixture(scope='class', autouse=True)
-    def filtered(self, filepath, bounds):
-        return list(bounds.chunk(filepath, 100))
+    def filtered(self, filepath, extents: Extents):
+        return list(extents.chunk(filepath, 100))
 
     @pytest.fixture(scope='class')
-    def unfiltered(self, filtered, bounds):
-        return list(bounds.root_chunk.get_leaf_children())
+    def unfiltered(self, filtered, extents):
+        return list(extents.root_chunk.get_leaf_children())
 
-    def test_indexing(self, bounds, filtered, unfiltered):
-        check_indexing(bounds, filtered)
-        check_for_holes(filtered, bounds)
-        check_indexing(bounds, unfiltered)
-        check_for_holes(unfiltered, bounds)
+    def test_indexing(self, extents, filtered, unfiltered):
+        check_indexing(extents, filtered)
+        check_for_holes(filtered, extents)
+        check_indexing(extents, unfiltered)
+        check_for_holes(unfiltered, extents)
 
     def test_cells(self, filepath, filtered, resolution):
         flag = False
@@ -114,12 +114,12 @@ class TestBounds(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, pipeline, filtered, unfiltered, test_point_count):
+    def test_pointcount(self, filepath, filtered, unfiltered, test_point_count):
 
-        l1 = [arrange_data(pipeline, leaf, ['Z']) for leaf in filtered]
+        l1 = [arrange_data(filepath, leaf, ['Z']) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        l2 = [arrange_data(pipeline, leaf, ['Z']) for leaf in unfiltered]
+        l2 = [arrange_data(filepath, leaf, ['Z']) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 
         fc = sum(filtered_counts)

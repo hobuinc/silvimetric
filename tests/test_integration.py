@@ -14,9 +14,9 @@ class TestShatter(object):
         yield ['Z', 'Red', 'Green', 'Blue']
 
     @pytest.fixture(scope="class", autouse=True)
-    def tdb_dir(self, filepath, group_size, resolution, atts) -> str:
+    def tdb_dir(self, filepath, tile_size, resolution, atts) -> str:
         dir_name = os.path.join(os.path.dirname(__file__), "tdb_test_data")
-        shatter(filepath, dir_name, group_size, resolution, debug=True,
+        shatter(filepath, dir_name, tile_size, resolution, debug=True,
                 atts=atts)
         yield dir_name
         try:

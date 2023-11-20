@@ -3,7 +3,7 @@ import os
 import dask
 import pdal
 
-from silvimetric import Bounds
+from silvimetric import Extents, Bounds
 from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
@@ -18,8 +18,12 @@ def filepath() -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope='class')
-def bounds(resolution, group_size, minx, maxx, miny, maxy, srs) -> Bounds:
-    yield Bounds(minx,miny,maxx,maxy,resolution,group_size,srs)
+def bounds(minx, maxx, miny, maxy) -> Bounds:
+    yield Bounds(minx, miny, maxx, maxy)
+
+@pytest.fixture(scope='class')
+def extents(resolution, tile_size, bounds, srs) -> Extents:
+    yield Extents(bounds,resolution,tile_size,srs)
 
 @pytest.fixture(scope="session")
 def attrs() -> list[str]:
@@ -38,7 +42,7 @@ def resolution() -> int:
     yield 30
 
 @pytest.fixture(scope='class')
-def group_size() -> int:
+def tile_size() -> int:
     yield 4
 
 @pytest.fixture(scope='class')

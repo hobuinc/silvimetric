@@ -5,16 +5,14 @@ from math import floor
 import pathlib
 import pyproj
 
-from . import Bounds
-
 class Storage(object):
     """ Handles storage of shattered data in a TileDB Database. """
 
     def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None):
-        if not ctx:
-            self.ctx = tiledb.default_ctx()
-        else:
-            self.ctx = ctx
+        # if not ctx:
+        #     self.ctx = tiledb.default_ctx()
+        # else:
+        #     self.ctx = ctx
 
         if not pathlib.Path(tdb_dir).exists():
             raise Exception(f"Given database directory '{tdb_dir}' does not exist")
@@ -74,29 +72,39 @@ class Storage(object):
         xi = floor((maxx - minx) / float(resolution))
         yi = floor((maxy - miny) / float(resolution))
 
-        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64, ctx=ctx)
-        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64, ctx=ctx)
-        domain = tiledb.Domain(dim_row, dim_col, ctx=ctx)
+        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64)
+        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64)
+        domain = tiledb.Domain(dim_row, dim_col)
 
-        count_att = tiledb.Attr(name="count", dtype=np.int32, ctx=ctx)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True, ctx=ctx)
+        count_att = tiledb.Attr(name="count", dtype=np.int32)
+        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True, fill=0)
                     for name in atts]
 
-        schema = tiledb.ArraySchema(ctx=ctx, domain=domain, sparse=True,
-            capacity=len(atts) * xi * yi,
+        schema = tiledb.ArraySchema(domain=domain, sparse=True,
+            capacity=len(atts) * xi * yi * 10000,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
+        try:
+            proj_crs = pyproj.CRS.from_user_input(crs)
+        except:
+            raise Exception(f"Invalid CRS ingested, {crs}")
+
         tiledb.SparseArray.create(dirname, schema)
-        with tiledb.SparseArray(dirname, "w", ctx=ctx) as A:
+        with tiledb.SparseArray(dirname, "w") as A:
             metadata = {'resolution': resolution}
             metadata['bounds'] = [minx, miny, maxx, maxy]
-            metadata['crs'] = crs
+            metadata['crs'] = proj_crs.to_string()
             A.meta.update(metadata)
 
-        s = Storage(dirname, ctx=ctx)
+        s = Storage(dirname)
 
         return s
+
+    def consolidate(self, ctx=None):
+        # if not ctx:
+        #     ctx = self.ctx
+        tiledb.consolidate(self.tdb_dir)
 
     def saveMetadata(self, metadata: dict) -> None:
         """
@@ -125,6 +133,14 @@ class Storage(object):
             data = dict(a.meta)
         return data
 
+    def getAttributes(self) -> list[str]:
+        with self.open('r') as a:
+            s = a.schema
+            att_list = []
+            for idx in range(s.nattr):
+                att_list.append(s.attr(idx).name)
+        return att_list
+
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """
         Open either a read or write stream for TileDB database
@@ -146,9 +162,9 @@ class Storage(object):
 
         if tiledb.object_type(self.tdb_dir) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "w", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'w')
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.SparseArray(self.tdb_dir, "r", ctx=self.ctx)
+                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'r')
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.tdb_dir).exists():

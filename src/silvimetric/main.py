@@ -18,7 +18,7 @@ def main():
     parser.add_argument("--tdb_dir", type=str)
     parser.add_argument("--threads", type=int, default=4)
     parser.add_argument("--workers", type=int, default=12)
-    parser.add_argument("--group_size", type=int, default=16)
+    parser.add_argument("--tile_size", type=int, default=16)
     parser.add_argument("--resolution", type=float, default=30)
     parser.add_argument("--polygon", type=str, default="")
     parser.add_argument("--debug", type=bool, default=False)
@@ -48,7 +48,7 @@ def main():
 
     threads = args.threads
     workers = args.workers
-    group_size = args.group_size
+    tile_size = args.tile_size
     res = args.resolution
     poly = args.polygon
 
@@ -58,7 +58,7 @@ def main():
 
     if debug:
         dask.config.set(scheduler="single-threaded")
-        shatter(filename, tdb_dir, group_size, res, debug, polygon=poly, atts=atts)
+        shatter(filename, tdb_dir, tile_size, res, debug, polygon=poly, atts=atts)
         extract(tdb_dir, out_file)
     else:
         with Client(n_workers=workers, threads_per_worker=threads) as client:
@@ -66,7 +66,7 @@ def main():
             client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter(filename, tdb_dir, group_size, res, debug, client, poly, atts)
+            shatter(filename, tdb_dir, tile_size, res, debug, client, poly, atts)
             extract(tdb_dir, out_file)
 
 if __name__ == "__main__":

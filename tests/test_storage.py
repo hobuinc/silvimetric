@@ -5,8 +5,7 @@ import os
 import click
 
 
-from silvimetric.storage import Storage
-from silvimetric.bounds import Bounds
+from silvimetric import Storage, Extents
 from silvimetric.cli import initialize
 
 @pytest.fixture(scope='class')
@@ -23,7 +22,7 @@ class Test_Storage(object):
 
     def test_schema(self, storage: Storage, attrs: list[str], dims):
         with storage.open('r') as st:
-            s = st.schema
+            s:tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
             assert s.attr('count').dtype == np.int32
 
@@ -41,20 +40,17 @@ class Test_Storage(object):
                 assert sc.has_attr(a)
                 assert sc.attr(a).dtype == dims[a]
 
-    def test_metadata(self, storage: Storage, resolution: float, bounds: Bounds):
+    def test_metadata(self, storage: Storage, extents: Extents):
+        minx, miny, maxx, maxy = extents.bounds.get()
         """Check that instantiation metadata is properly written"""
         metadata = storage.getMetadata()
-        assert metadata['resolution'] == resolution
-        assert metadata['bounds'] == (bounds.minx, bounds.miny, bounds.maxx,
-                                      bounds.maxy)
-        assert metadata['crs'] == bounds.srs
+        assert metadata['resolution'] == extents.resolution
+        assert metadata['bounds'] == (minx, miny, maxx, maxy)
+        assert metadata['crs'] == extents.srs
 
         storage.saveMetadata({'foo': 'bar'})
         metadata = storage.getMetadata()
         assert metadata['foo'] == 'bar'
-
-
-
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")
