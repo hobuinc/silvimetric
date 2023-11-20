@@ -52,7 +52,7 @@ class BoundsParamType(click.ParamType):
 
     def convert(self, value, param, ctx):
         try:
-            b = Bounds.loads(value)
+            b = Bounds.from_string(value)
             return b
         except ValueError:
             self.fail(f"{value!r} is not a bounds type", param, ctx)
@@ -69,16 +69,13 @@ class CRSParamType(click.ParamType):
 
 @cli.command('initialize')
 @click.argument("bounds", type=BoundsParamType())
-@click.argument("crs", type=pyproj.CRS)
+@click.argument("crs", type=CRSParamType())
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
 @click.pass_obj
 def initialize(app: Application, resolution: float, bounds: str, attributes: str, crs: str):
     """Initialize silvimetrics DATABASE
-    
-    
-    
     """
 
 
@@ -88,7 +85,8 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
 
     print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
-    config = Configuration(app.tdb_dir, resolution, bounds, attributes, crs)
+    breakpoint()
+    config = Configuration(app.tdb_dir, bounds, resolution, crs, attributes)
     initializeFunction(config)
 
 @cli.command('shatter')
