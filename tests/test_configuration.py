@@ -22,10 +22,7 @@ def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Conf
 class Test_Configuration(object):
 
     def test_serialization(self, config: Configuration):
-        assert config.resolution == float('30.0')
 
         j = config.to_json()
-        j = json.dumps(j)
-
-        c = Configuration.from_json(j)
-        assert c.resolution == float('30.0')
+        c = Configuration.from_string(j)
+        assert c == config

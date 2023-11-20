@@ -35,10 +35,10 @@ class Configuration:
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
         j = json.dumps(d)
-        return json.loads(j)
+        return j
 
     @classmethod
-    def from_json(self, data: str):
+    def from_string(self, data: str):
         x = json.loads(data)
         bounds = Bounds(*x['bounds'])
         if 'crs' in x:

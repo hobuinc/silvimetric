@@ -8,6 +8,12 @@ class Bounds(dict): #for JSON serializing
         self.maxx = float(maxx)
         self.maxy = float(maxy)
 
+    def __eq__(self, other):
+        return  other.minx == self.minx and \
+                other.miny == self.miny and \
+                other.maxx == self.maxx and \
+                other.maxy == self.maxy
+
     @staticmethod
     def from_string(bbox_str: str):
         """Accepts bounds from strings in the form:

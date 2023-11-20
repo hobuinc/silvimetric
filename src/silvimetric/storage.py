@@ -87,32 +87,29 @@ class Storage:
         #     ctx = self.ctx
         tiledb.consolidate(self.config.tdb_dir)
 
-    def saveMetadata(self, metadata: dict) -> None:
+    def saveConfig(self) -> None:
         """
-        Save metadata to the Database
+        Save configuration to the Database
 
-        Parameters
-        ----------
-        metadata : dict
-            Metadata key-value pairs to be saved
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
-            a.meta.update(metadata)
+            a.meta['config'] = self.config.to_json()
 
-    def getMetadata(self) -> dict:
+    def getConfig(self) -> Configuration:
         """
-        Get the metadata from the database
+        Get the Configuration currently in use by the Storage
 
         Returns
         -------
-        dict
-            Dictionary of key-value pairs of database metadata
+        Configuration
+            Configuration object
         """
         # reopen in read mode if current mode is write
         with self.open('r') as a:
-            data = dict(a.meta)
-        return data
+            s = a.meta['config']
+            config = Configuration.from_string(s)
+            return config
 
     def getAttributes(self) -> list[str]:
         with self.open('r') as a:
