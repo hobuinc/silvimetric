@@ -5,11 +5,12 @@ import numpy as np
 from copy import deepcopy
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress
+from dask.distributed import performance_report, progress, Client
 
 from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
+from .config import ShatterConfiguration
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -61,7 +62,8 @@ def arrange_data(filename, chunk: Extents, atts: list[str],
     dd = {}
     for att in atts:
         try:
-            dd[att] = np.array([*np.array([col[att] for col in data], object), None], object)[:-1]
+            dd[att] = np.array([*np.array([col[att] for col in data], object),
+                                None], object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
 
@@ -98,10 +100,12 @@ def create_pipeline(filename, chunk):
 def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
     # debug uses single threaded dask
     if debug:
-        data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
+        data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb)
+                                     for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
-            data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
+            data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb)
+                                         for leaf in leaves])
 
             progress(data_futures)
             client.gather(data_futures)
@@ -113,21 +117,21 @@ def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
 #TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
 # into things like get_data, get_atts, arrange_data so that they aren't waiting
 # on each other to compute and still using the resources.
-def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, client=None):
+def shatter(config: ShatterConfiguration):
     print('Filtering out empty chunks...')
     # set up tiledb
-    storage = Storage(tdb_dir)
+    storage = Storage(config.tdb_dir)
     atts = storage.getAttributes()
     atts.remove('count')
-    extents = Extents.from_storage(storage, tile_size)
-    leaves = list(extents.chunk(filename, 1000))
+    extents = Extents.from_storage(storage, config.tile_size)
+    leaves = list(extents.chunk(config.filename, 1000))
 
     # Begin main operations
     with storage.open('w') as tdb:
         print('Fetching and arranging data...')
-        pc = run(filename, atts, leaves, tdb, client, debug)
+        pc = run(config.filename, atts, leaves, tdb, config.client, config.debug)
 
         #TODO point count should be updated as we add
-        storage.saveMetadata({'point_count': pc.item()})
-    # storage.consolidate()
+        tdb.meta['point_count'] = pc.item()
+        # storage.saveMetadata({'point_count': pc.item()})
 

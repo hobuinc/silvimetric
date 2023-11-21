@@ -10,21 +10,21 @@ import asyncio
 from redis import Redis
 from pottery import Redlock
 
-class Storage(object):
+from .config import Configuration
+
+class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None, redis_url:str=None):
+    def __init__(self, config: Configuration, ctx:tiledb.Ctx=None):
         # if not ctx:
         #     self.ctx = tiledb.default_ctx()
         # else:
         #     self.ctx = ctx
 
-        if not pathlib.Path(tdb_dir).exists():
-            raise Exception(f"Given database directory '{tdb_dir}' does not exist")
+        if not pathlib.Path(config.tdb_dir).exists():
+            raise Exception(f"Given database directory '{config.tdb_dir}' does not exist")
 
-        self.tdb_dir: str = tdb_dir
-        self.redis = Redis.from_url(redis_url) if redis_url is not None else None
-
+        self.config = config
 
     def __enter__(self):
         return self
@@ -34,21 +34,14 @@ class Storage(object):
 
 
     @staticmethod
-    def create(atts:list[str], resolution: float, bounds: list[float],
-               dirname: str, crs: str, ctx:tiledb.Ctx=None):
+    def create( config:Configuration, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
         Parameters
         ----------
-        atts : list[str]
-            List of PDAL attributes
-        resolution : float
-            Resolution of a cell
-        bounds : list[float]
-            Bounding box of dataset. [minx, minz(, minz), maxx, maxy(, maxz)]
-        dirname : str
-            Path to where TileDB should be created
+        config : Configuration
+            Storage configuration
         ctx : tiledb.Ctx, optional
             TileDB Context, by default is None
 
@@ -66,17 +59,9 @@ class Storage(object):
         if not ctx:
             ctx = tiledb.default_ctx()
 
-        if len(bounds) == 4:
-            minx, miny, maxx, maxy = bounds
-        elif len(bounds) == 6:
-            minx, miny, minz, maxx, maxy, maxz = bounds
-        else:
-            raise Exception(f"Bounding box must have either 4 or 6 entities. {bounds}")
-
-
-        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in atts }
-        xi = floor((maxx - minx) / float(resolution))
-        yi = floor((maxy - miny) / float(resolution))
+        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
+        xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
+        yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
 
         dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64)
         dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64)
@@ -84,60 +69,52 @@ class Storage(object):
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True, fill=0)
-                    for name in atts]
+                    for name in config.attrs]
 
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(atts) * xi * yi * 10000,
+            capacity=len(config.attrs) * xi * yi * 10000,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
-        try:
-            proj_crs = pyproj.CRS.from_user_input(crs)
-        except:
-            raise Exception(f"Invalid CRS ingested, {crs}")
-
-        tiledb.SparseArray.create(dirname, schema)
-        with tiledb.SparseArray(dirname, "w") as A:
-            metadata = {'resolution': resolution}
-            metadata['bounds'] = [minx, miny, maxx, maxy]
-            metadata['crs'] = proj_crs.to_string()
+        tiledb.SparseArray.create(config.tdb_dir, schema)
+        with tiledb.SparseArray(config.tdb_dir, "w") as A:
+            metadata = {'resolution': config.resolution}
+            metadata['bounds'] = config.bounds.get()
+            metadata['crs'] = config.crs.to_string()
             A.meta.update(metadata)
 
-        s = Storage(dirname)
+        s = Storage(config, ctx)
 
         return s
 
     def consolidate(self, ctx=None):
         # if not ctx:
         #     ctx = self.ctx
-        tiledb.consolidate(self.tdb_dir)
+        tiledb.consolidate(self.config.tdb_dir)
 
-    def saveMetadata(self, metadata: dict) -> None:
+    def saveConfig(self) -> None:
         """
-        Save metadata to the Database
+        Save configuration to the Database
 
-        Parameters
-        ----------
-        metadata : dict
-            Metadata key-value pairs to be saved
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
-            a.meta.update(metadata)
+            a.meta['config'] = self.config.to_json()
 
-    def getMetadata(self) -> dict:
+    def getConfig(self) -> Configuration:
         """
-        Get the metadata from the database
+        Get the Configuration currently in use by the Storage
 
         Returns
         -------
-        dict
-            Dictionary of key-value pairs of database metadata
+        Configuration
+            Configuration object
         """
         # reopen in read mode if current mode is write
         with self.open('r') as a:
-            data = dict(a.meta)
-        return data
+            s = a.meta['config']
+            config = Configuration.from_string(s)
+            return config
 
     def getAttributes(self) -> list[str]:
         with self.open('r') as a:
@@ -166,18 +143,18 @@ class Storage(object):
             Path does not exist
         """
 
-        if tiledb.object_type(self.tdb_dir) == "array":
+        if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'w')
+                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w')
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.open(self.tdb_dir, 'r')
+                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'r')
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
-        elif pathlib.Path(self.tdb_dir).exists():
-            raise Exception(f"Path {self.tdb_dir} already exists and is not" +
+        elif pathlib.Path(self.config.tdb_dir).exists():
+            raise Exception(f"Path {self.config.tdb_dir} already exists and is not" +
                             " initialized for TileDB access.")
         else:
-            raise Exception(f"Path {self.tdb_dir} does not exist")
+            raise Exception(f"Path {self.config.tdb_dir} does not exist")
         return tdb
 
     #TODO what are we reading? queries are probably going to be specific
@@ -200,7 +177,8 @@ class Storage(object):
             data = tdb[xs, ys]
         return data
 
-    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
+    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray,
+              redis: Redlock=None) -> None:
         """
         Write data to TileDB database
 
@@ -220,9 +198,9 @@ class Storage(object):
         # ]
 
         with self.open('w') as tdb:
-            if self.redis is not None:
+            if redis is not None:
                 for x,y,d in zip(xs, ys, data):
-                    lock = Redlock(key=f'{x}_{y}_lock', masters={self.redis}, auto_release_time=0.2)
+                    lock = Redlock(key=f'{self.tdb_dir}/{x}_{y}_lock', masters={redis}, auto_release_time=0.2)
                     with lock:
                         with self.open('r') as tdb_r:
                             prev = tdb_r[x,y]

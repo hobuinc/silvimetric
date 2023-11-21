@@ -22,8 +22,8 @@ def bounds(minx, maxx, miny, maxy) -> Bounds:
     yield Bounds(minx, miny, maxx, maxy)
 
 @pytest.fixture(scope='class')
-def extents(resolution, tile_size, bounds, srs) -> Extents:
-    yield Extents(bounds,resolution,tile_size,srs)
+def extents(resolution, tile_size, bounds, crs) -> Extents:
+    yield Extents(bounds,resolution,tile_size,crs)
 
 @pytest.fixture(scope="session")
 def attrs() -> list[str]:
@@ -66,5 +66,5 @@ def maxy() -> float:
     yield 600
 
 @pytest.fixture(scope="class")
-def srs():
-    yield 5070
+def crs():
+    yield "EPSG:5070"
