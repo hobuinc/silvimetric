@@ -5,6 +5,7 @@ import copy
 from dataclasses import dataclass, field
 
 from .bounds import Bounds
+from . import __version__
 
     # config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
 @dataclass
@@ -14,6 +15,7 @@ class Configuration:
     resolution: float = 30.0
     crs: pyproj.CRS = None
     attrs: list[str] = field(default_factory=[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
+    version: str = __version__
 
     def __post_init__(self) -> None:
         

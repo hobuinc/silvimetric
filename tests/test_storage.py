@@ -6,6 +6,7 @@ import os
 
 from silvimetric import Storage, Extents, Bounds, Configuration
 from silvimetric.cli import initialize
+from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='class')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -49,6 +50,7 @@ class Test_Storage(object):
         assert config.resolution == storage.config.resolution
         assert config.bounds == storage.config.bounds
         assert config.crs == storage.config.crs
+        assert storage.config.version == svversion
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")
