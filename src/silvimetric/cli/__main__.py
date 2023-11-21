@@ -84,13 +84,15 @@ def initialize(app: Application, resolution: float, bounds: str, attributes: str
 @click.option("--workers", type=int, default=12)
 @click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
+@click.option("--redisurl", type=str)
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+
+    #TODO if redisurl is not specified then it's local threads
     with Client(n_workers=workers, threads_per_worker=threads) as client:
         client.get_versions(check=True)
         webbrowser.open(client.cluster.dashboard_link)
-        # dask.config.set(scheduler="processes")
         shatter(pointcloud, app.database, tilesize, client=client)
 
 
