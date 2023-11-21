@@ -126,6 +126,8 @@ def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, clie
     with storage.open('w') as tdb:
         print('Fetching and arranging data...')
         pc = run(filename, atts, leaves, tdb, client, debug)
+
+        #TODO point count should be updated as we add
         storage.saveMetadata({'point_count': pc.item()})
     # storage.consolidate()
 

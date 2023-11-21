@@ -11,3 +11,5 @@ dependencies:
   - dask
   - pyproj
   - gdal
+  - redis-py
+  - pottery

@@ -4,11 +4,16 @@ import numpy as np
 from math import floor
 import pathlib
 import pyproj
+from time import sleep
+
+import asyncio
+from redis import Redis
+from pottery import Redlock
 
 class Storage(object):
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None):
+    def __init__(self, tdb_dir: str, ctx:tiledb.Ctx=None, redis_url:str=None):
         # if not ctx:
         #     self.ctx = tiledb.default_ctx()
         # else:
@@ -18,6 +23,7 @@ class Storage(object):
             raise Exception(f"Given database directory '{tdb_dir}' does not exist")
 
         self.tdb_dir: str = tdb_dir
+        self.redis = Redis.from_url(redis_url) if redis_url is not None else None
 
 
     def __enter__(self):
@@ -207,5 +213,20 @@ class Storage(object):
         data : np.ndarray
             Numpy object of data values for attributes in each index pairing
         """
+        ## if using redis, acquire a lock key, otherwise, acquire mutex
+        # lock_list = [
+        #     Redlock(key=f'{x}_{y}_lock', masters={self.redis}, auto_release_time=10)
+        #     for x,y in zip(xs,ys)
+        # ]
+
         with self.open('w') as tdb:
-            tdb[xs, ys] = data
+            if self.redis is not None:
+                for x,y,d in zip(xs, ys, data):
+                    lock = Redlock(key=f'{x}_{y}_lock', masters={self.redis}, auto_release_time=0.2)
+                    with lock:
+                        with self.open('r') as tdb_r:
+                            prev = tdb_r[x,y]
+                            if bool(np.any(prev)):
+                                for att in prev:
+                                    d[att] = np.concatenate((d[att], prev[att]))
+                        tdb[x, y] = d
