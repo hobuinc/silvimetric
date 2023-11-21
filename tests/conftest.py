@@ -3,7 +3,7 @@ import os
 import dask
 import pdal
 
-from silvimetric import Extents, Bounds, Configuration
+from silvimetric import Extents, Bounds
 from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)

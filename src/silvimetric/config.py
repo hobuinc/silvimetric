@@ -40,14 +40,14 @@ class Configuration:
         return j
 
     @classmethod
-    def from_string(self, data: str):
+    def from_string(cls, data: str):
         x = json.loads(data)
         bounds = Bounds(*x['bounds'])
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
             crs = None
-        n = self(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'], crs=crs)
+        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'], crs=crs)
 
         return n
  

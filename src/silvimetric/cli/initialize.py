@@ -3,9 +3,7 @@ import pathlib
 
 from silvimetric.app import Application
 from silvimetric.storage import Storage, Configuration
-from silvimetric.bounds import Bounds
 from silvimetric.initialize import InitCommand 
-from pyproj import CRS
 
 logger = logging.getLogger(__name__)
 

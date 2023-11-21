@@ -13,6 +13,8 @@ class Bounds(dict): #for JSON serializing
                 other.miny == self.miny and \
                 other.maxx == self.maxx and \
                 other.maxy == self.maxy
+    def __neq__(self, other):
+        return not other.__eq__(self)
 
     @staticmethod
     def from_string(bbox_str: str):
