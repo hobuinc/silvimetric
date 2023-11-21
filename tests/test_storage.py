@@ -2,11 +2,11 @@ import pytest
 import tiledb
 import numpy as np
 import os
-import click
 
 
-from silvimetric import Storage, Extents
+from silvimetric import Storage, Extents, Bounds, Configuration
 from silvimetric.cli import initialize
+from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='class')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -14,9 +14,11 @@ def tdb_filepath(tmp_path_factory) -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope="class")
-def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, srs) -> Storage:
-    yield Storage.create(attrs, resolution, [minx, miny, maxx, maxy],
-                         tdb_filepath, srs)
+def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Storage:
+    b = Bounds(minx, miny, maxx, maxy)
+    config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
+    yield Storage.create(config)
+
 
 class Test_Storage(object):
 
@@ -40,17 +42,15 @@ class Test_Storage(object):
                 assert sc.has_attr(a)
                 assert sc.attr(a).dtype == dims[a]
 
-    def test_metadata(self, storage: Storage, extents: Extents):
-        minx, miny, maxx, maxy = extents.bounds.get()
+    def test_config(self, storage: Storage):
         """Check that instantiation metadata is properly written"""
-        metadata = storage.getMetadata()
-        assert metadata['resolution'] == extents.resolution
-        assert metadata['bounds'] == (minx, miny, maxx, maxy)
-        assert metadata['crs'] == extents.srs
-
-        storage.saveMetadata({'foo': 'bar'})
-        metadata = storage.getMetadata()
-        assert metadata['foo'] == 'bar'
+        
+        storage.saveConfig()
+        config = storage.getConfig()
+        assert config.resolution == storage.config.resolution
+        assert config.bounds == storage.config.bounds
+        assert config.crs == storage.config.crs
+        assert storage.config.version == svversion
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")
