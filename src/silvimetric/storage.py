@@ -6,10 +6,6 @@ import pathlib
 import pyproj
 from time import sleep
 
-import asyncio
-from redis import Redis
-from pottery import Redlock
-
 from .config import Configuration
 
 class Storage:
@@ -68,11 +64,14 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True, fill=0)
+        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
                     for name in config.attrs]
 
+        # allows_duplicates lets us insert multiple values into each cell,
+        # with each value representing a set of values from a shatter process
+        # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(config.attrs) * xi * yi * 10000,
+            capacity=len(config.attrs) * xi * yi * 100000,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
@@ -182,8 +181,7 @@ class Storage:
             data = tdb[xs, ys]
         return data
 
-    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray,
-              redis_url: str=None) -> None:
+    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
         Write data to TileDB database
 
@@ -197,34 +195,7 @@ class Storage:
             Numpy object of data values for attributes in each index pairing
         """
 
-        r = Redis.from_url(redis_url)
         with self.open('w') as tdb:
             tdb[xs, ys] = data
-
-            # commented out for now with assumption we don't need redis
-            # since allows_duplicates lets you have multiple values
-            # for one cell
-
-            # if redis_url is not None:
-            #     for idx, xy in enumerate(zip(xs, ys)):
-            #         x, y = xy
-            #         lock = Redlock(key=f'{self.config.name}_{x}_{y}_lock', masters={r}, auto_release_time=30)
-            #         with lock:
-            #             with self.open('r') as tdb_r:
-            #                 # prev = tdb_r[x,y]
-            #                 # if bool(np.any(prev['count'])):
-            #                 #     data_w = {}
-            #                 #     for att in prev:
-            #                 #         if att in ['X', 'Y']:
-            #                 #             continue
-            #                 #         elif att == 'count':
-            #                 #             data_w[att] = np.array(data[att][idx] + prev[att][0])
-            #                 #         else:
-            #                 #             data_w[att] = np.array([np.array([*data[att][idx], *prev[att][0]]), None], object)[:-1]
-            #                 #             # data_w[att] = np.array([np.array([*data[att][idx]]), np.array([*prev[att][0]])])
-            #                 # else:
-            #                 data_w = {
-            #                     att : np.array([np.array(*[data[att][idx]]), None], object)[:-1]
-            #                     for att in data
-            #                 }
-            #                 tdb[x, y] = data_w
+            with self.open('r') as tdb_r:
+                print(tdb_r[xs[0],ys[0]]['Z'])

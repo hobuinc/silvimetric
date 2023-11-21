@@ -61,7 +61,7 @@ class Configuration:
         j = self.to_json()
         return json.dumps(j)
 
-@dataclass(kw_only=True)
+@dataclass
 class ShatterConfiguration:
 
     tdb_dir: str
@@ -69,17 +69,17 @@ class ShatterConfiguration:
     tile_size: int
     debug: bool=field(default=False)
     client: Client=field(default=None)
-    redis_url: str=field(default=None)
+    # redis_url: str=field(default=None)
     # redis: Redis=field(init=False)
 
     def __post_init__(self) -> None:
-        if self.redis_url is not None:
-            r = Redis.from_url(self.redis_url)
-            try:
-                r.ping()
-                # self.redis=r
-            except BaseException as e:
-                raise Exception(f"Invalid redis url provided: {e.args}")
+        # if self.redis_url is not None:
+        #     r = Redis.from_url(self.redis_url)
+        #     try:
+        #         r.ping()
+        #         # self.redis=r
+        #     except BaseException as e:
+        #         raise Exception(f"Invalid redis url provided: {e.args}")
         if self.client is not None:
             # throws if not all package versions found on client workers match
             self.client.get_versions(check=True)

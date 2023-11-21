@@ -5,7 +5,7 @@ import numpy as np
 import dask
 import dask.array as da
 from dask.distributed import performance_report, progress, Client
-from redis import Redis
+# from redis import Redis
 
 from .bounds import Bounds
 from .extents import Extents
@@ -50,8 +50,7 @@ def get_data(filename, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(chunk: Extents, atts: list[str], filename:str, redis_url:str,
-                 storage: Storage):
+def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage):
 
     points = get_data(filename, chunk)
     if not points.size:
@@ -77,9 +76,9 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str, redis_url:str,
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    storage.write(dx, dy, dd, redis_url)
+    storage.write(dx, dy, dd)
     sum = counts.sum()
-    del data, dd, points, chunk
+    # del data, dd, points, chunk
     return sum
 
 def create_pipeline(filename, chunk):
@@ -99,13 +98,13 @@ def run(atts: list[str], leaves: list[Extents], config: ShatterConfiguration,
 
 
     if config.debug:
-        data_futures = dask.compute([arrange_data(leaf, atts, config, storage)
+        data_futures = dask.compute([arrange_data(leaf, atts, config.filename, storage)
                                      for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
             data_futures = dask.compute([
-                arrange_data(leaf, atts, config.filename, config.redis_url,
-                             storage) for leaf in leaves])
+                arrange_data(leaf, atts, config.filename, storage)
+                for leaf in leaves])
 
             progress(data_futures)
             config.client.gather(data_futures)
