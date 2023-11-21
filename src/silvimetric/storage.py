@@ -196,6 +196,12 @@ class Storage:
         """
 
         with self.open('w') as tdb:
+            with self.open('r') as tdb_r:
+                tdb_val = tdb_r[xs[0],ys[0]]['Z']
+                print(f'before {tdb_val}')
             tdb[xs, ys] = data
             with self.open('r') as tdb_r:
-                print(tdb_r[xs[0],ys[0]]['Z'])
+                tdb_val = tdb_r[xs[0],ys[0]]['Z'][0][0]
+                data_val = data['Z'][0][0]
+                print(f'after, {tdb_val}')
+                print(f'should be: {data_val}')
