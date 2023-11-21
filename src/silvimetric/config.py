@@ -6,6 +6,7 @@ from redis import Redis
 
 from dataclasses import dataclass, field
 
+from .names import get_random_name
 from .bounds import Bounds
 from . import __version__
 
@@ -16,8 +17,9 @@ class Configuration:
     bounds: Bounds
     resolution: float = 30.0
     crs: pyproj.CRS = None
-    attrs: list[str] = field(default_factory=[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
+    attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
     version: str = __version__
+    name: str = None
 
     def __post_init__(self) -> None:
 
@@ -32,6 +34,8 @@ class Configuration:
         if not self.crs.is_projected:
             raise Exception(f"Given coordinate system is not a rectilinear projected coordinate system")
 
+        if not self.name:
+            name = get_random_name()
 
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json

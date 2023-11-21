@@ -73,20 +73,24 @@ class CRSParamType(click.ParamType):
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
+@click.option("--name", "-a", type=str,
+              help="Working name for this SilviMetric DB (random one given if not specified)")
 @click.pass_obj
-def initialize(app: Application, resolution: float, bounds: str, attributes: str, crs: str):
+def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: list[str], resolution: float, name: str):
     """Initialize silvimetrics DATABASE
     """
-
-
-    # :param resolution: Resolution of a cell in dataset units, default to 30.0
-    # :type resolution: float, optional
-    # """
 
     print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
     breakpoint()
-    config = Configuration(app.tdb_dir, bounds, resolution, crs, attributes)
+    config = Configuration(app.tdb_dir, bounds, resolution, crs)
+    if name:
+        config.name = name
+    if attributes:
+        config.attrs = attributes
+    if resolution:
+        config.resolution = resolution
+
     initializeFunction(config)
 
 @cli.command('shatter')
