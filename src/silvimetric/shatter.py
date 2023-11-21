@@ -2,10 +2,10 @@ import tiledb
 import pdal
 import numpy as np
 
-from copy import deepcopy
 import dask
 import dask.array as da
 from dask.distributed import performance_report, progress, Client
+from redis import Redis
 
 from .bounds import Bounds
 from .extents import Extents
@@ -50,8 +50,8 @@ def get_data(filename, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(filename, chunk: Extents, atts: list[str],
-                 tdb: tiledb.SparseArray=None):
+def arrange_data(chunk: Extents, atts: list[str], filename:str, redis_url:str,
+                 storage: Storage):
 
     points = get_data(filename, chunk)
     if not points.size:
@@ -77,11 +77,7 @@ def arrange_data(filename, chunk: Extents, atts: list[str],
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    if tdb is not None:
-        print(dx)
-        print(dy)
-        print(dd)
-        tdb[dx, dy] = dd
+    storage.write(dx, dy, dd, redis_url)
     sum = counts.sum()
     del data, dd, points, chunk
     return sum
@@ -97,18 +93,22 @@ def create_pipeline(filename, chunk):
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
+def run(atts: list[str], leaves: list[Extents], config: ShatterConfiguration,
+        storage: Storage):
     # debug uses single threaded dask
-    if debug:
-        data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb)
+
+
+    if config.debug:
+        data_futures = dask.compute([arrange_data(leaf, atts, config, storage)
                                      for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
-            data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb)
-                                         for leaf in leaves])
+            data_futures = dask.compute([
+                arrange_data(leaf, atts, config.filename, config.redis_url,
+                             storage) for leaf in leaves])
 
             progress(data_futures)
-            client.gather(data_futures)
+            config.client.gather(data_futures)
     c = 0
     for f in data_futures:
         c += sum(f)
@@ -120,18 +120,18 @@ def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
 def shatter(config: ShatterConfiguration):
     print('Filtering out empty chunks...')
     # set up tiledb
-    storage = Storage(config.tdb_dir)
+    storage = Storage.from_db(config.tdb_dir)
     atts = storage.getAttributes()
     atts.remove('count')
     extents = Extents.from_storage(storage, config.tile_size)
     leaves = list(extents.chunk(config.filename, 1000))
 
     # Begin main operations
-    with storage.open('w') as tdb:
-        print('Fetching and arranging data...')
-        pc = run(config.filename, atts, leaves, tdb, config.client, config.debug)
+    print('Fetching and arranging data...')
+    pc = run(atts, leaves, config, storage)
 
-        #TODO point count should be updated as we add
+    #TODO point count should be updated as we add
+    with storage.open('w') as tdb:
         tdb.meta['point_count'] = pc.item()
         # storage.saveMetadata({'point_count': pc.item()})
 

@@ -82,7 +82,6 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 
     print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
-    breakpoint()
     config = Configuration(app.tdb_dir, bounds, resolution, crs)
     if name:
         config.name = name
@@ -105,10 +104,10 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, redisurl):
 
     #TODO if redisurl is not specified then it's local threads
     with Client(n_workers=workers, threads_per_worker=threads) as client:
-        config = ShatterConfiguration(tdb_dir=app.database, filename=pointcloud,
-                                      tile_size=tilesize, client=Client,
+        config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
+                                      tile_size=tilesize, client=client,
                                       redis_url=redisurl)
-        webbrowser.open(client.cluster.dashboard_link)
+        # webbrowser.open(client.cluster.dashboard_link)
         shatter(config)
 
 

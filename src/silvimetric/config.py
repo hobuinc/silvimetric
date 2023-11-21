@@ -70,12 +70,14 @@ class ShatterConfiguration:
     debug: bool=field(default=False)
     client: Client=field(default=None)
     redis_url: str=field(default=None)
+    # redis: Redis=field(init=False)
 
     def __post_init__(self) -> None:
         if self.redis_url is not None:
             r = Redis.from_url(self.redis_url)
             try:
                 r.ping()
+                # self.redis=r
             except BaseException as e:
                 raise Exception(f"Invalid redis url provided: {e.args}")
         if self.client is not None:

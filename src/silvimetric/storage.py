@@ -77,15 +77,20 @@ class Storage:
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
-        with tiledb.SparseArray(config.tdb_dir, "w") as A:
-            metadata = {'resolution': config.resolution}
-            metadata['bounds'] = config.bounds.get()
-            metadata['crs'] = config.crs.to_string()
-            A.meta.update(metadata)
+        with tiledb.SparseArray(config.tdb_dir, "w") as a:
+            a.meta['config'] = config.to_json()
 
         s = Storage(config, ctx)
 
         return s
+
+    @staticmethod
+    def from_db(tdb_dir: str):
+        with tiledb.open(tdb_dir, 'r') as a:
+            s = a.meta['config']
+            config = Configuration.from_string(s)
+            return Storage(config)
+
 
     def consolidate(self, ctx=None):
         # if not ctx:
@@ -178,7 +183,7 @@ class Storage:
         return data
 
     def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray,
-              redis: Redlock=None) -> None:
+              redis_url: str=None) -> None:
         """
         Write data to TileDB database
 
@@ -191,20 +196,35 @@ class Storage:
         data : np.ndarray
             Numpy object of data values for attributes in each index pairing
         """
-        ## if using redis, acquire a lock key, otherwise, acquire mutex
-        # lock_list = [
-        #     Redlock(key=f'{x}_{y}_lock', masters={self.redis}, auto_release_time=10)
-        #     for x,y in zip(xs,ys)
-        # ]
 
+        r = Redis.from_url(redis_url)
         with self.open('w') as tdb:
-            if redis is not None:
-                for x,y,d in zip(xs, ys, data):
-                    lock = Redlock(key=f'{self.tdb_dir}/{x}_{y}_lock', masters={redis}, auto_release_time=0.2)
-                    with lock:
-                        with self.open('r') as tdb_r:
-                            prev = tdb_r[x,y]
-                            if bool(np.any(prev)):
-                                for att in prev:
-                                    d[att] = np.concatenate((d[att], prev[att]))
-                        tdb[x, y] = d
+            tdb[xs, ys] = data
+
+            # commented out for now with assumption we don't need redis
+            # since allows_duplicates lets you have multiple values
+            # for one cell
+
+            # if redis_url is not None:
+            #     for idx, xy in enumerate(zip(xs, ys)):
+            #         x, y = xy
+            #         lock = Redlock(key=f'{self.config.name}_{x}_{y}_lock', masters={r}, auto_release_time=30)
+            #         with lock:
+            #             with self.open('r') as tdb_r:
+            #                 # prev = tdb_r[x,y]
+            #                 # if bool(np.any(prev['count'])):
+            #                 #     data_w = {}
+            #                 #     for att in prev:
+            #                 #         if att in ['X', 'Y']:
+            #                 #             continue
+            #                 #         elif att == 'count':
+            #                 #             data_w[att] = np.array(data[att][idx] + prev[att][0])
+            #                 #         else:
+            #                 #             data_w[att] = np.array([np.array([*data[att][idx], *prev[att][0]]), None], object)[:-1]
+            #                 #             # data_w[att] = np.array([np.array([*data[att][idx]]), np.array([*prev[att][0]])])
+            #                 # else:
+            #                 data_w = {
+            #                     att : np.array([np.array(*[data[att][idx]]), None], object)[:-1]
+            #                     for att in data
+            #                 }
+            #                 tdb[x, y] = data_w

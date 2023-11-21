@@ -160,11 +160,8 @@ class Extents(object):
 
     @staticmethod
     def from_storage(storage: Storage, tile_size: float=16):
-        meta = storage.getMetadata()
-        bounds = Bounds(*meta['bounds'])
-        crs = meta['crs']
-        res = meta['resolution']
-        return Extents(bounds, res, tile_size, crs)
+        meta = storage.getConfig()
+        return Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
 
     @staticmethod
     def create(reader, resolution: float=30, tile_size: float=16, polygon=None):
