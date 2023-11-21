@@ -17,7 +17,6 @@ class Configuration:
 
     def __post_init__(self) -> None:
         
-        breakpoint()
         crs = self.crs
         if isinstance(crs, dict):
             crs = json.loads(crs)
