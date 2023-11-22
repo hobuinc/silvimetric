@@ -1,10 +1,10 @@
-import tiledb
 import pdal
 import numpy as np
+import json
 
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress, Client
+from dask.distributed import performance_report, progress
 
 from .bounds import Bounds
 from .extents import Extents
@@ -30,7 +30,7 @@ def get_atts(points, chunk):
     yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
-    return dask.compute(*att_data, scheduler="Threads")
+    return dask.compute(att_data, scheduler="Threads")[0]
 
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
@@ -54,20 +54,25 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str,
     dd = {}
     for att in atts:
         try:
-            dd[att] = np.array([*np.array([col[att] for col in data]),
-                                None], object)[:-1]
+            dd[att] = np.array([*[np.array(col[att], data[0][att].dtype) for col in data], None], object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
+
+    # a = np.array([ np.array([1,1], dtype=np.int32), np.array([2], dtype=np.int32), np.array([3,3,3], dtype=np.int32), np.array([4], dtype=np.int32) ], dtype='O')
+
 
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices and create final sparse tiledb inputs
     empties = np.where(counts == 0)
     dd['count'] = counts
-    for att in dd:
-        dd[att] = np.delete(dd[att], empties)
-    dx = np.delete(chunk.indices['x'], empties)
-    dy = np.delete(chunk.indices['y'], empties)
+    dx = chunk.indices['x']
+    dy = chunk.indices['y']
+    if np.any(empties):
+        for att in dd:
+            dd[att] = np.delete(dd[att], empties)
+        dx = np.delete(dx, empties)
+        dy = np.delete(dy, empties)
 
     if storage is not None:
         storage.write(dx, dy, dd)
@@ -82,7 +87,7 @@ def create_pipeline(filename, chunk):
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    # smrf = pdal.Filter.smrf(
+    # smrf = pdal.Filter.smrf()
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
@@ -125,6 +130,12 @@ def shatter(config: ShatterConfiguration):
 
     #TODO point count should be updated as we add
     with storage.open('w') as tdb:
-        tdb.meta['point_count'] = pc.item()
-        # storage.saveMetadata({'point_count': pc.item()})
+        cpc = storage.getMetadata('point_count')
+        prev = storage.getMetadata('shatter')
+        prev = json.loads(prev) if prev is not None else []
+
+        tdb.meta['point_count'] = pc.item() + (cpc if cpc is not None else 0)
+        config.point_count = pc.item()
+        prev.append(config.to_json())
+        tdb.meta['shatter'] = json.dumps(prev)
 

@@ -41,10 +41,15 @@ def cli(ctx, database, log_level, progress):
 @click.pass_obj
 def info(app):
     """Print info about Silvimetric database"""
-    with Storage(app.database) as tdb:
-        meta = tdb.getMetadata()
+    with Storage.from_db(app.tdb_dir) as tdb:
+        meta = tdb.getConfig()
+        shatters = tdb.getMetadata('shatter')
         atts = tdb.getAttributes()
-        info = { 'attributes': atts, 'metadata': meta }
+        info = {
+            'attributes': atts,
+            'metadata': meta.to_json(),
+            'shatter': shatters
+        }
         print(json.dumps(info, indent=2))
 
 class BoundsParamType(click.ParamType):

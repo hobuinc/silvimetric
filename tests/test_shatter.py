@@ -85,3 +85,10 @@ class Test_Shatter(object):
                     assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
                     assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
                     assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
+
+    def test_config(self, shatter_config, storage, test_point_count):
+        shatter(shatter_config)
+        assert storage.getMetadata('shatter') is not None
+        assert storage.getMetadata('point_count') is not None
+
+        assert storage.getMetadata('point_count') == test_point_count

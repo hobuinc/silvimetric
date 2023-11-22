@@ -41,8 +41,7 @@ class Configuration:
         d = copy.deepcopy(self.__dict__)
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
-        j = json.dumps(d)
-        return j
+        return d
 
     @classmethod
     def from_string(cls, data: str):
@@ -57,30 +56,29 @@ class Configuration:
         return n
 
     def __repr__(self):
-        j = self.to_json()
-        return json.dumps(j)
+        return json.dumps(self.to_json())
 
 @dataclass
 class ShatterConfiguration:
-
     tdb_dir: str
     filename: str
     tile_size: int
     debug: bool=field(default=False)
     client: Client=field(default=None)
-    pipeline: str=field(default=None)
+    # pipeline: str=field(default=None)
+    point_count: int=field(default=0)
 
     def __post_init__(self) -> None:
         if self.client is not None:
             # throws if not all package versions found on client workers match
             self.client.get_versions(check=True)
 
-    @classmethod
     def to_json(self):
         meta = {}
         meta['filename'] = self.filename
         meta['tile_size'] = self.tile_size
-        meta['pipeline'] = self.pipeline
+        meta['point_count'] = self.point_count
+        # meta['pipeline'] = self.pipeline
         return meta
 
     def __repr__(self):

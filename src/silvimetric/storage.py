@@ -77,7 +77,7 @@ class Storage:
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
         with tiledb.SparseArray(config.tdb_dir, "w") as a:
-            a.meta['config'] = config.to_json()
+            a.meta['config'] = str(config)
 
         s = Storage(config, ctx)
 
@@ -103,7 +103,7 @@ class Storage:
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
-            a.meta['config'] = self.config.to_json()
+            a.meta['config'] = str(self.config)
 
     def getConfig(self) -> Configuration:
         """
@@ -119,6 +119,14 @@ class Storage:
             s = a.meta['config']
             config = Configuration.from_string(s)
             return config
+
+    def getMetadata(self, key):
+        with self.open('r') as r:
+            try:
+                val = r.meta[key]
+                return val
+            except KeyError:
+                return None
 
     def getAttributes(self) -> list[str]:
         with self.open('r') as a:

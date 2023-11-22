@@ -21,6 +21,6 @@ class Test_Configuration(object):
 
     def test_serialization(self, config: Configuration):
 
-        j = config.to_json()
+        j = str(config)
         c = Configuration.from_string(j)
         assert c == config
