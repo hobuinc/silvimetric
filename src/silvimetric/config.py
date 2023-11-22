@@ -2,7 +2,6 @@ import pyproj
 import json
 import copy
 from dask.distributed import Client
-from redis import Redis
 
 from dataclasses import dataclass, field
 

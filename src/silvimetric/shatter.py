@@ -5,7 +5,6 @@ import numpy as np
 import dask
 import dask.array as da
 from dask.distributed import performance_report, progress, Client
-# from redis import Redis
 
 from .bounds import Bounds
 from .extents import Extents
