@@ -1,26 +1,41 @@
 import pytest
 import os
 import numpy as np
+from multiprocessing import Pool
 
 from silvimetric.shatter import shatter, ShatterConfiguration
 from silvimetric.storage import Storage, Configuration
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
+def filepath_2() -> str:
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "test_data_2.copc.laz")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
     path = tmp_path_factory.mktemp("test_tdb")
     yield os.path.abspath(path)
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs):
     yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, 'test_version', name='test_db')
 
-@pytest.fixture(scope='class')
-def shatter_config(tdb_filepath, filepath):
-    yield ShatterConfiguration(tdb_filepath, filepath, 16, debug=True)
+@pytest.fixture(scope='function')
+def shatter_config(tdb_filepath, filepath, tile_size):
+    yield ShatterConfiguration(tdb_filepath, filepath, tile_size, debug=True)
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
+
+def write(x,y,val, s:Storage, attrs, dims):
+    data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
+                for att in attrs }
+    data['count'] = [val]
+    with s.open('w') as w:
+        w[x,y] = data
 
 class Test_Shatter(object):
 
@@ -49,3 +64,37 @@ class Test_Shatter(object):
                     a[xi, yi]['Z'].size == 2
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
+
+
+    def test_parallel(self, storage, attrs, dims):
+        # test that writing in parallel doesn't affect ordering of values
+        with Pool(5) as p:
+            # all data from a given index in a cell should correspond to the
+            # other values in that index
+
+            # data2 = { att: np.array([2], object) for att in attrs }
+            data2 = { att: np.array([np.array([2], dims[att]), None], object)[:-1]
+                     for att in attrs }
+            data2['count'] = [2]
+
+            # constrained by NumberOfReturns being uint8
+            count = 255
+            params = [
+                (0,0,val,storage,attrs,dims)
+                for val in range(count)
+            ]
+
+            p.starmap(write, params)
+                # write(0,0,1, storage)
+                # p.join()
+            with storage.open('r') as r:
+                d = r[0,0]
+                for idx in range(count):
+                    assert d['Z'][idx] == d['Intensity'][idx]
+                    assert d['Intensity'][idx] == d['NumberOfReturns'][idx]
+                    assert d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]
+                        # write both data sets at the same time
+
+
+
+

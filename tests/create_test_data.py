@@ -11,7 +11,7 @@ from math import sqrt, ceil
 # - have nice round bounds
 # - be in CRS 5070
 
-filename = './data/test_data.copc.laz'
+filename = './data/test_data_2.copc.laz'
 cell_size = 30
 
 # has a nice square root of 300
@@ -24,13 +24,18 @@ minx = 300
 maxx = minx + split
 miny = minx
 maxy = maxx
+# to easily make datasets with consistently different values
+diff_maker = 1
 
 pos = np.arange(minx, maxx, interval, dtype=np.float32)
 positions = pos[np.where(pos % cell_size != 0)]
 
-data = np.array([(x, y, ceil(y/cell_size), ceil(y/cell_size),
-                   ceil(y/cell_size), ceil(y/cell_size))
-                   for x in positions for y in positions ],
+data = np.array([(x, y,
+                  ceil(y/cell_size)+diff_maker,
+                  ceil(y/cell_size)+diff_maker,
+                  ceil(y/cell_size)+diff_maker,
+                  ceil(y/cell_size)+diff_maker)
+                  for x in positions for y in positions ],
     dtype=[
         ('X', np.float32),
         ('Y', np.float32),

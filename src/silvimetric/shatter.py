@@ -32,15 +32,8 @@ def get_atts(points, chunk):
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
     return dask.compute(*att_data, scheduler="Threads")
-    # return dask.compute(*att_data)
 
 def get_data(filename, chunk):
-    # for stage in pipeline.stages:
-    #     if 'readers' in stage.type:
-    #         reader = stage
-    #         break
-    # reader._options['bounds'] = str(chunk)
-    # pipeline = pipeline |
     pipeline = create_pipeline(filename, chunk)
     try:
         pipeline.execute()
