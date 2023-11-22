@@ -47,5 +47,5 @@ class Test_Shatter(object):
             for xi in range(x):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 2
-                    assert bool(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0])
+                    assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))

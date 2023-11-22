@@ -50,7 +50,8 @@ def get_data(filename, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage):
+def arrange_data(chunk: Extents, atts: list[str], filename:str,
+                 storage: Storage=None):
 
     points = get_data(filename, chunk)
     if not points.size:
@@ -76,7 +77,8 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage
     dx = np.delete(chunk.indices['x'], empties)
     dy = np.delete(chunk.indices['y'], empties)
 
-    storage.write(dx, dy, dd)
+    if storage is not None:
+        storage.write(dx, dy, dd)
     sum = counts.sum()
     del data, dd, points, chunk
     return sum
