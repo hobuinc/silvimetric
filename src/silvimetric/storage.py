@@ -59,8 +59,8 @@ class Storage:
         xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
         yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
 
-        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64)
-        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64)
+        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.int32)
+        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
@@ -71,7 +71,7 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(config.attrs) * xi * yi * 100000,
+            capacity=16,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
@@ -196,12 +196,4 @@ class Storage:
         """
 
         with self.open('w') as tdb:
-            with self.open('r') as tdb_r:
-                tdb_val = tdb_r[xs[0],ys[0]]['Z']
-                print(f'before {tdb_val}')
             tdb[xs, ys] = data
-            with self.open('r') as tdb_r:
-                tdb_val = tdb_r[xs[0],ys[0]]['Z'][0][0]
-                data_val = data['Z'][0][0]
-                print(f'after, {tdb_val}')
-                print(f'should be: {data_val}')

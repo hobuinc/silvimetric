@@ -61,7 +61,7 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage
     dd = {}
     for att in atts:
         try:
-            dd[att] = np.array([*np.array([col[att] for col in data], object),
+            dd[att] = np.array([*np.array([col[att] for col in data]),
                                 None], object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
@@ -69,12 +69,14 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices and create final sparse tiledb inputs
-    empties = np.where(counts == 0)
+    # empties = np.where(counts == 0)
     dd['count'] = counts
-    for att in dd:
-        dd[att] = np.delete(dd[att], empties)
-    dx = np.delete(chunk.indices['x'], empties)
-    dy = np.delete(chunk.indices['y'], empties)
+    # for att in dd:
+    #     dd[att] = np.delete(dd[att], empties)
+    # dx = np.delete(chunk.indices['x'], empties)
+    # dy = np.delete(chunk.indices['y'], empties)
+    dx = chunk.indices['x']
+    dy = chunk.indices['y']
 
     storage.write(dx, dy, dd)
     sum = counts.sum()

@@ -26,6 +26,4 @@ class Test_Shatter(object):
     def test_shatter(self, shatter_config, storage: Storage):
         shatter(shatter_config)
         with storage.open('r') as a:
-            data = a.query(attrs=['Z'], order='C', coords=True)[:]
-            z = data['Z']
-            print(z)
+            assert a[0,0]['Z'][0][0] == 20.0
