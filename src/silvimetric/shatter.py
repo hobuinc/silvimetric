@@ -69,18 +69,16 @@ def arrange_data(chunk: Extents, atts: list[str], filename:str, storage: Storage
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices and create final sparse tiledb inputs
-    # empties = np.where(counts == 0)
+    empties = np.where(counts == 0)
     dd['count'] = counts
-    # for att in dd:
-    #     dd[att] = np.delete(dd[att], empties)
-    # dx = np.delete(chunk.indices['x'], empties)
-    # dy = np.delete(chunk.indices['y'], empties)
-    dx = chunk.indices['x']
-    dy = chunk.indices['y']
+    for att in dd:
+        dd[att] = np.delete(dd[att], empties)
+    dx = np.delete(chunk.indices['x'], empties)
+    dy = np.delete(chunk.indices['y'], empties)
 
     storage.write(dx, dy, dd)
     sum = counts.sum()
-    # del data, dd, points, chunk
+    del data, dd, points, chunk
     return sum
 
 def create_pipeline(filename, chunk):
