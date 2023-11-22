@@ -85,8 +85,3 @@ class Test_Shatter(object):
                     assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
                     assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
                     assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
-                        # write both data sets at the same time
-
-
-
-

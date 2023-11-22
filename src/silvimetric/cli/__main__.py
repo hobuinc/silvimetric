@@ -104,7 +104,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     with Client(n_workers=workers, threads_per_worker=threads) as client:
         config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
                                       tile_size=tilesize, client=client)
-        # webbrowser.open(client.cluster.dashboard_link)
+        webbrowser.open(client.cluster.dashboard_link)
         shatter(config)
 
 

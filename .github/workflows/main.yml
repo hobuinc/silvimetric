@@ -51,7 +51,7 @@ jobs:
           pip list
       - name: Run Tests
         run: |
-          pytest -vv
+          pytest -vv --durations=0
 
   analyze:
       name: analyze
