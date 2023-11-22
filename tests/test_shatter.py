@@ -31,7 +31,7 @@ def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
 
 def write(x,y,val, s:Storage, attrs, dims):
-    data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
+    data = { att: np.array([np.array([val for idx in range(1000)], dims[att]), None], object)[:-1]
                 for att in attrs }
     data['count'] = [val]
     with s.open('w') as w:
@@ -69,14 +69,6 @@ class Test_Shatter(object):
     def test_parallel(self, storage, attrs, dims):
         # test that writing in parallel doesn't affect ordering of values
         with Pool(5) as p:
-            # all data from a given index in a cell should correspond to the
-            # other values in that index
-
-            # data2 = { att: np.array([2], object) for att in attrs }
-            data2 = { att: np.array([np.array([2], dims[att]), None], object)[:-1]
-                     for att in attrs }
-            data2['count'] = [2]
-
             # constrained by NumberOfReturns being uint8
             count = 255
             params = [
@@ -84,15 +76,15 @@ class Test_Shatter(object):
                 for val in range(count)
             ]
 
-            p.starmap(write, params)
-                # write(0,0,1, storage)
-                # p.join()
+            for idx in range(0,255,5):
+                p.starmap(write, params[idx:idx+5])
+
             with storage.open('r') as r:
                 d = r[0,0]
                 for idx in range(count):
-                    assert d['Z'][idx] == d['Intensity'][idx]
-                    assert d['Intensity'][idx] == d['NumberOfReturns'][idx]
-                    assert d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]
+                    assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
+                    assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
+                    assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
                         # write both data sets at the same time
 
 
