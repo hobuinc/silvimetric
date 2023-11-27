@@ -6,6 +6,11 @@ dist/
 stats/
 *.html
 
+#tiledb
+**/__fragments/**
+**/__commits/**
+**/__schema/**
+**/__meta/**
+
 
 .DS_Store
-

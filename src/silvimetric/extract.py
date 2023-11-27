@@ -3,14 +3,18 @@ import numpy as np
 import dask.array as da
 from osgeo import gdal
 
-def extract(tdb_dir, out_dir, atts):
+from .storage import Storage
+from .config import ExtractConfiguration
+
+def extract(config: ExtractConfiguration):
     # dd = da.from_tiledb(tdb_dir,'Z')
     # print(dd)
-    with tiledb.open(tdb_dir, "r") as tdb:
+    storage = Storage.from_db(config.tdb_dir)
+    with storage.open("r") as tdb:
         x1 = tdb.domain.dim("X")
         y1 = tdb.domain.dim("Y")
         shape = (int(y1.tile + 1),int(x1.tile + 1))
-        q = tdb.query(attrs=atts)[:]
+        q = tdb.query(attrs=config.attrs)[:]
         xs = q['X']
         ys = q['Y']
         zs = q['Z']
@@ -31,7 +35,7 @@ def extract(tdb_dir, out_dir, atts):
 
         driver = gdal.GetDriverByName("GTiff")
 
-        z_tif = driver.Create(f'{out_dir}/z_mean.tif', int(x1.tile + 1), int(y1.tile + 1), 1, gdal.GDT_Float64)
+        z_tif = driver.Create(f'{config.out_dir}/z_mean.tif', int(x1.tile + 1), int(y1.tile + 1), 1, gdal.GDT_Float64)
         z_tif.GetRasterBand(1).WriteArray(z_data)
         z_tif.GetRasterBand(1).SetNoDataValue(99999)
         z_tif.FlushCache()

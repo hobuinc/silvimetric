@@ -9,7 +9,7 @@ import pyproj
 from silvimetric.app import Application
 from silvimetric.storage import Storage, Configuration
 from silvimetric.shatter import shatter, ShatterConfiguration
-from silvimetric.extract import extract
+from silvimetric.extract import extract, ExtractConfiguration
 from silvimetric.bounds import Bounds
 
 logger = logging.getLogger(__name__)
@@ -118,14 +118,15 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
 #               default=["Z","NumberOfReturns","ReturnNumber",
 #                        "HeightAboveGround","Intensity"])
 @click.option("--attributes", "-a", multiple=True,
-              help="List of attributes to include in Database",
-              default=["Z","NumberOfReturns","ReturnNumber", "Intensity"])
+              help="List of attributes to include in Database. Default to \
+                what's in TileDB.", default=[])
 @click.option("--outdir", "-o", type=str, required=True)
 @click.pass_obj
 def extract_cmd(app, attributes, outdir):
     """Extract silvimetric metrics from DATABASE """
 
-    extract(app.database, outdir, attributes)
+    config = ExtractConfiguration(app.tdb_dir, outdir, attributes)
+    extract(config)
 
 
 if __name__ == "__main__":

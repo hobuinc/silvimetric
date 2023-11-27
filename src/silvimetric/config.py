@@ -83,3 +83,16 @@ class ShatterConfiguration:
 
     def __repr__(self):
         return json.dumps(self.to_json())
+
+@dataclass
+class ExtractConfiguration:
+    tdb_dir: str
+    out_dir: str
+    attrs: list[str]
+
+    def __post_init__(self) -> None:
+        from .storage import Storage
+        #TODO should storage be a member variable?
+        s = Storage.from_db(self.tdb_dir)
+        if not self.attrs:
+            self.attrs = s.getAttributes()

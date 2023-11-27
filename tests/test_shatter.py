@@ -1,17 +1,10 @@
 import pytest
 import os
 import numpy as np
-from multiprocessing import Pool
+import dask
 
 from silvimetric.shatter import shatter, ShatterConfiguration
 from silvimetric.storage import Storage, Configuration
-
-@pytest.fixture(scope='session')
-def filepath_2() -> str:
-    path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data_2.copc.laz")
-    assert os.path.exists(path)
-    yield os.path.abspath(path)
 
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -30,8 +23,9 @@ def shatter_config(tdb_filepath, filepath, tile_size):
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
 
+@dask.delayed
 def write(x,y,val, s:Storage, attrs, dims):
-    data = { att: np.array([np.array([val for idx in range(1000)], dims[att]), None], object)[:-1]
+    data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
                 for att in attrs }
     data['count'] = [val]
     with s.open('w') as w:
@@ -65,26 +59,21 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
 
-
     def test_parallel(self, storage, attrs, dims):
         # test that writing in parallel doesn't affect ordering of values
-        with Pool(5) as p:
-            # constrained by NumberOfReturns being uint8
-            count = 255
-            params = [
-                (0,0,val,storage,attrs,dims)
-                for val in range(count)
-            ]
+        # constrained by NumberOfReturns being uint8
 
-            for idx in range(0,255,5):
-                p.starmap(write, params[idx:idx+5])
+        count = 255
+        tl = [write(0,0,val,storage,attrs,dims) for val in range(count)]
 
-            with storage.open('r') as r:
-                d = r[0,0]
-                for idx in range(count):
-                    assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
-                    assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
-                    assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
+        dask.compute(tl)
+
+        with storage.open('r') as r:
+            d = r[0,0]
+            for idx in range(count):
+                assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
+                assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
+                assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
 
     def test_config(self, shatter_config, storage, test_point_count):
         shatter(shatter_config)
