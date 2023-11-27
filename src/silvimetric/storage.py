@@ -4,6 +4,7 @@ import numpy as np
 from math import floor
 import pathlib
 import pyproj
+from time import sleep
 
 from .config import Configuration
 
@@ -58,29 +59,37 @@ class Storage:
         xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
         yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
 
-        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.float64)
-        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.float64)
+        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.int32)
+        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True, fill=0)
+        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
                     for name in config.attrs]
 
+        # allows_duplicates lets us insert multiple values into each cell,
+        # with each value representing a set of values from a shatter process
+        # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=len(config.attrs) * xi * yi * 10000,
+            capacity=16,
             attrs=[count_att, *tdb_atts], allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
-        with tiledb.SparseArray(config.tdb_dir, "w") as A:
-            metadata = {'resolution': config.resolution}
-            metadata['bounds'] = config.bounds.get()
-            metadata['crs'] = config.crs.to_string()
-            A.meta.update(metadata)
+        with tiledb.SparseArray(config.tdb_dir, "w") as a:
+            a.meta['config'] = str(config)
 
         s = Storage(config, ctx)
 
         return s
+
+    @staticmethod
+    def from_db(tdb_dir: str):
+        with tiledb.open(tdb_dir, 'r') as a:
+            s = a.meta['config']
+            config = Configuration.from_string(s)
+            return Storage(config)
+
 
     def consolidate(self, ctx=None):
         # if not ctx:
@@ -94,7 +103,7 @@ class Storage:
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
-            a.meta['config'] = self.config.to_json()
+            a.meta['config'] = str(self.config)
 
     def getConfig(self) -> Configuration:
         """
@@ -110,6 +119,14 @@ class Storage:
             s = a.meta['config']
             config = Configuration.from_string(s)
             return config
+
+    def getMetadata(self, key):
+        with self.open('r') as r:
+            try:
+                val = r.meta[key]
+                return val
+            except KeyError:
+                return None
 
     def getAttributes(self) -> list[str]:
         with self.open('r') as a:
@@ -185,5 +202,6 @@ class Storage:
         data : np.ndarray
             Numpy object of data values for attributes in each index pairing
         """
+
         with self.open('w') as tdb:
             tdb[xs, ys] = data

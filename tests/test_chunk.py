@@ -116,10 +116,10 @@ class TestExtents(object):
 
     def test_pointcount(self, filepath, filtered, unfiltered, test_point_count):
 
-        l1 = [arrange_data(filepath, leaf, ['Z']) for leaf in filtered]
+        l1 = [arrange_data(leaf, ['Z'], filepath) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        l2 = [arrange_data(filepath, leaf, ['Z']) for leaf in unfiltered]
+        l2 = [arrange_data(leaf, ['Z'], filepath) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 
         fc = sum(filtered_counts)

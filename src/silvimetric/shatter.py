@@ -1,8 +1,7 @@
-import tiledb
 import pdal
 import numpy as np
+import json
 
-from copy import deepcopy
 import dask
 import dask.array as da
 from dask.distributed import performance_report, progress
@@ -10,6 +9,7 @@ from dask.distributed import performance_report, progress
 from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
+from .config import ShatterConfiguration
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -30,16 +30,9 @@ def get_atts(points, chunk):
     yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
     att_data = [da.array(points[:][cell_indices(xis,
         yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
-    return dask.compute(*att_data, scheduler="Threads")
-    # return dask.compute(*att_data)
+    return dask.compute(att_data, scheduler="Threads")[0]
 
 def get_data(filename, chunk):
-    # for stage in pipeline.stages:
-    #     if 'readers' in stage.type:
-    #         reader = stage
-    #         break
-    # reader._options['bounds'] = str(chunk)
-    # pipeline = pipeline |
     pipeline = create_pipeline(filename, chunk)
     try:
         pipeline.execute()
@@ -49,8 +42,8 @@ def get_data(filename, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(filename, chunk: Extents, atts: list[str],
-                 tdb: tiledb.SparseArray=None):
+def arrange_data(chunk: Extents, atts: list[str], filename:str,
+                 storage: Storage=None):
 
     points = get_data(filename, chunk)
     if not points.size:
@@ -61,25 +54,28 @@ def arrange_data(filename, chunk: Extents, atts: list[str],
     dd = {}
     for att in atts:
         try:
-            dd[att] = np.array([*np.array([col[att] for col in data], object), None], object)[:-1]
+            dd[att] = np.array([*[np.array(col[att], data[0][att].dtype) for col in data], None], object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
+
+    # a = np.array([ np.array([1,1], dtype=np.int32), np.array([2], dtype=np.int32), np.array([3,3,3], dtype=np.int32), np.array([4], dtype=np.int32) ], dtype='O')
+
 
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices and create final sparse tiledb inputs
     empties = np.where(counts == 0)
     dd['count'] = counts
-    for att in dd:
-        dd[att] = np.delete(dd[att], empties)
-    dx = np.delete(chunk.indices['x'], empties)
-    dy = np.delete(chunk.indices['y'], empties)
+    dx = chunk.indices['x']
+    dy = chunk.indices['y']
+    if np.any(empties):
+        for att in dd:
+            dd[att] = np.delete(dd[att], empties)
+        dx = np.delete(dx, empties)
+        dy = np.delete(dy, empties)
 
-    if tdb is not None:
-        print(dx)
-        print(dy)
-        print(dd)
-        tdb[dx, dy] = dd
+    if storage is not None:
+        storage.write(dx, dy, dd)
     sum = counts.sum()
     del data, dd, points, chunk
     return sum
@@ -91,20 +87,26 @@ def create_pipeline(filename, chunk):
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    # smrf = pdal.Filter.smrf(
+    # smrf = pdal.Filter.smrf()
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
+def run(atts: list[str], leaves: list[Extents], config: ShatterConfiguration,
+        storage: Storage):
     # debug uses single threaded dask
-    if debug:
-        data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
+
+
+    if config.debug:
+        data_futures = dask.compute([arrange_data(leaf, atts, config.filename, storage)
+                                     for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
-            data_futures = dask.compute([arrange_data(filename, leaf, atts, tdb) for leaf in leaves])
+            data_futures = dask.compute([
+                arrange_data(leaf, atts, config.filename, storage)
+                for leaf in leaves])
 
             progress(data_futures)
-            client.gather(data_futures)
+            config.client.gather(data_futures)
     c = 0
     for f in data_futures:
         c += sum(f)
@@ -113,19 +115,27 @@ def run(filename, atts, leaves, tdb: tiledb.SparseArray, client, debug):
 #TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
 # into things like get_data, get_atts, arrange_data so that they aren't waiting
 # on each other to compute and still using the resources.
-def shatter(filename: str, tdb_dir: str, tile_size: int, debug: bool=False, client=None):
+def shatter(config: ShatterConfiguration):
     print('Filtering out empty chunks...')
     # set up tiledb
-    storage = Storage(tdb_dir)
+    storage = Storage.from_db(config.tdb_dir)
     atts = storage.getAttributes()
     atts.remove('count')
-    extents = Extents.from_storage(storage, tile_size)
-    leaves = list(extents.chunk(filename, 1000))
+    extents = Extents.from_storage(storage, config.tile_size)
+    leaves = list(extents.chunk(config.filename, 1000))
 
     # Begin main operations
+    print('Fetching and arranging data...')
+    pc = run(atts, leaves, config, storage)
+
+    #TODO point count should be updated as we add
     with storage.open('w') as tdb:
-        print('Fetching and arranging data...')
-        pc = run(filename, atts, leaves, tdb, client, debug)
-        storage.saveMetadata({'point_count': pc.item()})
-    # storage.consolidate()
+        cpc = storage.getMetadata('point_count')
+        prev = storage.getMetadata('shatter')
+        prev = json.loads(prev) if prev is not None else []
+
+        tdb.meta['point_count'] = pc.item() + (cpc if cpc is not None else 0)
+        config.point_count = pc.item()
+        prev.append(config.to_json())
+        tdb.meta['shatter'] = json.dumps(prev)
 

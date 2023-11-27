@@ -5,7 +5,6 @@ dependencies:
   - python=3.11
   - tiledb-py
   - python-pdal
-  - pyarrow
   - numpy
   - shapely
   - dask

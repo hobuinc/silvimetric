@@ -1,6 +1,7 @@
 import pyproj
 import json
 import copy
+from dask.distributed import Client
 
 from dataclasses import dataclass, field
 
@@ -20,7 +21,7 @@ class Configuration:
     name: str = None
 
     def __post_init__(self) -> None:
-        
+
         crs = self.crs
         if isinstance(crs, dict):
             crs = json.loads(crs)
@@ -34,14 +35,13 @@ class Configuration:
 
         if not self.name:
             name = get_random_name()
-    
+
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
-        j = json.dumps(d)
-        return j
+        return d
 
     @classmethod
     def from_string(cls, data: str):
@@ -54,7 +54,32 @@ class Configuration:
         n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'], crs=crs)
 
         return n
- 
+
     def __repr__(self):
-        j = self.to_json()
-        return json.dumps(j)
+        return json.dumps(self.to_json())
+
+@dataclass
+class ShatterConfiguration:
+    tdb_dir: str
+    filename: str
+    tile_size: int
+    debug: bool=field(default=False)
+    client: Client=field(default=None)
+    # pipeline: str=field(default=None)
+    point_count: int=field(default=0)
+
+    def __post_init__(self) -> None:
+        if self.client is not None:
+            # throws if not all package versions found on client workers match
+            self.client.get_versions(check=True)
+
+    def to_json(self):
+        meta = {}
+        meta['filename'] = self.filename
+        meta['tile_size'] = self.tile_size
+        meta['point_count'] = self.point_count
+        # meta['pipeline'] = self.pipeline
+        return meta
+
+    def __repr__(self):
+        return json.dumps(self.to_json())

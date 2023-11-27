@@ -8,7 +8,7 @@ import pyproj
 
 from silvimetric.app import Application
 from silvimetric.storage import Storage, Configuration
-from silvimetric.shatter import shatter
+from silvimetric.shatter import shatter, ShatterConfiguration
 from silvimetric.extract import extract
 from silvimetric.bounds import Bounds
 
@@ -41,10 +41,15 @@ def cli(ctx, database, log_level, progress):
 @click.pass_obj
 def info(app):
     """Print info about Silvimetric database"""
-    with Storage(app.database) as tdb:
-        meta = tdb.getMetadata()
+    with Storage.from_db(app.tdb_dir) as tdb:
+        meta = tdb.getConfig()
+        shatters = tdb.getMetadata('shatter')
         atts = tdb.getAttributes()
-        info = { 'attributes': atts, 'metadata': meta }
+        info = {
+            'attributes': atts,
+            'metadata': meta.to_json(),
+            'shatter': shatters
+        }
         print(json.dumps(info, indent=2))
 
 class BoundsParamType(click.ParamType):
@@ -82,7 +87,6 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 
     print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
-    breakpoint()
     config = Configuration(app.tdb_dir, bounds, resolution, crs)
     if name:
         config.name = name
@@ -101,11 +105,12 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+
     with Client(n_workers=workers, threads_per_worker=threads) as client:
-        client.get_versions(check=True)
+        config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
+                                      tile_size=tilesize, client=client)
         webbrowser.open(client.cluster.dashboard_link)
-        # dask.config.set(scheduler="processes")
-        shatter(pointcloud, app.database, tilesize, client=client)
+        shatter(config)
 
 
 @cli.command('extract')
