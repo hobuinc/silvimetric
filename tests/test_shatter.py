@@ -68,7 +68,7 @@ class Test_Shatter(object):
 
     def test_parallel(self, storage, attrs, dims):
         # test that writing in parallel doesn't affect ordering of values
-        with Pool(5) as p:
+        with Pool(2) as p:
             # constrained by NumberOfReturns being uint8
             count = 255
             params = [
