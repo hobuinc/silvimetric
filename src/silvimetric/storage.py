@@ -3,8 +3,6 @@ import tiledb
 import numpy as np
 from math import floor
 import pathlib
-import pyproj
-from time import sleep
 
 from .config import Configuration
 

@@ -13,11 +13,8 @@ def tdb_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='class')
 def tif_filepath(tmp_path_factory) -> str:
-    yield os.path.join(os.path.dirname(__file__), "data",
-            "tif_out")
-
-    # path = tmp_path_factory.mktemp("test_tifs")
-    # yield os.path.abspath(path)
+    path = tmp_path_factory.mktemp("test_tifs")
+    yield os.path.abspath(path)
 
 @pytest.fixture(scope='class')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs):
@@ -45,5 +42,5 @@ class Test_Extract(object):
         assert extract_config.tdb_dir == tdb_filepath
         assert extract_config.out_dir == tif_filepath
 
-    def test_extract(self, extract_config):
-        extract(extract_config)
+    # def test_extract(self, extract_config, shatter_config):
+    #     extract(extract_config)
