@@ -88,7 +88,7 @@ class ShatterConfiguration:
 class ExtractConfiguration:
     tdb_dir: str
     out_dir: str
-    attrs: list[str]
+    attrs: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         from .storage import Storage
