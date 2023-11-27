@@ -24,7 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
+    container: condaforge/miniforge3:latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
