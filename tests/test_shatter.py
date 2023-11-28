@@ -13,11 +13,13 @@ def tdb_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs):
-    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, 'test_version', name='test_db')
+    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, version='test_version', name='test_db')
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size):
-    yield ShatterConfiguration(tdb_filepath, filepath, tile_size, debug=True)
+def shatter_config(tdb_filepath, filepath, tile_size, storage_config):
+    yield ShatterConfiguration(tdb_filepath, filepath, tile_size,
+                               storage_config.attrs, storage_config.metrics,
+                               debug=True)
 
 @pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:

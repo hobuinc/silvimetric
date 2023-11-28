@@ -107,8 +107,11 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
+        storage = Storage.from_db(app.tdb_dir)
+        s_config = storage.getConfig()
         config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
-                                      tile_size=tilesize, client=client)
+            tile_size=tilesize, attrs=s_config.attrs,
+            metrics=s_config.metrics)
         webbrowser.open(client.cluster.dashboard_link)
         shatter(config)
 

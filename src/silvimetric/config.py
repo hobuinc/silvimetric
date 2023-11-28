@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from .names import get_random_name
 from .bounds import Bounds
+from .metric import Metric, metrics
 from . import __version__
 
     # config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
@@ -17,6 +18,7 @@ class Configuration:
     resolution: float = 30.0
     crs: pyproj.CRS = None
     attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
+    metrics: list[str] = field(default_factory=lambda: [m for m in metrics.keys()])
     version: str = __version__
     name: str = None
 
@@ -51,7 +53,8 @@ class Configuration:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
             crs = None
-        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'], crs=crs)
+        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'],
+                crs=crs, metrics=x['metrics'])
 
         return n
 
@@ -63,15 +66,11 @@ class ShatterConfiguration:
     tdb_dir: str
     filename: str
     tile_size: int
+    attrs: list[str]
+    metrics: list[str]
     debug: bool=field(default=False)
-    client: Client=field(default=None)
     # pipeline: str=field(default=None)
     point_count: int=field(default=0)
-
-    def __post_init__(self) -> None:
-        if self.client is not None:
-            # throws if not all package versions found on client workers match
-            self.client.get_versions(check=True)
 
     def to_json(self):
         meta = {}

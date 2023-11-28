@@ -4,8 +4,8 @@ import numpy as np
 import os
 
 
-from silvimetric import Storage, Extents, Bounds, Configuration
-from silvimetric.cli import initialize
+from silvimetric import Storage, Bounds, Configuration
+from silvimetric.metric import metrics
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='class')
@@ -44,13 +44,25 @@ class Test_Storage(object):
 
     def test_config(self, storage: Storage):
         """Check that instantiation metadata is properly written"""
-        
+
         storage.saveConfig()
         config = storage.getConfig()
         assert config.resolution == storage.config.resolution
         assert config.bounds == storage.config.bounds
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
+
+    def test_metrics(self, storage: Storage):
+        m_list = storage.getMetrics()
+        a_list = storage.getAttributes()
+
+        with storage.open('r') as a:
+            s: tiledb.ArraySchema = a.schema
+            for m in m_list:
+                assert m in metrics.keys()
+                assert all([s.attr(f'm_{att}_{m}').dtype == metrics[m].dtype
+                            for att in a_list])
+
 
 # class Test_Initialize(object):
 #     @pytest.skip(reason="Not finishes")

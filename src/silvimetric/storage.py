@@ -5,6 +5,7 @@ from math import floor
 import pathlib
 
 from .config import Configuration
+from .metric import metrics
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -62,15 +63,24 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
+        dim_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
                     for name in config.attrs]
+
+        metric_atts = [
+            tiledb.Attr(
+                name=f'm_{att}_{m}',
+                dtype=metrics[m].dtype
+            )
+            for m in config.metrics
+            for att in config.attrs
+        ]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=16,
-            attrs=[count_att, *tdb_atts], allows_duplicates=True)
+            capacity=16, attrs=[count_att, *dim_atts, *metric_atts],
+            allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -127,12 +137,37 @@ class Storage:
                 return None
 
     def getAttributes(self) -> list[str]:
+        config = self.getConfig()
+        return config.attrs
+        parser = lambda metric: metric.split('_')[2]
         with self.open('r') as a:
             s = a.schema
             att_list = []
             for idx in range(s.nattr):
-                att_list.append(s.attr(idx).name)
+                name =  s.attr(idx).name
+                if name[0:2] != 'm_':
+                    att_list.append(name)
         return att_list
+
+    def getMetrics(self) -> list[str]:
+        config = self.getConfig()
+        return config.metrics
+        with self.open('r') as a:
+            s = a.schema
+            m_list = []
+            for idx in range(s.nattr):
+                try:
+                    # metrics will be in the form m_{attribute}_{metric}
+                    prefix, att, metric = s.attr(idx).name.split('_')
+                    if prefix != 'm_':
+                        continue
+                    if metric not in m_list:
+                        m_list.append(metric)
+                except ValueError:
+                    # TODO this seems questionable
+                    # expected failure if it's not a metric
+                    continue
+        return m_list
 
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """
