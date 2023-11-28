@@ -3,12 +3,12 @@ import os
 import dask
 import pdal
 
-from silvimetric import Extents, Bounds
+from silvimetric.extents import Extents, Bounds
 from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
-    dask.config.set(scheduler="single-threaded")
+    dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='session')
 def filepath() -> str:
