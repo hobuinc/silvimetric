@@ -8,6 +8,10 @@ from silvimetric.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
+    dask.config.set(scheduler="single-threaded")
+
+@pytest.fixture(scope="function")
+def threaded_dask():
     dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='session')

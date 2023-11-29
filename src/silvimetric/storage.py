@@ -5,7 +5,7 @@ from math import floor
 import pathlib
 
 from .config import Configuration
-from .metric import metrics
+from .metric import Metrics
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -69,7 +69,7 @@ class Storage:
         metric_atts = [
             tiledb.Attr(
                 name=f'm_{att}_{m}',
-                dtype=metrics[m].dtype
+                dtype=Metrics[m].dtype
             )
             for m in config.metrics
             for att in config.attrs

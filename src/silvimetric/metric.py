@@ -10,13 +10,16 @@ class Metric:
         self._method = method
         self.dtype = dtype
 
+    def att(self, attr: str):
+        return f'm_{attr}_{self.name}'
+
     def do(self, data):
         return self._method(data)
 
     def __call__(self, data):
         return self._method(data)
 
-metrics = {
+Metrics = {
     'mean' : Metric('mean', np.float64, lambda data: np.mean(data, keepdims=True)),
     'mode' : Metric('mode', np.float64, lambda data: stats.mode(data, keepdims=True).mode),
     'median' : Metric('median', np.float64, lambda data: np.median(data, keepdims=True)),

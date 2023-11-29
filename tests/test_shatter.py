@@ -61,7 +61,7 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
 
-    def test_parallel(self, storage, attrs, dims):
+    def test_parallel(self, storage, attrs, dims, threaded_dask):
         # test that writing in parallel doesn't affect ordering of values
         # constrained by NumberOfReturns being uint8
 

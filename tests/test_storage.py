@@ -5,7 +5,7 @@ import os
 
 
 from silvimetric import Storage, Bounds, Configuration
-from silvimetric.metric import metrics
+from silvimetric.metric import Metrics
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='class')
@@ -59,8 +59,8 @@ class Test_Storage(object):
         with storage.open('r') as a:
             s: tiledb.ArraySchema = a.schema
             for m in m_list:
-                assert m in metrics.keys()
-                assert all([s.attr(f'm_{att}_{m}').dtype == metrics[m].dtype
+                assert m in Metrics.keys()
+                assert all([s.attr(f'm_{att}_{m}').dtype == Metrics[m].dtype
                             for att in a_list])
 
 

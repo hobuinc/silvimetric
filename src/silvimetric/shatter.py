@@ -10,6 +10,7 @@ from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
 from .config import ShatterConfiguration
+from .metric import Metrics
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -23,15 +24,26 @@ def floor_y(points: da.Array, bounds: Bounds, resolution: float):
         np.int32)
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
-def get_atts(points, chunk, metrics, attrs):
+def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     bounds = chunk.root
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds, chunk.resolution)
     yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
     # get attribute_data
-    att_data = [da.array(points[:][attrs][cell_indices(xis,
-        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
+    att_view = points[:][attrs]
+    dt = att_view.dtype
+    att_data = [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+                for x,y in chunk.indices]
     return dask.compute(att_data, scheduler="Threads")[0]
+
+def get_metrics(data, metrics, attrs):
+    ## data comes in as { 'att': [data] }
+    for attr in attrs:
+        for m in metrics:
+            metric = Metrics[m]
+            name = metric.att(attr)
+            data[name] = np.array([metric(cell_data) for cell_data in data[attr]], metric.dtype).flatten(order='C')
+    return data
 
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
@@ -50,7 +62,7 @@ def arrange_data(chunk: Extents, config: ShatterConfiguration,
     if not points.size:
         return 0
 
-    data = get_atts(points, chunk, config.metrics, config.attrs)
+    data = get_atts(points, chunk, config.attrs)
 
     dd = {}
     for att in config.attrs:
@@ -61,8 +73,7 @@ def arrange_data(chunk: Extents, config: ShatterConfiguration,
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
 
-    # a = np.array([ np.array([1,1], dtype=np.int32), np.array([2], dtype=np.int32), np.array([3,3,3], dtype=np.int32), np.array([4], dtype=np.int32) ], dtype='O')
-
+    dd = get_metrics(dd, config.metrics, config.attrs)
 
     counts = np.array([z.size for z in dd['Z']], np.int32)
 

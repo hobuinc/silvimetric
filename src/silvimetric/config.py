@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 from .names import get_random_name
 from .bounds import Bounds
-from .metric import Metric, metrics
+from .metric import Metric, Metrics
 from . import __version__
 
     # config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
@@ -18,7 +18,7 @@ class Configuration:
     resolution: float = 30.0
     crs: pyproj.CRS = None
     attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
-    metrics: list[str] = field(default_factory=lambda: [m for m in metrics.keys()])
+    metrics: list[str] = field(default_factory=lambda: [m for m in Metrics.keys()])
     version: str = __version__
     name: str = None
 
