@@ -69,11 +69,20 @@ class ShatterConfiguration:
     tdb_dir: str
     filename: str
     tile_size: int
-    attrs: list[str]
-    metrics: list[str]
+    attrs: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
     debug: bool=field(default=False)
     # pipeline: str=field(default=None)
     point_count: int=field(default=0)
+
+    def __post_init__(self) -> None:
+        from .storage import Storage
+        #TODO should storage be a member variable?
+        s = Storage.from_db(self.tdb_dir)
+        if not self.attrs:
+            self.attrs = s.getAttributes()
+        if not self.metrics:
+            self.metrics = s.getMetrics()
 
     def to_json(self):
         meta = {}
@@ -91,6 +100,7 @@ class ExtractConfiguration:
     tdb_dir: str
     out_dir: str
     attrs: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -98,3 +108,5 @@ class ExtractConfiguration:
         s = Storage.from_db(self.tdb_dir)
         if not self.attrs:
             self.attrs = s.getAttributes()
+        if not self.metrics:
+            self.metrics = s.getMetrics()

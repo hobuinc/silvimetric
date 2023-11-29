@@ -5,6 +5,7 @@ from osgeo import gdal
 
 from .storage import Storage
 from .config import ExtractConfiguration
+from .metric import Metric, Metrics
 
 def write_tif(xsize, ysize, data, out_dir, name):
     driver = gdal.GetDriverByName("GTiff")
@@ -14,26 +15,16 @@ def write_tif(xsize, ysize, data, out_dir, name):
     tif.GetRasterBand(1).SetNoDataValue(99999)
     tif.FlushCache()
 
+def create_metric_att_list(metrics: list[str], attrs: list[str]):
+    return [ Metrics[m].att(a) for m in metrics for a in attrs ]
+
 def extract(config: ExtractConfiguration):
+    ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)
     with storage.open("r") as tdb:
-        tdb: tiledb.SparseArray
-        x1 = tdb.domain.dim("X")
-        y1 = tdb.domain.dim("Y")
-        shape = (int(y1.tile + 1),int(x1.tile + 1))
-        att_data = tdb.query(attrs=config.attrs, coords=False)[:]
-
-        for att in att_data:
-            write_tif(x1.tile, y1.tile, att_data[att], config.out_dir)
-
-        # xs = q['X']
-        # ys = q['Y']
-        # atts = [a for a in config.attrs]
-        # att_data = q['Z']
-
-        # z_data = np.empty(shape=shape, dtype=np.float64)
-        # z_data[:] = np.nan
-
-        #TODO flatten on axis 1? and do mean there. See if it means all cells
-        # for x,y,z in zip(xs,ys,att_data):
-        #     z_data[int(y),int(x)] = z.flatten().mean()
+        for ma in ma_list:
+            tdb: tiledb.SparseArray
+            x1 = tdb.domain.dim("X")
+            y1 = tdb.domain.dim("Y")
+            # shape = (int(y1.tile + 1),int(x1.tile + 1))
+            write_tif(x1.tile, y1.tile, tdb[:][ma], config.out_dir, ma)

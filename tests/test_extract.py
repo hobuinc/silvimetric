@@ -18,21 +18,23 @@ def tif_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='class')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs):
-    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, 'test_version', name='test_db')
+    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs,
+                        version='test_version', name='test_db')
 
 @pytest.fixture(scope='class', autouse=True)
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
 
 @pytest.fixture(scope='class')
-def shatter_config(tdb_filepath, filepath, tile_size):
+def shatter_config(tdb_filepath, filepath, tile_size, storage):
     config = ShatterConfiguration(tdb_filepath, filepath, tile_size, debug=True)
     shatter(config)
     yield config
 
 @pytest.fixture(scope='class')
 def extract_config(tdb_filepath, tif_filepath):
-    yield ExtractConfiguration(tdb_filepath, tif_filepath)
+    yield ExtractConfiguration(tdb_filepath, tif_filepath, attrs=['Z'],
+                               metrics=['mean'])
 
 class Test_Extract(object):
 
@@ -42,5 +44,5 @@ class Test_Extract(object):
         assert extract_config.tdb_dir == tdb_filepath
         assert extract_config.out_dir == tif_filepath
 
-    # def test_extract(self, extract_config, shatter_config):
-    #     extract(extract_config)
+    def test_extract(self, extract_config, shatter_config):
+        extract(extract_config)
