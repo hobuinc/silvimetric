@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Callable, Optional, Any, Union
 from scipy import stats
+from inspect import getsource
 
 StatFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
@@ -10,14 +11,17 @@ class Metric:
         self._method = method
         self.dtype = dtype
 
-    def att(self, attr: str):
+    def att(self, attr: str) -> str:
         return f'm_{attr}_{self.name}'
 
-    def do(self, data):
+    def do(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
-    def __call__(self, data):
+    def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
+
+    def __repr__(self) -> str:
+        return getsource(self._method)
 
 Metrics = {
     'mean' : Metric('mean', np.float64, lambda data: np.mean(data, keepdims=True)),
@@ -26,6 +30,6 @@ Metrics = {
     'min' : Metric('min', np.float64, lambda data: np.min(data, keepdims=True)),
     'max' : Metric('max', np.float64, lambda data: np.max(data, keepdims=True)),
     #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
-    # 'stddev' : Metric('stddev', lambda data: np.std(data, keepdims=True)),
-    # 'p01' : Metric('stddev', lambda data: np.std(data, keepdims=True)),
+    'stddev' : Metric('stddev', np.float64, lambda data: np.std(data, keepdims=True)),
+    'p01' : Metric('stddev', np.float64, lambda data: np.std(data, keepdims=True)),
 }

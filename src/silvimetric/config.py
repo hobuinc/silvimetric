@@ -38,6 +38,9 @@ class Configuration:
         if not self.name:
             name = get_random_name()
 
+        self.metric_definitions = { m: str(Metrics[m]) for m in self.metrics}
+
+
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)

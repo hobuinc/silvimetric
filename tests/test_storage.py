@@ -19,7 +19,6 @@ def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Sto
     config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
     yield Storage.create(config)
 
-
 class Test_Storage(object):
 
     def test_schema(self, storage: Storage, attrs: list[str], dims):
@@ -62,9 +61,3 @@ class Test_Storage(object):
                 assert m in Metrics.keys()
                 assert all([s.attr(f'm_{att}_{m}').dtype == Metrics[m].dtype
                             for att in a_list])
-
-
-# class Test_Initialize(object):
-#     @pytest.skip(reason="Not finishes")
-#     def test_command(self, cli_runner):
-#         res = cli_runner.invoke(initialize, [])

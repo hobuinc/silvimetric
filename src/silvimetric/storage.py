@@ -93,16 +93,23 @@ class Storage:
 
     @staticmethod
     def from_db(tdb_dir: str):
+        """
+        Create Storage class from previously created storage path
+
+        Parameters
+        ----------
+        tdb_dir : str
+            Path to storage directory
+
+        Returns
+        -------
+        Storage
+            Return the generated storage
+        """
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
             config = Configuration.from_string(s)
             return Storage(config)
-
-
-    def consolidate(self, ctx=None):
-        # if not ctx:
-        #     ctx = self.ctx
-        tiledb.consolidate(self.config.tdb_dir)
 
     def saveConfig(self) -> None:
         """
@@ -128,7 +135,20 @@ class Storage:
             config = Configuration.from_string(s)
             return config
 
-    def getMetadata(self, key):
+    def getMetadata(self, key: str) -> str:
+        """
+        Return metadata at given key
+
+        Parameters
+        ----------
+        key : str
+            Metadata key
+
+        Returns
+        -------
+        str
+            Metadata value found in storage
+        """
         with self.open('r') as r:
             try:
                 val = r.meta[key]
@@ -137,37 +157,26 @@ class Storage:
                 return None
 
     def getAttributes(self) -> list[str]:
-        config = self.getConfig()
-        return config.attrs
-        parser = lambda metric: metric.split('_')[2]
-        with self.open('r') as a:
-            s = a.schema
-            att_list = []
-            for idx in range(s.nattr):
-                name =  s.attr(idx).name
-                if name[0:2] != 'm_':
-                    att_list.append(name)
-        return att_list
+        """
+        Return list of attribute names from storage config
+
+        Returns
+        -------
+        list[str]
+            List of attribute names
+        """
+        return self.getConfig().attrs
 
     def getMetrics(self) -> list[str]:
-        config = self.getConfig()
-        return config.metrics
-        with self.open('r') as a:
-            s = a.schema
-            m_list = []
-            for idx in range(s.nattr):
-                try:
-                    # metrics will be in the form m_{attribute}_{metric}
-                    prefix, att, metric = s.attr(idx).name.split('_')
-                    if prefix != 'm_':
-                        continue
-                    if metric not in m_list:
-                        m_list.append(metric)
-                except ValueError:
-                    # TODO this seems questionable
-                    # expected failure if it's not a metric
-                    continue
-        return m_list
+        """
+        Return List of metric names from storage config
+
+        Returns
+        -------
+        list[str]
+            List of metric names
+        """
+        return self.getConfig().metrics
 
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """
