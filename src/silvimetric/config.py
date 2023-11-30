@@ -104,9 +104,12 @@ class ExtractConfiguration:
 
     def __post_init__(self) -> None:
         from .storage import Storage
-        #TODO should storage be a member variable?
-        s = Storage.from_db(self.tdb_dir)
+        config = Storage.from_db(self.tdb_dir).config
         if not self.attrs:
-            self.attrs = s.getAttributes()
+            self.attrs = config.attrs()
         if not self.metrics:
-            self.metrics = s.getMetrics()
+            self.metrics = config.metrics()
+
+        self.bounds: Bounds = config.bounds
+        self.resolution: float = config.resolution
+        self.crs: pyproj.CRS = config.crs

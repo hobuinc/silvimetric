@@ -2,6 +2,7 @@ import pytest
 import os
 from pathlib import Path
 from osgeo import gdal
+from pyproj import CRS
 
 from silvimetric.shatter import shatter, ShatterConfiguration
 from silvimetric.storage import Storage, Configuration
@@ -47,7 +48,7 @@ class Test_Extract(object):
         assert extract_config.tdb_dir == tdb_filepath
         assert extract_config.out_dir == tif_filepath
 
-    def test_extract(self, extract_config, resolution, miny, maxy):
+    def test_extract(self, extract_config, resolution, miny, maxy, minx, maxx):
         extract(extract_config)
         filenames = [Metrics[m].att(a)
                      for m in extract_config.metrics
@@ -55,5 +56,15 @@ class Test_Extract(object):
         for f in filenames:
             path = Path(extract_config.out_dir) / f'{f}.tif'
             assert path.exists()
-            r = gdal.Open(str(path)).ReadAsArray()
+
+            raster: gdal.Dataset = gdal.Open(str(path))
+            derived = CRS.from_user_input(raster.GetProjection())
+            assert derived == extract_config.crs
+
+            xsize = (maxx - minx) / resolution
+            ysize = (maxy - miny) / resolution
+            assert raster.RasterXSize == xsize
+            assert raster.RasterYSize == ysize
+
+            r = raster.ReadAsArray()
             assert all([ r[y,x] == ((maxy/resolution)-y)  for y in range(10) for x in range(10)])
