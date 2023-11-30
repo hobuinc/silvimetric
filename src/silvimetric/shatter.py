@@ -73,20 +73,21 @@ def arrange_data(chunk: Extents, config: ShatterConfiguration,
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
 
-    dd = get_metrics(dd, config.metrics, config.attrs)
-
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
-    ## remove empty indices and create final sparse tiledb inputs
-    empties = np.where(counts == 0)
+    ## remove empty indices
+    empties = np.where(counts == 0)[0]
     dd['count'] = counts
     dx = chunk.indices['x']
     dy = chunk.indices['y']
-    if np.any(empties):
+    if bool(empties.size):
         for att in dd:
             dd[att] = np.delete(dd[att], empties)
         dx = np.delete(dx, empties)
         dy = np.delete(dy, empties)
+
+    ## perform metric calculations
+    dd = get_metrics(dd, config.metrics, config.attrs)
 
     if storage is not None:
         storage.write(dx, dy, dd)

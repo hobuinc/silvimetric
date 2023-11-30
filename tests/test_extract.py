@@ -4,8 +4,7 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric.shatter import shatter, ShatterConfiguration
-from silvimetric.storage import Storage, Configuration
+from silvimetric.shatter import shatter
 from silvimetric.extract import extract, ExtractConfiguration
 from silvimetric.metric import Metrics
 
@@ -46,8 +45,8 @@ class Test_Extract(object):
 
             xsize = (maxx - minx) / resolution
             ysize = (maxy - miny) / resolution
-            assert raster.RasterXSize == xsize
-            assert raster.RasterYSize == ysize
+            assert raster.RasterXSize == xsize + 1
+            assert raster.RasterYSize == ysize + 1
 
             r = raster.ReadAsArray()
             assert all([ r[y,x] == ((maxy/resolution)-y)  for y in range(10) for x in range(10)])

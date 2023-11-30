@@ -2,6 +2,7 @@ import pyproj
 import json
 import copy
 from dask.distributed import Client
+from pathlib import Path
 
 from dataclasses import dataclass, field
 
@@ -106,9 +107,14 @@ class ExtractConfiguration:
         from .storage import Storage
         config = Storage.from_db(self.tdb_dir).config
         if not self.attrs:
-            self.attrs = config.attrs()
+            self.attrs = config.attrs
         if not self.metrics:
-            self.metrics = config.metrics()
+            self.metrics = config.metrics
+
+        p = Path(self.out_dir)
+        p.mkdir(parents=True, exist_ok=True)
+
+
 
         self.bounds: Bounds = config.bounds
         self.resolution: float = config.resolution

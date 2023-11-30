@@ -37,7 +37,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    tif.GetRasterBand(1).SetNoDataValue(99999)
+    # tif.GetRasterBand(1).SetNoDataValue()
     tif.FlushCache()
     tif = None
 
@@ -45,6 +45,7 @@ def create_metric_att_list(metrics: list[str], attrs: list[str]):
     return [ Metrics[m].att(a) for m in metrics for a in attrs ]
 
 def extract(config: ExtractConfiguration):
+
     ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)
     with storage.open("r") as tdb:
@@ -53,5 +54,9 @@ def extract(config: ExtractConfiguration):
         y1 = tdb.domain.dim("Y").tile
 
         for ma in ma_list:
-            d = data[ma].to_numpy().reshape((x1, y1))
-            write_tif(x1, y1, d, ma, config)
+            raster_data = np.empty(shape=(y1,x1), dtype=data[ma].dtype)
+            raster_data.fill(None)
+            m_data = data[['X','Y',ma]].to_numpy()
+            for x,y,d in m_data:
+                raster_data[int(y)][int(x)]=d
+            write_tif(x1, y1, raster_data, ma, config)

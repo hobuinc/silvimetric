@@ -25,11 +25,11 @@ class Metric:
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 Metrics = {
-    'mean' : Metric('mean', np.float64, lambda data: np.mean(data, keepdims=True)),
-    'mode' : Metric('mode', np.float64, lambda data: stats.mode(data, keepdims=True).mode),
-    'median' : Metric('median', np.float64, lambda data: np.median(data, keepdims=True)),
-    'min' : Metric('min', np.float64, lambda data: np.min(data, keepdims=True)),
-    'max' : Metric('max', np.float64, lambda data: np.max(data, keepdims=True)),
-    'stddev' : Metric('stddev', np.float64, lambda data: np.std(data, keepdims=True)),
+    'mean' : Metric('mean', np.float64, lambda data: np.mean(data)),
+    'mode' : Metric('mode', np.float64, lambda data: stats.mode(data).mode),
+    'median' : Metric('median', np.float64, lambda data: np.median(data)),
+    'min' : Metric('min', np.float64, lambda data: np.min(data)),
+    'max' : Metric('max', np.float64, lambda data: np.max(data)),
+    'stddev' : Metric('stddev', np.float64, lambda data: np.std(data)),
     # 'p01' : Metric('p01', np.float64, lambda data: np.std(data, keepdims=True)),
 }
