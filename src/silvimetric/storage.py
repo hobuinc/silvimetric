@@ -55,8 +55,8 @@ class Storage:
             ctx = tiledb.default_ctx()
 
         dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
-        xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
-        yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
+        xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution)) - 1
+        yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution)) - 1
 
         dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.int32)
         dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)
@@ -79,7 +79,7 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=16, attrs=[count_att, *dim_atts, *metric_atts],
+            capacity=10000, attrs=[count_att, *dim_atts, *metric_atts],
             allows_duplicates=True)
         schema.check()
 

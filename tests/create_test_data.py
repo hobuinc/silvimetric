@@ -30,11 +30,9 @@ diff_maker = 1
 pos = np.arange(minx, maxx, interval, dtype=np.float32)
 positions = pos[np.where(pos % cell_size != 0)]
 
-data = np.array([(x, y,
-                  ceil(y/cell_size)+diff_maker,
-                  ceil(y/cell_size)+diff_maker,
-                  ceil(y/cell_size)+diff_maker,
-                  ceil(y/cell_size)+diff_maker)
+alg = lambda y: ceil(y/cell_size) + diff_maker
+
+data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
                   for x in positions for y in positions ],
     dtype=[
         ('X', np.float32),
