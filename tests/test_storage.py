@@ -1,23 +1,9 @@
-import pytest
 import tiledb
 import numpy as np
-import os
 
-
-from silvimetric import Storage, Bounds, Configuration
+from silvimetric import Storage
 from silvimetric.metric import Metrics
 from silvimetric import __version__ as svversion
-
-@pytest.fixture(scope='class')
-def tdb_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tdb")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope="class")
-def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Storage:
-    b = Bounds(minx, miny, maxx, maxy)
-    config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
-    yield Storage.create(config)
 
 class Test_Storage(object):
 

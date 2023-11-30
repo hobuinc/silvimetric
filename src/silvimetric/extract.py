@@ -6,19 +6,34 @@ from .storage import Storage
 from .config import ExtractConfiguration
 from .metric import Metrics
 
+np_to_gdal_types = {
+    np.dtype(np.byte).str: gdal.GDT_Byte,
+    np.dtype(np.int8).str: gdal.GDT_Int8,
+    np.dtype(np.uint16).str: gdal.GDT_UInt16,
+    np.dtype(np.int16).str: gdal.GDT_Int16,
+    np.dtype(np.uint32).str: gdal.GDT_UInt32,
+    np.dtype(np.int32).str: gdal.GDT_Int32,
+    np.dtype(np.uint64).str: gdal.GDT_UInt64,
+    np.dtype(np.int64).str: gdal.GDT_Int64,
+    np.dtype(np.float32).str: gdal.GDT_Float32,
+    np.dtype(np.float64).str: gdal.GDT_Float64
+}
+
 def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
               config: ExtractConfiguration):
+    osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
     crs = config.crs
     srs = osr.SpatialReference()
-    srs.ImportFromProj4(crs.to_proj4())
+    srs.ImportFromWkt(crs.to_wkt())
     # transform = [x, res, 0, y, 0, res]
     b = config.bounds
     transform = [b.minx, config.resolution, 0,
                  b.maxy, 0, config.resolution]
 
     driver = gdal.GetDriverByName("GTiff")
-    tif = driver.Create(str(path), int(xsize), int(ysize), 1, gdal.GDT_Float64)
+    gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]
+    tif = driver.Create(str(path), int(xsize), int(ysize), 1, gdal_type)
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
