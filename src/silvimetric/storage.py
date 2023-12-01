@@ -5,6 +5,7 @@ from math import floor
 import pathlib
 
 from .config import Configuration
+from .metric import Metrics
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -62,15 +63,24 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        tdb_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
+        dim_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
                     for name in config.attrs]
+
+        metric_atts = [
+            tiledb.Attr(
+                name=f'm_{att}_{m}',
+                dtype=Metrics[m].dtype
+            )
+            for m in config.metrics
+            for att in config.attrs
+        ]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=16,
-            attrs=[count_att, *tdb_atts], allows_duplicates=True)
+            capacity=10000, attrs=[count_att, *dim_atts, *metric_atts],
+            allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -83,16 +93,23 @@ class Storage:
 
     @staticmethod
     def from_db(tdb_dir: str):
+        """
+        Create Storage class from previously created storage path
+
+        Parameters
+        ----------
+        tdb_dir : str
+            Path to storage directory
+
+        Returns
+        -------
+        Storage
+            Return the generated storage
+        """
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
             config = Configuration.from_string(s)
             return Storage(config)
-
-
-    def consolidate(self, ctx=None):
-        # if not ctx:
-        #     ctx = self.ctx
-        tiledb.consolidate(self.config.tdb_dir)
 
     def saveConfig(self) -> None:
         """
@@ -118,7 +135,20 @@ class Storage:
             config = Configuration.from_string(s)
             return config
 
-    def getMetadata(self, key):
+    def getMetadata(self, key: str) -> str:
+        """
+        Return metadata at given key
+
+        Parameters
+        ----------
+        key : str
+            Metadata key
+
+        Returns
+        -------
+        str
+            Metadata value found in storage
+        """
         with self.open('r') as r:
             try:
                 val = r.meta[key]
@@ -127,12 +157,26 @@ class Storage:
                 return None
 
     def getAttributes(self) -> list[str]:
-        with self.open('r') as a:
-            s = a.schema
-            att_list = []
-            for idx in range(s.nattr):
-                att_list.append(s.attr(idx).name)
-        return att_list
+        """
+        Return list of attribute names from storage config
+
+        Returns
+        -------
+        list[str]
+            List of attribute names
+        """
+        return self.getConfig().attrs
+
+    def getMetrics(self) -> list[str]:
+        """
+        Return List of metric names from storage config
+
+        Returns
+        -------
+        list[str]
+            List of metric names
+        """
+        return self.getConfig().metrics
 
     def open(self, mode:str='r') -> tiledb.SparseArray:
         """

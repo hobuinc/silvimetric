@@ -1,24 +1,9 @@
-import pytest
 import tiledb
 import numpy as np
-import os
 
-
-from silvimetric import Storage, Extents, Bounds, Configuration
-from silvimetric.cli import initialize
+from silvimetric import Storage
+from silvimetric.metric import Metrics
 from silvimetric import __version__ as svversion
-
-@pytest.fixture(scope='class')
-def tdb_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tdb")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope="class")
-def storage(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Storage:
-    b = Bounds(minx, miny, maxx, maxy)
-    config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
-    yield Storage.create(config)
-
 
 class Test_Storage(object):
 
@@ -44,7 +29,7 @@ class Test_Storage(object):
 
     def test_config(self, storage: Storage):
         """Check that instantiation metadata is properly written"""
-        
+
         storage.saveConfig()
         config = storage.getConfig()
         assert config.resolution == storage.config.resolution
@@ -52,7 +37,13 @@ class Test_Storage(object):
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
 
-# class Test_Initialize(object):
-#     @pytest.skip(reason="Not finishes")
-#     def test_command(self, cli_runner):
-#         res = cli_runner.invoke(initialize, [])
+    def test_metrics(self, storage: Storage):
+        m_list = storage.getMetrics()
+        a_list = storage.getAttributes()
+
+        with storage.open('r') as a:
+            s: tiledb.ArraySchema = a.schema
+            for m in m_list:
+                assert m in Metrics.keys()
+                assert all([s.attr(f'm_{att}_{m}').dtype == Metrics[m].dtype
+                            for att in a_list])

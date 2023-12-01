@@ -108,7 +108,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
         config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
-                                      tile_size=tilesize, client=client)
+            tile_size=tilesize)
         webbrowser.open(client.cluster.dashboard_link)
         shatter(config)
 
@@ -118,14 +118,17 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
 #               default=["Z","NumberOfReturns","ReturnNumber",
 #                        "HeightAboveGround","Intensity"])
 @click.option("--attributes", "-a", multiple=True,
-              help="List of attributes to include in Database. Default to \
+              help="List of attributes to include in output. Default to \
+                what's in TileDB.", default=[])
+@click.option("--metrics", "-m", multiple=True,
+              help="List of metrics to include in output. Default to \
                 what's in TileDB.", default=[])
 @click.option("--outdir", "-o", type=str, required=True)
 @click.pass_obj
-def extract_cmd(app, attributes, outdir):
+def extract_cmd(app, attributes, metrics, outdir):
     """Extract silvimetric metrics from DATABASE """
 
-    config = ExtractConfiguration(app.tdb_dir, outdir, attributes)
+    config = ExtractConfiguration(app.tdb_dir, outdir, attributes, metrics)
     extract(config)
 
 

@@ -4,16 +4,46 @@ import dask
 import pdal
 
 from silvimetric.extents import Extents, Bounds
-from silvimetric.shatter import create_pipeline
+from silvimetric.shatter import create_pipeline, ShatterConfiguration
+from silvimetric.storage import Storage, Configuration
+from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
+    dask.config.set(scheduler="single-threaded")
+
+@pytest.fixture(scope="function")
+def threaded_dask():
     dask.config.set(scheduler="threads")
+
+@pytest.fixture(scope='function')
+def tdb_filepath(tmp_path_factory) -> str:
+    path = tmp_path_factory.mktemp("test_tdb")
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='function')
+def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
+    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, metrics,
+                        svversion, 'test_db')
+
+@pytest.fixture(scope='function')
+def metrics():
+    yield ['mean', 'median']
+
+@pytest.fixture(scope='function')
+def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage, metrics):
+    yield ShatterConfiguration(tdb_filepath, filepath, tile_size,
+                               storage_config.attrs, storage_config.metrics,
+                               debug=True)
+
+@pytest.fixture(scope="function")
+def storage(storage_config) -> Storage:
+    yield Storage.create(storage_config)
 
 @pytest.fixture(scope='session')
 def filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data.copc.laz")
+            "test_data_2.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 

@@ -4,7 +4,7 @@ import pdal
 import pytest
 
 from silvimetric.extents import Extents
-from silvimetric.shatter import arrange_data, shatter
+from silvimetric.shatter import arrange_data
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):
     ind = np.array([], dtype=chunk.indices.dtype)
@@ -114,12 +114,12 @@ class TestExtents(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, filepath, filtered, unfiltered, test_point_count):
+    def test_pointcount(self, filepath, filtered, unfiltered, test_point_count, shatter_config):
 
-        l1 = [arrange_data(leaf, ['Z'], filepath) for leaf in filtered]
+        l1 = [arrange_data(leaf, shatter_config) for leaf in filtered]
         filtered_counts = dask.compute(*l1, optimize_graph=True)
 
-        l2 = [arrange_data(leaf, ['Z'], filepath) for leaf in unfiltered]
+        l2 = [arrange_data(leaf, shatter_config) for leaf in unfiltered]
         unfiltered_counts = dask.compute(*l2, optimize_graph=True)
 
         fc = sum(filtered_counts)

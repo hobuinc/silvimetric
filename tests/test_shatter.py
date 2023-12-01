@@ -5,28 +5,18 @@ import dask
 
 from silvimetric.shatter import shatter, ShatterConfiguration
 from silvimetric.storage import Storage, Configuration
+from silvimetric.metric import Metrics
 
-@pytest.fixture(scope='function')
-def tdb_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tdb")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope='function')
-def storage_config(tdb_filepath, bounds, resolution, crs, attrs):
-    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, 'test_version', name='test_db')
-
-@pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size):
-    yield ShatterConfiguration(tdb_filepath, filepath, tile_size, debug=True)
-
-@pytest.fixture(scope="function")
-def storage(storage_config) -> Storage:
-    yield Storage.create(storage_config)
 
 @dask.delayed
-def write(x,y,val, s:Storage, attrs, dims):
+def write(x,y,val, s:Storage, attrs, dims, metrics):
+    m_list = [Metrics[m].att(a) for m in metrics for a in attrs]
     data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
                 for att in attrs }
+
+    for m in m_list:
+        data[m] = [val]
+
     data['count'] = [val]
     with s.open('w') as w:
         w[x,y] = data
@@ -59,12 +49,12 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
 
-    def test_parallel(self, storage, attrs, dims):
+    def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
         # constrained by NumberOfReturns being uint8
 
         count = 255
-        tl = [write(0,0,val,storage,attrs,dims) for val in range(count)]
+        tl = [write(0,0,val,storage,attrs,dims, metrics) for val in range(count)]
 
         dask.compute(tl)
 

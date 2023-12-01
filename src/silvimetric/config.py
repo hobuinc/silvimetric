@@ -2,11 +2,13 @@ import pyproj
 import json
 import copy
 from dask.distributed import Client
+from pathlib import Path
 
 from dataclasses import dataclass, field
 
 from .names import get_random_name
 from .bounds import Bounds
+from .metric import Metric, Metrics
 from . import __version__
 
     # config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
@@ -17,6 +19,7 @@ class Configuration:
     resolution: float = 30.0
     crs: pyproj.CRS = None
     attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
+    metrics: list[str] = field(default_factory=lambda: [m for m in Metrics.keys()])
     version: str = __version__
     name: str = None
 
@@ -36,6 +39,9 @@ class Configuration:
         if not self.name:
             name = get_random_name()
 
+        self.metric_definitions = { m: str(Metrics[m]) for m in self.metrics}
+
+
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)
@@ -51,7 +57,8 @@ class Configuration:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
             crs = None
-        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'], crs=crs)
+        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'],
+                crs=crs, metrics=x['metrics'])
 
         return n
 
@@ -63,15 +70,20 @@ class ShatterConfiguration:
     tdb_dir: str
     filename: str
     tile_size: int
+    attrs: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
     debug: bool=field(default=False)
-    client: Client=field(default=None)
     # pipeline: str=field(default=None)
     point_count: int=field(default=0)
 
     def __post_init__(self) -> None:
-        if self.client is not None:
-            # throws if not all package versions found on client workers match
-            self.client.get_versions(check=True)
+        from .storage import Storage
+        #TODO should storage be a member variable?
+        s = Storage.from_db(self.tdb_dir)
+        if not self.attrs:
+            self.attrs = s.getAttributes()
+        if not self.metrics:
+            self.metrics = s.getMetrics()
 
     def to_json(self):
         meta = {}
@@ -89,10 +101,21 @@ class ExtractConfiguration:
     tdb_dir: str
     out_dir: str
     attrs: list[str] = field(default_factory=list)
+    metrics: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         from .storage import Storage
-        #TODO should storage be a member variable?
-        s = Storage.from_db(self.tdb_dir)
+        config = Storage.from_db(self.tdb_dir).config
         if not self.attrs:
-            self.attrs = s.getAttributes()
+            self.attrs = config.attrs
+        if not self.metrics:
+            self.metrics = config.metrics
+
+        p = Path(self.out_dir)
+        p.mkdir(parents=True, exist_ok=True)
+
+
+
+        self.bounds: Bounds = config.bounds
+        self.resolution: float = config.resolution
+        self.crs: pyproj.CRS = config.crs

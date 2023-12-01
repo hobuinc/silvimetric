@@ -10,6 +10,7 @@ from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
 from .config import ShatterConfiguration
+from .metric import Metrics
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -23,14 +24,26 @@ def floor_y(points: da.Array, bounds: Bounds, resolution: float):
         np.int32)
 
 #TODO move pruning of attributes to this method so we're not grabbing everything
-def get_atts(points, chunk):
+def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     bounds = chunk.root
     xypoints = points[['X','Y']].view()
     xis = floor_x(xypoints['X'], bounds, chunk.resolution)
     yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
-    att_data = [da.array(points[:][cell_indices(xis,
-        yis, x, y)], dtype=points.dtype) for x,y in chunk.indices]
+    # get attribute_data
+    att_view = points[:][attrs]
+    dt = att_view.dtype
+    att_data = [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+                for x,y in chunk.indices]
     return dask.compute(att_data, scheduler="Threads")[0]
+
+def get_metrics(data, metrics, attrs):
+    ## data comes in as { 'att': [data] }
+    for attr in attrs:
+        for m in metrics:
+            metric = Metrics[m]
+            name = metric.att(attr)
+            data[name] = np.array([metric(cell_data) for cell_data in data[attr]], metric.dtype).flatten(order='C')
+    return data
 
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
@@ -42,37 +55,39 @@ def get_data(filename, chunk):
     return da.array(pipeline.arrays[0])
 
 @dask.delayed
-def arrange_data(chunk: Extents, atts: list[str], filename:str,
+def arrange_data(chunk: Extents, config: ShatterConfiguration,
                  storage: Storage=None):
 
-    points = get_data(filename, chunk)
+    points = get_data(config.filename, chunk)
     if not points.size:
         return 0
 
-    data = get_atts(points, chunk)
+    data = get_atts(points, chunk, config.attrs)
 
     dd = {}
-    for att in atts:
+    for att in config.attrs:
         try:
-            dd[att] = np.array([*[np.array(col[att], data[0][att].dtype) for col in data], None], object)[:-1]
+            dd[att] = np.array(dtype=object, object=[
+                *[np.array(col[att], data[0][att].dtype) for col in data],
+                None])[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
 
-    # a = np.array([ np.array([1,1], dtype=np.int32), np.array([2], dtype=np.int32), np.array([3,3,3], dtype=np.int32), np.array([4], dtype=np.int32) ], dtype='O')
-
-
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
-    ## remove empty indices and create final sparse tiledb inputs
-    empties = np.where(counts == 0)
+    ## remove empty indices
+    empties = np.where(counts == 0)[0]
     dd['count'] = counts
     dx = chunk.indices['x']
     dy = chunk.indices['y']
-    if np.any(empties):
+    if bool(empties.size):
         for att in dd:
             dd[att] = np.delete(dd[att], empties)
         dx = np.delete(dx, empties)
         dy = np.delete(dy, empties)
+
+    ## perform metric calculations
+    dd = get_metrics(dd, config.metrics, config.attrs)
 
     if storage is not None:
         storage.write(dx, dy, dd)
@@ -91,22 +106,19 @@ def create_pipeline(filename, chunk):
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(atts: list[str], leaves: list[Extents], config: ShatterConfiguration,
-        storage: Storage):
+def run(leaves: list[Extents], config: ShatterConfiguration, storage: Storage):
     # debug uses single threaded dask
 
-
     if config.debug:
-        data_futures = dask.compute([arrange_data(leaf, atts, config.filename, storage)
+        data_futures = dask.compute([arrange_data(leaf, config, storage)
                                      for leaf in leaves])
     else:
         with performance_report(f'dask-report.html'):
             data_futures = dask.compute([
-                arrange_data(leaf, atts, config.filename, storage)
+                arrange_data(leaf, config, storage)
                 for leaf in leaves])
 
             progress(data_futures)
-            config.client.gather(data_futures)
     c = 0
     for f in data_futures:
         c += sum(f)
@@ -119,14 +131,15 @@ def shatter(config: ShatterConfiguration):
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    atts = storage.getAttributes()
-    atts.remove('count')
+    # atts = storage.getAttributes()
+    # metrics = storage.getMetrics()
+    # atts.remove('count')
     extents = Extents.from_storage(storage, config.tile_size)
     leaves = list(extents.chunk(config.filename, 1000))
 
     # Begin main operations
     print('Fetching and arranging data...')
-    pc = run(atts, leaves, config, storage)
+    pc = run(leaves, config, storage)
 
     #TODO point count should be updated as we add
     with storage.open('w') as tdb:
