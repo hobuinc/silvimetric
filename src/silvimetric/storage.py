@@ -135,7 +135,7 @@ class Storage:
             config = Configuration.from_string(s)
             return config
 
-    def getMetadata(self, key: str) -> str:
+    def getMetadata(self, key: str, default=None) -> str:
         """
         Return metadata at given key
 
@@ -153,8 +153,11 @@ class Storage:
             try:
                 val = r.meta[key]
                 return val
-            except KeyError:
-                return None
+            except KeyError as e:
+                if default is not None:
+                    return default
+                raise(e)
+
 
     def getAttributes(self) -> list[str]:
         """

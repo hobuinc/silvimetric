@@ -11,6 +11,7 @@ class Metric:
         self._method = method
         self.dtype = dtype
 
+    # common name, storage name
     def att(self, attr: str) -> str:
         return f'm_{attr}_{self.name}'
 

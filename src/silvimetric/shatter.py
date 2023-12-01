@@ -32,9 +32,8 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     # get attribute_data
     att_view = points[:][attrs]
     dt = att_view.dtype
-    att_data = [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+    return [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
                 for x,y in chunk.indices]
-    return dask.compute(att_data, scheduler="Threads")[0]
 
 def get_metrics(data, metrics, attrs):
     ## data comes in as { 'att': [data] }
@@ -52,7 +51,7 @@ def get_data(filename, chunk):
     except Exception as e:
         print(pipeline.pipeline, e)
 
-    return da.array(pipeline.arrays[0])
+    return pipeline.arrays[0]
 
 @dask.delayed
 def arrange_data(chunk: Extents, config: ShatterConfiguration,
@@ -131,9 +130,6 @@ def shatter(config: ShatterConfiguration):
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    # atts = storage.getAttributes()
-    # metrics = storage.getMetrics()
-    # atts.remove('count')
     extents = Extents.from_storage(storage, config.tile_size)
     leaves = list(extents.chunk(config.filename, 1000))
 

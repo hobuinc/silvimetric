@@ -74,7 +74,6 @@ class ShatterConfiguration:
     metrics: list[str] = field(default_factory=list)
     debug: bool=field(default=False)
     # pipeline: str=field(default=None)
-    point_count: int=field(default=0)
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -84,6 +83,7 @@ class ShatterConfiguration:
             self.attrs = s.getAttributes()
         if not self.metrics:
             self.metrics = s.getMetrics()
+        self.point_count=0
 
     def to_json(self):
         meta = {}
