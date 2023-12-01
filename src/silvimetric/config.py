@@ -3,6 +3,7 @@ import json
 import copy
 from dask.distributed import Client
 from pathlib import Path
+from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, field
 
@@ -11,13 +12,29 @@ from .bounds import Bounds
 from .metric import Metric, Metrics
 from . import __version__
 
-    # config = Configuration(tdb_filepath, resolution, b, crs = crs, attrs = attrs)
 @dataclass
-class Configuration:
+class Config(ABC):
+    tdb_dir: str
+
+    @abstractmethod
+    def to_json(self):
+        return self.__dict__
+
+    @abstractmethod
+    def from_string(self, data: str):
+        pass
+
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
+
+@dataclass
+class StorageConfig(Config):
     tdb_dir: str
     bounds: Bounds
     resolution: float = 30.0
     crs: pyproj.CRS = None
+    #TODO change these to a list of Metric and Entry class objects
     attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
     metrics: list[str] = field(default_factory=lambda: [m for m in Metrics.keys()])
     version: str = __version__
@@ -62,14 +79,11 @@ class Configuration:
 
         return n
 
-    def __repr__(self):
-        return json.dumps(self.to_json())
-
 @dataclass
-class ShatterConfiguration:
-    tdb_dir: str
+class ShatterConfig(Config):
     filename: str
     tile_size: int
+    #TODO change these to a list of Metric and Entry class objects
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
     debug: bool=field(default=False)
@@ -93,13 +107,10 @@ class ShatterConfiguration:
         # meta['pipeline'] = self.pipeline
         return meta
 
-    def __repr__(self):
-        return json.dumps(self.to_json())
-
 @dataclass
-class ExtractConfiguration:
-    tdb_dir: str
+class ExtractConfig(Config):
     out_dir: str
+    #TODO change these to a list of Metric and Entry class objects
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
 
@@ -114,8 +125,13 @@ class ExtractConfiguration:
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)
 
-
-
         self.bounds: Bounds = config.bounds
         self.resolution: float = config.resolution
         self.crs: pyproj.CRS = config.crs
+
+    def to_json(self):
+        # silliness because pyproj.CRS doesn't default to using to_json
+        d = copy.deepcopy(self.__dict__)
+        d['crs'] = json.loads(self.crs.to_json())
+        d['bounds'] = json.loads(self.bounds.to_json())
+        return d

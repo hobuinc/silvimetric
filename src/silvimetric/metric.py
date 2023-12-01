@@ -1,18 +1,28 @@
 import numpy as np
-from typing import Callable, Optional, Any, Union
+from typing import Callable, Optional, Any, Union, Self
 from scipy import stats
 from inspect import getsource
+from abc import ABC, abstractmethod
+from tiledb import Attr
 
-StatFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
+from .entry import Entry
 
-class Metric:
-    def __init__(self, name: str, dtype: np.dtype, method: StatFn):
-        self.name = name
+MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
+
+# Derived information about a cell of points
+
+## TODO should create list of metrics as classes that derive from Metric?
+class Metric(Entry):
+    def __init__(self, name: str, dtype: np.dtype, deps: list[Entry], method: MetricFn):
+        super(Entry, self).__init__(name, dtype, deps)
         self._method = method
-        self.dtype = dtype
+
+    def schema(self, attr: str):
+        entry_name = self.entry_name(attr)
+        return Attr(name=entry_name, dtype=self._dtype)
 
     # common name, storage name
-    def att(self, attr: str) -> str:
+    def entry_name(self, attr: str) -> str:
         return f'm_{attr}_{self.name}'
 
     def do(self, data: np.ndarray) -> np.ndarray:
