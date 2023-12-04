@@ -7,9 +7,9 @@ import webbrowser
 import pyproj
 
 from silvimetric.app import Application
-from silvimetric.storage import Storage, Configuration
-from silvimetric.shatter import shatter, ShatterConfiguration
-from silvimetric.extract import extract, ExtractConfiguration
+from silvimetric.storage import Storage, StorageConfig
+from silvimetric.shatter import shatter, ShatterConfig
+from silvimetric.extract import extract, ExtractConfig
 from silvimetric.bounds import Bounds
 
 logger = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 
     print(f"Creating database at {app.tdb_dir}")
     from silvimetric.cli.initialize import initialize as initializeFunction
-    config = Configuration(app.tdb_dir, bounds, resolution, crs)
+    config = StorageConfig(app.tdb_dir, bounds, resolution, crs)
     if name:
         config.name = name
     if attributes:
@@ -107,7 +107,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
-        config = ShatterConfiguration(tdb_dir=app.tdb_dir, filename=pointcloud,
+        config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
             tile_size=tilesize)
         webbrowser.open(client.cluster.dashboard_link)
         shatter(config)
@@ -128,7 +128,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads):
 def extract_cmd(app, attributes, metrics, outdir):
     """Extract silvimetric metrics from DATABASE """
 
-    config = ExtractConfiguration(app.tdb_dir, outdir, attributes, metrics)
+    config = ExtractConfig(app.tdb_dir, outdir, attributes, metrics)
     extract(config)
 
 

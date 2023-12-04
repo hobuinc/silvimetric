@@ -4,13 +4,13 @@ import numpy as np
 from math import floor
 import pathlib
 
-from .config import Configuration
-from .metric import Metrics
+from .config import StorageConfig
+from .metric import Metrics, Metric, Attribute
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, config: Configuration, ctx:tiledb.Ctx=None):
+    def __init__(self, config: StorageConfig, ctx:tiledb.Ctx=None):
         # if not ctx:
         #     self.ctx = tiledb.default_ctx()
         # else:
@@ -29,14 +29,14 @@ class Storage:
 
 
     @staticmethod
-    def create( config:Configuration, ctx:tiledb.Ctx=None):
+    def create( config:StorageConfig, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
         Parameters
         ----------
-        config : Configuration
-            Storage configuration
+        config : StorageConfig
+            Storage StorageConfig
         ctx : tiledb.Ctx, optional
             TileDB Context, by default is None
 
@@ -63,17 +63,9 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        dim_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
-                    for name in config.attrs]
+        dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [
-            tiledb.Attr(
-                name=f'm_{att}_{m}',
-                dtype=Metrics[m].dtype
-            )
-            for m in config.metrics
-            for att in config.attrs
-        ]
+        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
@@ -108,31 +100,31 @@ class Storage:
         """
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
-            config = Configuration.from_string(s)
+            config = StorageConfig.from_string(s)
             return Storage(config)
 
     def saveConfig(self) -> None:
         """
-        Save configuration to the Database
+        Save StorageConfig to the Database
 
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
             a.meta['config'] = str(self.config)
 
-    def getConfig(self) -> Configuration:
+    def getConfig(self) -> StorageConfig:
         """
-        Get the Configuration currently in use by the Storage
+        Get the StorageConfig currently in use by the Storage
 
         Returns
         -------
-        Configuration
-            Configuration object
+        StorageConfig
+            StorageConfig object
         """
         # reopen in read mode if current mode is write
         with self.open('r') as a:
             s = a.meta['config']
-            config = Configuration.from_string(s)
+            config = StorageConfig.from_string(s)
             return config
 
     def getMetadata(self, key: str, default=None) -> str:
@@ -159,7 +151,7 @@ class Storage:
                 raise(e)
 
 
-    def getAttributes(self) -> list[str]:
+    def getAttributes(self) -> list[Attribute]:
         """
         Return list of attribute names from storage config
 
@@ -170,7 +162,7 @@ class Storage:
         """
         return self.getConfig().attrs
 
-    def getMetrics(self) -> list[str]:
+    def getMetrics(self) -> list[Metric]:
         """
         Return List of metric names from storage config
 

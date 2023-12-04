@@ -5,7 +5,7 @@ from osgeo import gdal
 from pyproj import CRS
 
 from silvimetric.shatter import shatter
-from silvimetric.extract import extract, ExtractConfiguration
+from silvimetric.extract import extract, ExtractConfig
 from silvimetric.metric import Metrics
 
 @pytest.fixture(scope='function')
@@ -20,7 +20,7 @@ def extract_attrs()->list[str]:
 @pytest.fixture(scope='function')
 def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
     shatter(shatter_config)
-    yield ExtractConfiguration(tdb_filepath, tif_filepath, extract_attrs, metrics)
+    yield ExtractConfig(tdb_filepath, tif_filepath, extract_attrs, metrics)
 
 class Test_Extract(object):
 

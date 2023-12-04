@@ -1,11 +1,11 @@
+import json
 import numpy as np
 from typing import Callable, Optional, Any, Union, Self
 from scipy import stats
 from inspect import getsource
-from abc import ABC, abstractmethod
 from tiledb import Attr
 
-from .entry import Entry
+from .entry import Attribute, Entry
 
 MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
@@ -13,13 +13,16 @@ MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
-    def __init__(self, name: str, dtype: np.dtype, deps: list[Entry], method: MetricFn):
-        super(Entry, self).__init__(name, dtype, deps)
+    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
+        super().__init__()
+        self.name = name
+        self.dtype = dtype
+        self.dependencies = deps
         self._method = method
 
     def schema(self, attr: str):
         entry_name = self.entry_name(attr)
-        return Attr(name=entry_name, dtype=self._dtype)
+        return Attr(name=entry_name, dtype=self.dtype)
 
     # common name, storage name
     def entry_name(self, attr: str) -> str:
@@ -27,6 +30,22 @@ class Metric(Entry):
 
     def do(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
+
+    def to_json(self):
+        return {
+            'name': self.name,
+            'dtype': np.dtype(self.dtype).str,
+            'dependencies': self.dependencies,
+            'method': getsource(self._method)
+        }
+
+    def from_string(data: str):
+        j = json.loads(data)
+        name = j['name']
+        dtype = j['dtype']
+        deps = j['dependencies']
+        method = j['method']
+        return Metric(name, dtype, method, deps)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)

@@ -9,7 +9,7 @@ from dask.distributed import performance_report, progress
 from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
-from .config import ShatterConfiguration
+from .config import ShatterConfig
 from .metric import Metrics
 
 def cell_indices(xpoints, ypoints, x, y):
@@ -54,7 +54,7 @@ def get_data(filename, chunk):
     return pipeline.arrays[0]
 
 @dask.delayed
-def arrange_data(chunk: Extents, config: ShatterConfiguration,
+def arrange_data(chunk: Extents, config: ShatterConfig,
                  storage: Storage=None):
 
     points = get_data(config.filename, chunk)
@@ -105,7 +105,7 @@ def create_pipeline(filename, chunk):
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(leaves: list[Extents], config: ShatterConfiguration, storage: Storage):
+def run(leaves: list[Extents], config: ShatterConfig, storage: Storage):
     # debug uses single threaded dask
 
     if config.debug:
@@ -126,7 +126,7 @@ def run(leaves: list[Extents], config: ShatterConfiguration, storage: Storage):
 #TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
 # into things like get_data, get_atts, arrange_data so that they aren't waiting
 # on each other to compute and still using the resources.
-def shatter(config: ShatterConfiguration):
+def shatter(config: ShatterConfig):
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)

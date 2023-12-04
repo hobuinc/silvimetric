@@ -3,7 +3,7 @@ import json
 import os
 
 
-from silvimetric import Configuration, Bounds
+from silvimetric import StorageConfig, Bounds
 
 @pytest.fixture(scope='class')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -11,16 +11,16 @@ def tdb_filepath(tmp_path_factory) -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope="class")
-def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> Configuration:
+def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy, crs) -> StorageConfig:
     b = Bounds(minx, miny, maxx, maxy)
-    config = Configuration(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
+    config = StorageConfig(tdb_filepath, b, resolution, crs = crs, attrs = attrs)
     yield config
 
 
 class Test_Configuration(object):
 
-    def test_serialization(self, config: Configuration):
+    def test_serialization(self, config: StorageConfig):
 
         j = str(config)
-        c = Configuration.from_string(j)
+        c = StorageConfig.from_string(j)
         assert c == config

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from .names import get_random_name
 from .bounds import Bounds
-from .metric import Metric, Metrics
+from .metric import Metric, Metrics, Attribute
 from . import __version__
 
 @dataclass
@@ -18,25 +18,28 @@ class Config(ABC):
 
     @abstractmethod
     def to_json(self):
-        return self.__dict__
+        raise NotImplementedError
 
+    @classmethod
     @abstractmethod
     def from_string(self, data: str):
-        pass
+        raise NotImplementedError
 
     def __repr__(self):
-        return json.dumps(self.to_json())
+        raise NotImplementedError
 
 
 @dataclass
 class StorageConfig(Config):
-    tdb_dir: str
     bounds: Bounds
     resolution: float = 30.0
     crs: pyproj.CRS = None
     #TODO change these to a list of Metric and Entry class objects
-    attrs: list[str] = field(default_factory=lambda:[ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ])
-    metrics: list[str] = field(default_factory=lambda: [m for m in Metrics.keys()])
+    attrs: list[Attribute] = field(default_factory= lambda: [ Attribute(a)
+        for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ] ])
+
+    metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
+        for m in Metrics.keys() ])
     version: str = __version__
     name: str = None
 
@@ -56,12 +59,15 @@ class StorageConfig(Config):
         if not self.name:
             name = get_random_name()
 
-        self.metric_definitions = { m: str(Metrics[m]) for m in self.metrics}
+        self.metric_definitions = { m: str(m) for m in self.metrics}
 
 
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)
+
+        d['attrs'] = [a.to_json() for a in self.attrs]
+        d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
         return d
@@ -70,12 +76,16 @@ class StorageConfig(Config):
     def from_string(cls, data: str):
         x = json.loads(data)
         bounds = Bounds(*x['bounds'])
+        if 'metrics' in x:
+            ms = [ Metric.from_string(m) for m in x['metrics']]
+        if 'attrs' in x:
+            attrs = [ Attribute.from_string(a) for a in x['attrs']]
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
             crs = None
-        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=x['attrs'],
-                crs=crs, metrics=x['metrics'])
+        n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=attrs,
+                crs=crs, metrics=ms)
 
         return n
 
@@ -83,15 +93,13 @@ class StorageConfig(Config):
 class ShatterConfig(Config):
     filename: str
     tile_size: int
-    #TODO change these to a list of Metric and Entry class objects
-    attrs: list[str] = field(default_factory=list)
-    metrics: list[str] = field(default_factory=list)
+    attrs: list[Attribute] = field(default_factory=list)
+    metrics: list[Metric] = field(default_factory=list)
     debug: bool=field(default=False)
     # pipeline: str=field(default=None)
 
     def __post_init__(self) -> None:
         from .storage import Storage
-        #TODO should storage be a member variable?
         s = Storage.from_db(self.tdb_dir)
         if not self.attrs:
             self.attrs = s.getAttributes()
@@ -101,16 +109,32 @@ class ShatterConfig(Config):
 
     def to_json(self):
         meta = {}
+        meta['attrs'] = [a.to_json() for a in self.attrs]
+        meta['metrics'] = [m.to_json() for m in self.metrics]
         meta['filename'] = self.filename
         meta['tile_size'] = self.tile_size
         meta['point_count'] = self.point_count
         # meta['pipeline'] = self.pipeline
         return meta
 
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+
+        if 'metrics' in x:
+            ms = [ Metric.from_string(m) for m in x['metrics']]
+        if 'attrs' in x:
+            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        n = cls(tdb_dir=x['tdb_dir'], filename=x['filename'],
+                tile_size=x['tile_size'], attrs=attrs, metrics=ms,
+                debug=x['debug'])
+
+        return n
+
+
 @dataclass
 class ExtractConfig(Config):
     out_dir: str
-    #TODO change these to a list of Metric and Entry class objects
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
 
@@ -132,6 +156,19 @@ class ExtractConfig(Config):
     def to_json(self):
         # silliness because pyproj.CRS doesn't default to using to_json
         d = copy.deepcopy(self.__dict__)
+        d['attrs'] = [a.to_json() for a in self.attrs]
+        d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
         return d
+
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        if 'metrics' in x:
+            ms = [ Metric.from_string(m) for m in x['metrics']]
+        if 'attrs' in x:
+            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        n = cls(x['out_dir'], x['tile_size'], attrs, ms, x['debug'])
+
+        return n

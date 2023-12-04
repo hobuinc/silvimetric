@@ -3,14 +3,13 @@ import os
 import numpy as np
 import dask
 
-from silvimetric.shatter import shatter, ShatterConfiguration
-from silvimetric.storage import Storage, Configuration
-from silvimetric.metric import Metrics
+from silvimetric.shatter import shatter, ShatterConfig
+from silvimetric.storage import Storage, StorageConfig
 
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
-    m_list = [Metrics[m].att(a) for m in metrics for a in attrs]
+    m_list = [m.entry_name(a) for m in metrics for a in attrs]
     data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
                 for att in attrs }
 
