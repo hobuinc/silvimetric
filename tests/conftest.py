@@ -25,7 +25,7 @@ def tdb_filepath(tmp_path_factory) -> str:
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
     yield StorageConfig(tdb_filepath, bounds, resolution, crs, attrs, metrics,
-                        svversion, 'test_db')
+                        svversion)
 
 @pytest.fixture(scope='function')
 def metrics():

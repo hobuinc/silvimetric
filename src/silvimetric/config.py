@@ -1,7 +1,7 @@
 import pyproj
 import json
 import copy
-from dask.distributed import Client
+import uuid
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -40,7 +40,6 @@ class StorageConfig(Config):
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
         for m in Metrics.keys() ])
     version: str = __version__
-    name: str = None
 
     def __post_init__(self) -> None:
 
@@ -54,9 +53,6 @@ class StorageConfig(Config):
 
         if not self.crs.is_projected:
             raise Exception(f"Given coordinate system is not a rectilinear projected coordinate system")
-
-        if not self.name:
-            name = get_random_name()
 
         self.metric_definitions = { m.name: str(m) for m in self.metrics}
 
@@ -97,7 +93,8 @@ class ShatterConfig(Config):
     tile_size: int
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
-    debug: bool=field(default=False)
+    debug: bool = field(default=False)
+    name: uuid.UUID = field(default=uuid.uuid1())
     # pipeline: str=field(default=None)
 
     def __post_init__(self) -> None:
@@ -110,14 +107,17 @@ class ShatterConfig(Config):
         self.point_count=0
 
     def to_json(self):
-        meta = {}
-        meta['attrs'] = [a.to_json() for a in self.attrs]
-        meta['metrics'] = [m.to_json() for m in self.metrics]
-        meta['filename'] = self.filename
-        meta['tile_size'] = self.tile_size
-        meta['point_count'] = self.point_count
+        d = copy.deepcopy(self.__dict__)
+        # d['tdb_dir'] = self.tdb_dir
+        # d['debug'] = self.debug
+        d['name'] = str(self.name)
+        d['attrs'] = [a.to_json() for a in self.attrs]
+        d['metrics'] = [m.to_json() for m in self.metrics]
+        # d['filename'] = self.filename
+        # d['tile_size'] = self.tile_size
+        # d['point_count'] = self.point_count
         # meta['pipeline'] = self.pipeline
-        return meta
+        return d
 
     @classmethod
     def from_string(cls, data: str):
@@ -127,9 +127,10 @@ class ShatterConfig(Config):
             ms = [ Metric.from_string(m) for m in x['metrics']]
         if 'attrs' in x:
             attrs = [ Attribute.from_string(a) for a in x['attrs']]
+
         n = cls(tdb_dir=x['tdb_dir'], filename=x['filename'],
                 tile_size=x['tile_size'], attrs=attrs, metrics=ms,
-                debug=x['debug'])
+                debug=x['debug'], name=uuid.UUID(x['name']))
 
         return n
 

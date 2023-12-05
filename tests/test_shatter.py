@@ -1,8 +1,9 @@
 import pytest
-import os
+import tiledb
 import numpy as np
 import dask
 import json
+import uuid
 
 from silvimetric.shatter import shatter, ShatterConfig
 from silvimetric.storage import Storage, StorageConfig
@@ -34,9 +35,11 @@ class Test_Shatter(object):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
+            m = storage.get_history()
 
-            shatter(shatter_config)
-            a.reopen()
+        shatter_config.name = uuid.uuid1()
+        shatter(shatter_config)
+        with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
             assert a[:,0]['Z'].shape[0] == 20
             assert a[0,:]['Z'].shape[0] == 20
@@ -48,6 +51,9 @@ class Test_Shatter(object):
                     a[xi, yi]['Z'].size == 2
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
+
+            m2 = storage.get_history()
+            assert len(m2['shatter']) == 2
 
     def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
