@@ -77,7 +77,8 @@ class Storage:
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
         with tiledb.SparseArray(config.tdb_dir, "w") as a:
-            a.meta['config'] = str(config)
+            meta = str(config)
+            a.meta['config'] = meta
 
         s = Storage(config, ctx)
 

@@ -26,8 +26,7 @@ class Config(ABC):
         raise NotImplementedError
 
     def __repr__(self):
-        raise NotImplementedError
-
+        return json.dumps(self.to_json())
 
 @dataclass
 class StorageConfig(Config):
@@ -59,7 +58,7 @@ class StorageConfig(Config):
         if not self.name:
             name = get_random_name()
 
-        self.metric_definitions = { m: str(m) for m in self.metrics}
+        self.metric_definitions = { m.name: str(m) for m in self.metrics}
 
 
     def to_json(self):
@@ -131,6 +130,9 @@ class ShatterConfig(Config):
 
         return n
 
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
 
 @dataclass
 class ExtractConfig(Config):
@@ -172,3 +174,6 @@ class ExtractConfig(Config):
         n = cls(x['out_dir'], x['tile_size'], attrs, ms, x['debug'])
 
         return n
+
+    def __repr__(self):
+        return json.dumps(self.to_json())

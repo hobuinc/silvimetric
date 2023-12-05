@@ -31,15 +31,15 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
 def metrics():
     yield [Metrics['mean'], Metrics['median']]
 
+@pytest.fixture(scope="function")
+def storage(storage_config) -> Storage:
+    yield Storage.create(storage_config)
+
 @pytest.fixture(scope='function')
 def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
     yield ShatterConfig(tdb_filepath, filepath, tile_size,
                                storage_config.attrs, storage_config.metrics,
                                debug=True)
-
-@pytest.fixture(scope="function")
-def storage(storage_config) -> Storage:
-    yield Storage.create(storage_config)
 
 @pytest.fixture(scope='session')
 def filepath() -> str:
