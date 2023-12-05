@@ -88,6 +88,9 @@ class StorageConfig(Config):
 
         return n
 
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
 @dataclass
 class ShatterConfig(Config):
     filename: str

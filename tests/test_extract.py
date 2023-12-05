@@ -6,7 +6,7 @@ from pyproj import CRS
 
 from silvimetric.shatter import shatter
 from silvimetric.extract import extract, ExtractConfig
-from silvimetric.metric import Metrics
+from silvimetric.metric import Metrics, Metric, Attribute
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> str:
@@ -14,8 +14,8 @@ def tif_filepath(tmp_path_factory) -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope='function')
-def extract_attrs()->list[str]:
-    yield ['Z', 'Intensity']
+def extract_attrs(dims)->list[str]:
+    yield [Attribute('Z', dtype=dims['Z']), Attribute('Intensity', dtype=dims['Intensity'])]
 
 @pytest.fixture(scope='function')
 def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
@@ -32,7 +32,7 @@ class Test_Extract(object):
 
     def test_extract(self, extract_config, resolution, miny, maxy, minx, maxx):
         extract(extract_config)
-        filenames = [Metrics[m].att(a)
+        filenames = [Metrics[m.name].entry_name(a.name)
                      for m in extract_config.metrics
                      for a in extract_config.attrs]
         for f in filenames:

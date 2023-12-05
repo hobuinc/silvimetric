@@ -31,7 +31,7 @@ class Metric(Entry):
     def do(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
-    def to_json(self):
+    def to_json(self) -> dict[str, any]:
         return {
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
@@ -39,13 +39,23 @@ class Metric(Entry):
             'method': getsource(self._method)
         }
 
-    def from_string(data: str):
-        j = json.loads(data)
+    def from_string(data: Union[str, dict]):
+        if isinstance(data, str):
+            j = json.loads(data)
+        elif isinstance(data, dict):
+            j = data
         name = j['name']
-        dtype = j['dtype']
-        deps = j['dependencies']
-        method = j['method']
-        return Metric(name, dtype, method, deps)
+
+        # TODO should this be derived from config or from list of metrics?
+        # dtype = j['dtype']
+        # deps = j['dependencies']
+        # method = j['method']
+        # method = Metrics[name].method
+
+        return Metrics[name]
+
+    def __eq__(self, other):
+        return super().__eq__(other) and self._method == other._method
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)

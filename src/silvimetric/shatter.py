@@ -10,7 +10,7 @@ from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
 from .config import ShatterConfig
-from .metric import Metrics
+from .metric import Metrics, Metric, Attribute
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -35,13 +35,14 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     return [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
                 for x,y in chunk.indices]
 
-def get_metrics(data, metrics, attrs):
+def get_metrics(data, metrics: list[Metric], attrs: list[str]):
     ## data comes in as { 'att': [data] }
     for attr in attrs:
         for m in metrics:
-            metric = Metrics[m]
-            name = metric.att(attr)
-            data[name] = np.array([metric(cell_data) for cell_data in data[attr]], metric.dtype).flatten(order='C')
+            m: Metric
+            name = m.entry_name(attr)
+            data[name] = np.array([m(cell_data) for cell_data in data[attr]],
+                                  m.dtype).flatten(order='C')
     return data
 
 def get_data(filename, chunk):
@@ -60,11 +61,11 @@ def arrange_data(chunk: Extents, config: ShatterConfig,
     points = get_data(config.filename, chunk)
     if not points.size:
         return 0
-
-    data = get_atts(points, chunk, config.attrs)
+    attrs = [a.name for a in config.attrs]
+    data = get_atts(points, chunk, attrs)
 
     dd = {}
-    for att in config.attrs:
+    for att in attrs:
         try:
             dd[att] = np.array(dtype=object, object=[
                 *[np.array(col[att], data[0][att].dtype) for col in data],
@@ -86,7 +87,7 @@ def arrange_data(chunk: Extents, config: ShatterConfig,
         dy = np.delete(dy, empties)
 
     ## perform metric calculations
-    dd = get_metrics(dd, config.metrics, config.attrs)
+    dd = get_metrics(dd, config.metrics, attrs)
 
     if storage is not None:
         storage.write(dx, dy, dd)
@@ -136,15 +137,5 @@ def shatter(config: ShatterConfig):
     # Begin main operations
     print('Fetching and arranging data...')
     pc = run(leaves, config, storage)
-
-    #TODO point count should be updated as we add
-    with storage.open('w') as tdb:
-        cpc = storage.getMetadata('point_count')
-        prev = storage.getMetadata('shatter')
-        prev = json.loads(prev) if prev is not None else []
-
-        tdb.meta['point_count'] = pc.item() + (cpc if cpc is not None else 0)
-        config.point_count = pc.item()
-        prev.append(config.to_json())
-        tdb.meta['shatter'] = json.dumps(prev)
-
+    config.point_count = pc.item()
+    storage.saveMetadata('shatter', str(config))

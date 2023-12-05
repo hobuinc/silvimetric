@@ -1,10 +1,15 @@
 import json
 import numpy as np
-from typing import Self
+from typing import Self, Union
 from abc import ABC, abstractmethod
 from tiledb import Attr
 
 class Entry(ABC):
+
+    def __eq__(self, other: Self):
+        return self.name == other.name and \
+            self.dtype == other.dtype and \
+            self.dependencies == other.dependencies
 
     @abstractmethod
     def entry_name(self) -> str:
@@ -50,8 +55,13 @@ class Attribute(Entry):
         }
 
     @staticmethod
-    def from_string(data: str) -> Self:
-        j = json.loads(data)
+    def from_string(data: Union[str, dict]) -> Self:
+        if isinstance(data, str):
+            j = json.loads(data)
+        elif isinstance(data, dict):
+            j = data
+        else:
+            raise TypeError(f'Type of data, {data} is not str or dict')
         name = j['name']
         dtype = j['dtype']
         deps = j['dependencies']

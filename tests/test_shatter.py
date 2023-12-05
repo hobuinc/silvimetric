@@ -2,6 +2,7 @@ import pytest
 import os
 import numpy as np
 import dask
+import json
 
 from silvimetric.shatter import shatter, ShatterConfig
 from silvimetric.storage import Storage, StorageConfig
@@ -9,9 +10,9 @@ from silvimetric.storage import Storage, StorageConfig
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
-    m_list = [m.entry_name(a) for m in metrics for a in attrs]
-    data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
-                for att in attrs }
+    m_list = [m.entry_name(a.name) for m in metrics for a in attrs]
+    data = { a.name: np.array([np.array([val], dims[a.name]), None], object)[:-1]
+                for a in attrs }
 
     for m in m_list:
         data[m] = [val]
@@ -66,7 +67,11 @@ class Test_Shatter(object):
 
     def test_config(self, shatter_config, storage, test_point_count):
         shatter(shatter_config)
-        assert storage.getMetadata('shatter') is not None
-        assert storage.getMetadata('point_count') is not None
+        try:
+            meta = storage.getMetadata('shatter')
+        except BaseException as e:
+            pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
+        meta_j = json.loads(meta)
+        pc = meta_j['point_count']
+        assert pc == test_point_count
 
-        assert storage.getMetadata('point_count') == test_point_count

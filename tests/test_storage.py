@@ -2,30 +2,30 @@ import tiledb
 import numpy as np
 
 from silvimetric import Storage
-from silvimetric.metric import Metrics
+from silvimetric.metric import Metrics, Attribute
 from silvimetric import __version__ as svversion
 
 class Test_Storage(object):
 
-    def test_schema(self, storage: Storage, attrs: list[str], dims):
+    def test_schema(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
             s:tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
             assert s.attr('count').dtype == np.int32
 
             for a in attrs:
-                assert s.has_attr(a)
-                assert s.attr(a).dtype == dims[a]
+                assert s.has_attr(a.name)
+                assert s.attr(a.name) == a.schema()
 
-    def test_local(self, storage: Storage, attrs: list[str], dims):
+    def test_local(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
             sc = st.schema
             assert sc.has_attr('count')
             assert sc.attr('count').dtype == np.int32
 
             for a in attrs:
-                assert sc.has_attr(a)
-                assert sc.attr(a).dtype == dims[a]
+                assert sc.has_attr(a.name)
+                assert sc.attr(a.name) == a.schema()
 
     def test_config(self, storage: Storage):
         """Check that instantiation metadata is properly written"""
@@ -41,9 +41,12 @@ class Test_Storage(object):
         m_list = storage.getMetrics()
         a_list = storage.getAttributes()
 
-        with storage.open('r') as a:
-            s: tiledb.ArraySchema = a.schema
+        with storage.open('r') as st:
+            s: tiledb.ArraySchema = st.schema
             for m in m_list:
-                assert m in Metrics.keys()
-                assert all([s.attr(f'm_{att}_{m}').dtype == Metrics[m].dtype
-                            for att in a_list])
+                assert m.name in Metrics.keys()
+                def e_name(att):
+                    return s.attr(m.entry_name(att.name))
+                def schema(att):
+                    return Metrics[m.name].schema(att.name)
+                assert all([e_name(a) == schema(a) for a in a_list])

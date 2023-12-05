@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .storage import Storage
 from .config import ExtractConfig
-from .metric import Metrics
+from .metric import Metrics, Metric, Attribute
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -41,8 +41,8 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.FlushCache()
     tif = None
 
-def create_metric_att_list(metrics: list[str], attrs: list[str]):
-    return [ Metrics[m].att(a) for m in metrics for a in attrs ]
+def create_metric_att_list(metrics: list[Metric], attrs: list[Attribute]):
+    return [ m.entry_name(a.name) for m in metrics for a in attrs ]
 
 def extract(config: ExtractConfig):
 

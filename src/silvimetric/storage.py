@@ -54,7 +54,7 @@ class Storage:
         if not ctx:
             ctx = tiledb.default_ctx()
 
-        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
+        # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
         yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
 
@@ -65,7 +65,7 @@ class Storage:
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
+        metric_atts = [m.schema(a.name) for m in config.metrics for a in config.attrs]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
@@ -151,6 +151,20 @@ class Storage:
                     return default
                 raise(e)
 
+    def saveMetadata(self, key: str, data: any) -> None:
+        """
+        Save metadata to storage
+
+        Parameters
+        ----------
+        key : str
+            Metadata key
+        data : any
+            Metadata value. Must be translatable to and from string.
+        """
+        with self.open('w') as w:
+            w: tiledb.SparseArray
+            w.meta[key] = data
 
     def getAttributes(self) -> list[Attribute]:
         """
