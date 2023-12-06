@@ -18,7 +18,6 @@ def floor_y(points: da.Array, bounds: Bounds, resolution: float):
     return da.array(da.floor((bounds.maxy - points) / resolution),
         np.int32)
 
-#TODO move pruning of attributes to this method so we're not grabbing everything
 @dask.delayed
 def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     bounds = chunk.root
@@ -51,8 +50,6 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     storage.write(dx,dy,data)
     return data['count'].sum()
 
-    # return [dx, dy, data]
-
 @dask.delayed
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
@@ -61,7 +58,7 @@ def get_data(filename, chunk):
     except Exception as e:
         print(pipeline.pipeline, e)
 
-    return da.array(pipeline.arrays[0])
+    return pipeline.arrays[0]
 
 @dask.delayed
 def arrange(chunk, data, attrs):
@@ -86,53 +83,6 @@ def arrange(chunk, data, attrs):
         dy = np.delete(dy, empties)
     return [dx, dy, dd]
 
-# @dask.delayed
-# def write(data_packed, storage: Storage):
-#     dx, dy, dd = data_packed
-#     storage.write(dx, dy, dd)
-#     return dd['count'].sum()
-
-
-# @dask.delayed
-# def arrange_data(chunk: Extents, config: ShatterConfig,
-#                  storage: Storage=None):
-
-#     points = get_data(config.filename, chunk)
-#     if not points.size:
-#         return 0
-#     attrs = [a.name for a in config.attrs]
-#     data = get_atts(points, chunk, attrs)
-
-#     dd = {}
-#     for att in attrs:
-#         try:
-#             dd[att] = np.array(dtype=object, object=[
-#                 *[np.array(col[att], data[0][att].dtype) for col in data],
-#                 None])[:-1]
-#         except Exception as e:
-#             raise Exception(f"Missing attribute {att}: {e}")
-
-#     counts = np.array([z.size for z in dd['Z']], np.int32)
-
-#     ## remove empty indices
-#     empties = np.where(counts == 0)[0]
-#     dd['count'] = counts
-#     dx = chunk.indices['x']
-#     dy = chunk.indices['y']
-#     if bool(empties.size):
-#         for att in dd:
-#             dd[att] = np.delete(dd[att], empties)
-#         dx = np.delete(dx, empties)
-#         dy = np.delete(dy, empties)
-
-#     ## perform metric calculations
-#     dd = get_metrics(dd, config.metrics, attrs)
-
-#     if storage is not None:
-#         storage.write(dx, dy, dd)
-#     sum = counts.sum()
-#     del data, dd, points, chunk
-#     return sum
 
 def create_pipeline(filename, chunk):
     reader = pdal.Reader(filename, tag='reader')
@@ -147,57 +97,34 @@ def create_pipeline(filename, chunk):
     # return reader | crop | class_zero | rn | nor #| smrf | hag
     return reader | class_zero | rn | nor #| smrf | hag
 
-def run(leaves: list[Extents], config: ShatterConfig, storage: Storage,
-        client: Client=None):
-    # debug uses single threaded dask
+def one(leaf: Extents, config: ShatterConfig, storage: Storage):
+    attrs = [a.name for a in config.attrs]
 
+    points = get_data(config.filename, leaf)
+    att_data = get_atts(points, leaf, attrs)
+    arranged = arrange(leaf, att_data, attrs)
+    return get_metrics(arranged, attrs, config.metrics, storage)
+
+def run(leaves: list[Extents], config: ShatterConfig, storage: Storage):
     count = 0
     l = []
-    attrs = [a.name for a in config.attrs]
 
     if config.debug:
         for leaf in leaves:
-            points = get_data(config.filename, leaf)
-            att_data = get_atts(points, leaf, attrs)
-            arranged = arrange(leaf, att_data, attrs)
-            counts = get_metrics(arranged, attrs, config.metrics, storage)
-            l.append(counts)
+            l.append(one(leaf, config, storage))
             # l.append(write(packed, storage))
         vals = dask.compute(*l)
-        for pc in l:
-            count += pc
-        # data_futures = dask.compute([arrange_data(leaf, config, storage)
-        #                              for leaf in leaves])
     else:
-        with performance_report(f'dask-report.html'):
+        with performance_report(f'dask-report-1.html'):
             l = []
             for leaf in leaves:
-                points = get_data(config.filename, leaf)
-                att_data = get_atts(points, leaf, attrs)
-                arranged = arrange(leaf, att_data, attrs)
-                counts = get_metrics(arranged, attrs, config.metrics, storage)
-                l.append(counts)
+                l.append(one(leaf,config,storage))
+
             vals = dask.compute(*l)
 
-            for pc in vals:
-                count += pc
+    for pc in vals:
+        count += pc
 
-
-
-
-            # if client:
-            #     data_futures = client.persist([
-            #         arrange_data(leaf, config, storage)
-            #         for leaf in leaves])
-            # else:
-            #     data_futures = dask.compute([
-            #         arrange_data(leaf, config, storage)
-            #         for leaf in leaves])
-
-            #     progress(data_futures)
-    # c = 0
-    # for f in data_futures:
-    #     c += sum(f)
     return count
 
 #TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
