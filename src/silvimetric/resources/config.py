@@ -2,6 +2,7 @@ import pyproj
 import json
 import copy
 import uuid
+import pdal
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -34,9 +35,12 @@ class StorageConfig(Config):
     resolution: float = 30.0
     crs: pyproj.CRS = None
     #TODO change these to a list of Metric and Entry class objects
-    attrs: list[Attribute] = field(default_factory= lambda: [ Attribute(a)
-        for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ] ])
 
+    def attr_make():
+        dims = { d['name']: d['dtype'] for d in pdal.dimensions }
+        return [ Attribute(a, dims[a])
+        for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ] ]
+    attrs: list[Attribute] = field(default_factory=attr_make)
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
         for m in Metrics.keys() ])
     version: str = __version__
