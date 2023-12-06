@@ -1,5 +1,7 @@
 import pdal
 import numpy as np
+from line_profiler import profile
+import itertools
 
 import dask
 import dask.array as da
@@ -19,6 +21,7 @@ def floor_y(points: da.Array, bounds: Bounds, resolution: float):
         np.int32)
 
 @dask.delayed
+@profile
 def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     bounds = chunk.root
     xypoints = points[['X','Y']].view()
@@ -27,10 +30,11 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     # get attribute_data
     att_view = points[:][attrs]
     dt = att_view.dtype
-    return [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+    return [np.array(att_view[cell_indices(xis, yis, x, y)], dt)
                 for x,y in chunk.indices]
 
 @dask.delayed
+@profile
 def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
                 storage: Storage):
     ## data comes in as [dx, dy, { 'att': [data] }]
@@ -61,18 +65,22 @@ def get_data(filename, chunk):
     return pipeline.arrays[0]
 
 @dask.delayed
+@profile
 def arrange(chunk, data, attrs):
     dd = {}
     for att in attrs:
         try:
-            dd[att] = np.array(dtype=object, object=[
-                *[np.array(col[att], data[0][att].dtype) for col in data],
-                None])[:-1]
+            dd[att] = np.fromiter([*[col[att] for col in data], None], dtype=object)[:-1]
+            # dd[att] = np.array( dtype=object, object=[ itertools.chain( [ np.array( [ [ col[att] for col in data ], [ None ] ]) ])])
+            # dd[att] = np.array(dtype=object, object=[
+            #     *[np.array(col[att], data[0][att].dtype) for col in data],
+            #     None])[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
     counts = np.array([z.size for z in dd['Z']], np.int32)
+
     ## remove empty indices
-    empties = np.where(counts == 0)[0]
+    empties = np.where(counts != 0)[0]
     dd['count'] = counts
     dx = chunk.indices['x']
     dy = chunk.indices['y']
@@ -97,6 +105,7 @@ def create_pipeline(filename, chunk):
     # return reader | crop | class_zero | rn | nor #| smrf | hag
     return reader | class_zero | rn | nor #| smrf | hag
 
+@profile
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
@@ -139,6 +148,6 @@ def shatter(config: ShatterConfig, client: Client=None):
 
     # Begin main operations
     print('Fetching and arranging data...')
-    pc = run(leaves, config, storage, client)
-    config.point_count = pc.item()
+    pc = run(leaves, config, storage)
+    config.point_count = pc
     storage.saveMetadata('shatter', str(config))
