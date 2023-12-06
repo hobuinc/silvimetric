@@ -7,10 +7,9 @@ import webbrowser
 import pyproj
 
 from silvimetric.app import Application
-from silvimetric.storage import Storage, StorageConfig
-from silvimetric.shatter import shatter, ShatterConfig
-from silvimetric.extract import extract, ExtractConfig
-from silvimetric.bounds import Bounds
+from silvimetric.resources import Storage, Bounds
+from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig
+from silvimetric.commands import shatter, extract
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ def info(app):
     """Print info about Silvimetric database"""
     with Storage.from_db(app.tdb_dir) as tdb:
         meta = tdb.getConfig()
-        shatters = tdb.getMetadata('shatter')
+        shatters = tdb.get_history()['shatters']
         atts = tdb.getAttributes()
         info = {
             'attributes': atts,

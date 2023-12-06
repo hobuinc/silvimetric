@@ -1,8 +1,6 @@
 __version__ = '0.0.1'
 
-from .bounds import Bounds
-from .extents import Extents
-from .storage import Storage, StorageConfig
-from .metric import Metric
-from .shatter import shatter, ShatterConfig
-from .extract import extract, ExtractConfig
+from .resources import Bounds, Extents, Storage, Metric, Attribute, Metrics
+from .resources import StorageConfig, ExtractConfig, ShatterConfig
+
+from .commands import extract, shatter

@@ -2,9 +2,7 @@ from osgeo import gdal, osr
 import numpy as np
 from pathlib import Path
 
-from .storage import Storage
-from .config import ExtractConfig
-from .metric import Metrics, Metric, Attribute
+from ..resources import Storage, ExtractConfig, Metric, Attribute
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,

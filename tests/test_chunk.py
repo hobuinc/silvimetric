@@ -3,8 +3,8 @@ import dask
 import pdal
 import pytest
 
-from silvimetric.extents import Extents
-from silvimetric.shatter import arrange_data
+from silvimetric import Extents
+from silvimetric.commands.shatter import arrange_data
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):
     ind = np.array([], dtype=chunk.indices.dtype)

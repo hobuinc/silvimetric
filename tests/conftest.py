@@ -3,11 +3,11 @@ import os
 import dask
 import pdal
 
-from silvimetric.extents import Extents, Bounds
-from silvimetric.shatter import create_pipeline, ShatterConfig
-from silvimetric.storage import Storage, StorageConfig
-from silvimetric.metric import Metrics, Attribute, Metric
+from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
+from silvimetric import ShatterConfig, StorageConfig
 from silvimetric import __version__ as svversion
+
+from silvimetric.commands.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():

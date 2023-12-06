@@ -6,11 +6,7 @@ import dask
 import dask.array as da
 from dask.distributed import performance_report, progress
 
-from .bounds import Bounds
-from .extents import Extents
-from .storage import Storage
-from .config import ShatterConfig
-from .metric import Metrics, Metric, Attribute
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)

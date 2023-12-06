@@ -1,8 +1,7 @@
 import tiledb
 import numpy as np
 
-from silvimetric import Storage
-from silvimetric.metric import Metrics, Attribute
+from silvimetric import Storage, Metrics, Attribute
 from silvimetric import __version__ as svversion
 
 class Test_Storage(object):
