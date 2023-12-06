@@ -1,18 +1,19 @@
 import pytest
-import os
+import tiledb
 import numpy as np
 import dask
+import json
+import uuid
 
-from silvimetric.shatter import shatter, ShatterConfiguration
-from silvimetric.storage import Storage, Configuration
-from silvimetric.metric import Metrics
+from silvimetric.shatter import shatter, ShatterConfig
+from silvimetric.storage import Storage, StorageConfig
 
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
-    m_list = [Metrics[m].att(a) for m in metrics for a in attrs]
-    data = { att: np.array([np.array([val], dims[att]), None], object)[:-1]
-                for att in attrs }
+    m_list = [m.entry_name(a.name) for m in metrics for a in attrs]
+    data = { a.name: np.array([np.array([val], dims[a.name]), None], object)[:-1]
+                for a in attrs }
 
     for m in m_list:
         data[m] = [val]
@@ -34,9 +35,11 @@ class Test_Shatter(object):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
+            m = storage.get_history()
 
-            shatter(shatter_config)
-            a.reopen()
+        shatter_config.name = uuid.uuid1()
+        shatter(shatter_config)
+        with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
             assert a[:,0]['Z'].shape[0] == 20
             assert a[0,:]['Z'].shape[0] == 20
@@ -48,6 +51,9 @@ class Test_Shatter(object):
                     a[xi, yi]['Z'].size == 2
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
+
+            m2 = storage.get_history()
+            assert len(m2['shatter']) == 2
 
     def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
@@ -67,7 +73,11 @@ class Test_Shatter(object):
 
     def test_config(self, shatter_config, storage, test_point_count):
         shatter(shatter_config)
-        assert storage.getMetadata('shatter') is not None
-        assert storage.getMetadata('point_count') is not None
+        try:
+            meta = storage.getMetadata('shatter')
+        except BaseException as e:
+            pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
+        meta_j = json.loads(meta)
+        pc = meta_j['point_count']
+        assert pc == test_point_count
 
-        assert storage.getMetadata('point_count') == test_point_count

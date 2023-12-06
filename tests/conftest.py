@@ -4,8 +4,9 @@ import dask
 import pdal
 
 from silvimetric.extents import Extents, Bounds
-from silvimetric.shatter import create_pipeline, ShatterConfiguration
-from silvimetric.storage import Storage, Configuration
+from silvimetric.shatter import create_pipeline, ShatterConfig
+from silvimetric.storage import Storage, StorageConfig
+from silvimetric.metric import Metrics, Attribute, Metric
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope="session", autouse=True)
@@ -23,22 +24,22 @@ def tdb_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
-    yield Configuration(tdb_filepath, bounds, resolution, crs, attrs, metrics,
-                        svversion, 'test_db')
+    yield StorageConfig(tdb_filepath, bounds, resolution, crs, attrs, metrics,
+                        svversion)
 
 @pytest.fixture(scope='function')
 def metrics():
-    yield ['mean', 'median']
-
-@pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage, metrics):
-    yield ShatterConfiguration(tdb_filepath, filepath, tile_size,
-                               storage_config.attrs, storage_config.metrics,
-                               debug=True)
+    yield [Metrics['mean'], Metrics['median']]
 
 @pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
+
+@pytest.fixture(scope='function')
+def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
+    yield ShatterConfig(tdb_filepath, filepath, tile_size,
+                               storage_config.attrs, storage_config.metrics,
+                               debug=True)
 
 @pytest.fixture(scope='session')
 def filepath() -> str:
@@ -56,12 +57,13 @@ def extents(resolution, tile_size, bounds, crs) -> Extents:
     yield Extents(bounds,resolution,tile_size,crs)
 
 @pytest.fixture(scope="session")
-def attrs() -> list[str]:
-    yield [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]
+def attrs(dims) -> list[str]:
+    yield [Attribute(a, dims[a]) for a in
+           ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']]
 
 @pytest.fixture(scope="session")
-def dims(attrs):
-    yield { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in attrs }
+def dims():
+    yield { d['name']: d['dtype'] for d in pdal.dimensions }
 
 @pytest.fixture(scope='class')
 def pipeline(filepath) -> pdal.Pipeline:

@@ -9,8 +9,8 @@ from dask.distributed import performance_report, progress
 from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
-from .config import ShatterConfiguration
-from .metric import Metrics
+from .config import ShatterConfig
+from .metric import Metrics, Metric, Attribute
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -32,17 +32,17 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     # get attribute_data
     att_view = points[:][attrs]
     dt = att_view.dtype
-    att_data = [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+    return [da.array(att_view[cell_indices(xis, yis, x, y)], dt)
                 for x,y in chunk.indices]
-    return dask.compute(att_data, scheduler="Threads")[0]
 
-def get_metrics(data, metrics, attrs):
+def get_metrics(data, metrics: list[Metric], attrs: list[str]):
     ## data comes in as { 'att': [data] }
     for attr in attrs:
         for m in metrics:
-            metric = Metrics[m]
-            name = metric.att(attr)
-            data[name] = np.array([metric(cell_data) for cell_data in data[attr]], metric.dtype).flatten(order='C')
+            m: Metric
+            name = m.entry_name(attr)
+            data[name] = np.array([m(cell_data) for cell_data in data[attr]],
+                                  m.dtype).flatten(order='C')
     return data
 
 def get_data(filename, chunk):
@@ -52,20 +52,20 @@ def get_data(filename, chunk):
     except Exception as e:
         print(pipeline.pipeline, e)
 
-    return da.array(pipeline.arrays[0])
+    return pipeline.arrays[0]
 
 @dask.delayed
-def arrange_data(chunk: Extents, config: ShatterConfiguration,
+def arrange_data(chunk: Extents, config: ShatterConfig,
                  storage: Storage=None):
 
     points = get_data(config.filename, chunk)
     if not points.size:
         return 0
-
-    data = get_atts(points, chunk, config.attrs)
+    attrs = [a.name for a in config.attrs]
+    data = get_atts(points, chunk, attrs)
 
     dd = {}
-    for att in config.attrs:
+    for att in attrs:
         try:
             dd[att] = np.array(dtype=object, object=[
                 *[np.array(col[att], data[0][att].dtype) for col in data],
@@ -87,7 +87,7 @@ def arrange_data(chunk: Extents, config: ShatterConfiguration,
         dy = np.delete(dy, empties)
 
     ## perform metric calculations
-    dd = get_metrics(dd, config.metrics, config.attrs)
+    dd = get_metrics(dd, config.metrics, attrs)
 
     if storage is not None:
         storage.write(dx, dy, dd)
@@ -106,7 +106,7 @@ def create_pipeline(filename, chunk):
     # hag = pdal.Filter.hag_nn()
     return reader | crop | class_zero | rn | nor #| smrf | hag
 
-def run(leaves: list[Extents], config: ShatterConfiguration, storage: Storage):
+def run(leaves: list[Extents], config: ShatterConfig, storage: Storage):
     # debug uses single threaded dask
 
     if config.debug:
@@ -127,28 +127,15 @@ def run(leaves: list[Extents], config: ShatterConfiguration, storage: Storage):
 #TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
 # into things like get_data, get_atts, arrange_data so that they aren't waiting
 # on each other to compute and still using the resources.
-def shatter(config: ShatterConfiguration):
+def shatter(config: ShatterConfig):
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    # atts = storage.getAttributes()
-    # metrics = storage.getMetrics()
-    # atts.remove('count')
     extents = Extents.from_storage(storage, config.tile_size)
     leaves = list(extents.chunk(config.filename, 1000))
 
     # Begin main operations
     print('Fetching and arranging data...')
     pc = run(leaves, config, storage)
-
-    #TODO point count should be updated as we add
-    with storage.open('w') as tdb:
-        cpc = storage.getMetadata('point_count')
-        prev = storage.getMetadata('shatter')
-        prev = json.loads(prev) if prev is not None else []
-
-        tdb.meta['point_count'] = pc.item() + (cpc if cpc is not None else 0)
-        config.point_count = pc.item()
-        prev.append(config.to_json())
-        tdb.meta['shatter'] = json.dumps(prev)
-
+    config.point_count = pc.item()
+    storage.saveMetadata('shatter', str(config))

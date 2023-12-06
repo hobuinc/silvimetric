@@ -4,13 +4,13 @@ import numpy as np
 from math import floor
 import pathlib
 
-from .config import Configuration
-from .metric import Metrics
+from .config import StorageConfig
+from .metric import Metrics, Metric, Attribute
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
 
-    def __init__(self, config: Configuration, ctx:tiledb.Ctx=None):
+    def __init__(self, config: StorageConfig, ctx:tiledb.Ctx=None):
         # if not ctx:
         #     self.ctx = tiledb.default_ctx()
         # else:
@@ -29,14 +29,14 @@ class Storage:
 
 
     @staticmethod
-    def create( config:Configuration, ctx:tiledb.Ctx=None):
+    def create( config:StorageConfig, ctx:tiledb.Ctx=None):
         """
         Creates TileDB storage.
 
         Parameters
         ----------
-        config : Configuration
-            Storage configuration
+        config : StorageConfig
+            Storage StorageConfig
         ctx : tiledb.Ctx, optional
             TileDB Context, by default is None
 
@@ -54,7 +54,7 @@ class Storage:
         if not ctx:
             ctx = tiledb.default_ctx()
 
-        dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
+        # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
         yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
 
@@ -63,17 +63,9 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name="count", dtype=np.int32)
-        dim_atts = [tiledb.Attr(name=name, dtype=dims[name], var=True)
-                    for name in config.attrs]
+        dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [
-            tiledb.Attr(
-                name=f'm_{att}_{m}',
-                dtype=Metrics[m].dtype
-            )
-            for m in config.metrics
-            for att in config.attrs
-        ]
+        metric_atts = [m.schema(a.name) for m in config.metrics for a in config.attrs]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
@@ -85,7 +77,8 @@ class Storage:
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
         with tiledb.SparseArray(config.tdb_dir, "w") as a:
-            a.meta['config'] = str(config)
+            meta = str(config)
+            a.meta['config'] = meta
 
         s = Storage(config, ctx)
 
@@ -108,34 +101,34 @@ class Storage:
         """
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
-            config = Configuration.from_string(s)
+            config = StorageConfig.from_string(s)
             return Storage(config)
 
     def saveConfig(self) -> None:
         """
-        Save configuration to the Database
+        Save StorageConfig to the Database
 
         """
         # reopen in write mode if current mode is read
         with self.open('w') as a:
             a.meta['config'] = str(self.config)
 
-    def getConfig(self) -> Configuration:
+    def getConfig(self) -> StorageConfig:
         """
-        Get the Configuration currently in use by the Storage
+        Get the StorageConfig currently in use by the Storage
 
         Returns
         -------
-        Configuration
-            Configuration object
+        StorageConfig
+            StorageConfig object
         """
         # reopen in read mode if current mode is write
         with self.open('r') as a:
             s = a.meta['config']
-            config = Configuration.from_string(s)
+            config = StorageConfig.from_string(s)
             return config
 
-    def getMetadata(self, key: str) -> str:
+    def getMetadata(self, key: str, default=None) -> str:
         """
         Return metadata at given key
 
@@ -153,10 +146,27 @@ class Storage:
             try:
                 val = r.meta[key]
                 return val
-            except KeyError:
-                return None
+            except KeyError as e:
+                if default is not None:
+                    return default
+                raise(e)
 
-    def getAttributes(self) -> list[str]:
+    def saveMetadata(self, key: str, data: any) -> None:
+        """
+        Save metadata to storage
+
+        Parameters
+        ----------
+        key : str
+            Metadata key
+        data : any
+            Metadata value. Must be translatable to and from string.
+        """
+        with self.open('w') as w:
+            w: tiledb.SparseArray
+            w.meta[key] = data
+
+    def getAttributes(self) -> list[Attribute]:
         """
         Return list of attribute names from storage config
 
@@ -167,7 +177,7 @@ class Storage:
         """
         return self.getConfig().attrs
 
-    def getMetrics(self) -> list[str]:
+    def getMetrics(self) -> list[Metric]:
         """
         Return List of metric names from storage config
 
@@ -178,7 +188,7 @@ class Storage:
         """
         return self.getConfig().metrics
 
-    def open(self, mode:str='r') -> tiledb.SparseArray:
+    def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
         """
         Open either a read or write stream for TileDB database
 
@@ -199,9 +209,11 @@ class Storage:
 
         if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w')
+                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w',
+                                                      timestamp=timestamp)
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'r')
+                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'r',
+                                                      timestamp=timestamp)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
@@ -210,6 +222,33 @@ class Storage:
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
         return tdb
+
+    def get_history(self):
+        af = tiledb.array_fragments(self.config.tdb_dir)
+        with self.open('r') as r:
+            meta = dict(r.meta)
+
+        for idx in range(len(af)):
+
+            begin = af[idx].timestamp_range[0]
+            if len(af) > idx + 1:
+                end = af[idx+1].timestamp_range[1]
+            else:
+                end = af[idx].timestamp_range[1]
+
+            with self.open('r', (begin, end)) as r:
+                keys = r.meta.keys()
+                for key in r.meta.keys():
+                    if meta[key] is not None:
+                        if not isinstance(meta[key], list):
+                            meta[key] = [ meta[key] ]
+                        if not isinstance(r.meta[key], list):
+                            meta[key] = meta[key] + [ r.meta[key] ]
+                        else:
+                            meta[key] = meta[key] + r.meta[key]
+                    else:
+                        meta[key] = r.meta[key]
+        return meta
 
     #TODO what are we reading? queries are probably going to be specific
     def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
