@@ -285,5 +285,5 @@ class Storage:
         """
 
         with self.open('w') as tdb:
-            data = {k: v.astype(np.dtype(v.dtype.kind)) for k,v in data.items()}
+            # data = {k: v.astype(np.dtype(v.dtype)) for k,v in data.items()}
             tdb[xs, ys] = data

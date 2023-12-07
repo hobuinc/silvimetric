@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, field
 
-from .names import get_random_name
+# from .names import get_random_name
 from .bounds import Bounds
 from .metric import Metric, Metrics, Attribute
 from . import __version__

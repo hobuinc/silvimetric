@@ -9,13 +9,16 @@ from dask.distributed import performance_report, progress, Client
 
 from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
 
+@profile
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
+@profile
 def floor_x(points: da.Array, bounds: Bounds, resolution: float):
     return da.array(da.floor((points - bounds.minx) / resolution),
         np.int32)
 
+@profile
 def floor_y(points: da.Array, bounds: Bounds, resolution: float):
     return da.array(da.floor((bounds.maxy - points) / resolution),
         np.int32)
@@ -30,8 +33,13 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     # get attribute_data
     att_view = points[:][attrs]
     dt = att_view.dtype
-    return [np.array(att_view[cell_indices(xis, yis, x, y)], dt)
-                for x,y in chunk.indices]
+    l = []
+    for x, y in chunk.indices:
+       element = att_view[cell_indices(xis, yis, x, y)]
+       l.append(element)
+    return dask.compute(*l)
+    # return dask.compute(*[da.array(att_view[cell_indices(xis, yis, x, y)], dt)
+    #             for x,y in chunk.indices])
 
 @dask.delayed
 @profile

@@ -67,7 +67,7 @@ class Metric(Entry):
 Metrics = {
     'mean' : Metric('mean', np.float64, lambda data: np.mean(data)),
     'mode' : Metric('mode', np.float64, lambda data: stats.mode(data).mode),
-    'median' : Metric('median', np.float64, lambda data: np.median(data)),
+    'median' : Metric('median', np.float64, lambda data: np.median(data, axis=0)),
     'min' : Metric('min', np.float64, lambda data: np.min(data)),
     'max' : Metric('max', np.float64, lambda data: np.max(data)),
     'stddev' : Metric('stddev', np.float64, lambda data: np.std(data)),
