@@ -5,20 +5,18 @@ import itertools
 
 import dask
 import dask.array as da
-from dask.distributed import performance_report, progress, Client
+import dask.bag as db
+from dask.distributed import performance_report, Client
 
 from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
 
-@profile
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-@profile
 def floor_x(points: da.Array, bounds: Bounds, resolution: float):
     return da.array(da.floor((points - bounds.minx) / resolution),
         np.int32)
 
-@profile
 def floor_y(points: da.Array, bounds: Bounds, resolution: float):
     return da.array(da.floor((bounds.maxy - points) / resolution),
         np.int32)
@@ -26,20 +24,18 @@ def floor_y(points: da.Array, bounds: Bounds, resolution: float):
 @dask.delayed
 @profile
 def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
-    bounds = chunk.root
-    xypoints = points[['X','Y']].view()
-    xis = floor_x(xypoints['X'], bounds, chunk.resolution)
-    yis = floor_y(xypoints['Y'], bounds, chunk.resolution)
-    # get attribute_data
+    xis = da.floor(points[['xi']]['xi'])
+    yis = da.floor(points[['yi']]['yi'])
+
     att_view = points[:][attrs]
-    dt = att_view.dtype
-    l = []
-    for x, y in chunk.indices:
-       element = att_view[cell_indices(xis, yis, x, y)]
-       l.append(element)
-    return dask.compute(*l)
-    # return dask.compute(*[da.array(att_view[cell_indices(xis, yis, x, y)], dt)
-    #             for x,y in chunk.indices])
+    # l = []
+    # for x, y in chunk.indices:
+    #     indices = cell_indices(xis, yis, x, y)
+    #     element = dask.delayed(lambda a,i: a[i])(att_view, indices)
+    #     l.append(element)
+    # return dask.compute(*l, scheduler="threads")
+    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
+    return dask.compute(*l, scheduler="threads")
 
 @dask.delayed
 @profile
@@ -63,6 +59,7 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     return data['count'].sum()
 
 @dask.delayed
+@profile
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
     try:
@@ -79,16 +76,12 @@ def arrange(chunk, data, attrs):
     for att in attrs:
         try:
             dd[att] = np.fromiter([*[col[att] for col in data], None], dtype=object)[:-1]
-            # dd[att] = np.array( dtype=object, object=[ itertools.chain( [ np.array( [ [ col[att] for col in data ], [ None ] ]) ])])
-            # dd[att] = np.array(dtype=object, object=[
-            #     *[np.array(col[att], data[0][att].dtype) for col in data],
-            #     None])[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
     counts = np.array([z.size for z in dd['Z']], np.int32)
 
     ## remove empty indices
-    empties = np.where(counts != 0)[0]
+    empties = np.where(counts == 0)[0]
     dd['count'] = counts
     dx = chunk.indices['x']
     dy = chunk.indices['y']
@@ -104,58 +97,52 @@ def create_pipeline(filename, chunk):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
     reader._options['bounds'] = str(chunk)
-    # crop = pdal.Filter.crop(bounds=str(chunk))
     class_zero = pdal.Filter.assign(value="Classification = 0")
     rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
     nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
+    ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
+    assign_x = pdal.Filter.assign(
+        value=f"xi = (X - {chunk.root.minx}) / {chunk.resolution}")
+    assign_y = pdal.Filter.assign(
+        value=f"yi = ({chunk.root.maxy} - Y) / {chunk.resolution}")
     # smrf = pdal.Filter.smrf()
     # hag = pdal.Filter.hag_nn()
     # return reader | crop | class_zero | rn | nor #| smrf | hag
-    return reader | class_zero | rn | nor #| smrf | hag
+    return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
 
-@profile
+@dask.delayed
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
     points = get_data(config.filename, leaf)
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
-    return get_metrics(arranged, attrs, config.metrics, storage)
+    m = get_metrics(arranged, attrs, config.metrics, storage)
+    return dask.compute(m, scheduler="threads")[0]
+    # return dask.compute(m, scheduler="threads")[0]
 
-def run(leaves: list[Extents], config: ShatterConfig, storage: Storage):
-    count = 0
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     l = []
-
     if config.debug:
-        for leaf in leaves:
-            l.append(one(leaf, config, storage))
-            # l.append(write(packed, storage))
-        vals = dask.compute(*l)
+        l = db.map(one, leaves, config, storage)
+        vals = dask.compute(*l.compute())
     else:
         with performance_report(f'dask-report-1.html'):
-            l = []
             for leaf in leaves:
                 l.append(one(leaf,config,storage))
-
             vals = dask.compute(*l)
 
-    for pc in vals:
-        count += pc
+    return sum(vals)
 
-    return count
-
-#TODO OPTIMIZE: try using dask.persist and seeing if you can break up the tasks
-# into things like get_data, get_atts, arrange_data so that they aren't waiting
-# on each other to compute and still using the resources.
 def shatter(config: ShatterConfig, client: Client=None):
     print('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_storage(storage, config.tile_size)
-    leaves = list(extents.chunk(config.filename, 1000))
+    leaves = db.from_sequence(extents.chunk(config.filename, 1000))
 
     # Begin main operations
     print('Fetching and arranging data...')
     pc = run(leaves, config, storage)
-    config.point_count = pc
+    config.point_count = pc.item()
     storage.saveMetadata('shatter', str(config))
