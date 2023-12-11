@@ -11,7 +11,7 @@ from math import sqrt, ceil
 # - have nice round bounds
 # - be in CRS 5070
 
-filename = './data/test_data_2.copc.laz'
+filename = './data/test_data.copc.laz'
 cell_size = 30
 
 # has a nice square root of 300

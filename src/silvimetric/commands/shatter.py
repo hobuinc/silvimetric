@@ -31,12 +31,6 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     yis = da.floor(points[['yi']]['yi'])
 
     att_view = points[:][attrs]
-    # l = []
-    # for x, y in chunk.indices:
-    #     indices = cell_indices(xis, yis, x, y)
-    #     element = dask.delayed(lambda a,i: a[i])(att_view, indices)
-    #     l.append(element)
-    # return dask.compute(*l, scheduler="threads")
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.compute(*l, scheduler="threads")
 
@@ -46,7 +40,7 @@ def arrange(chunk, data, attrs):
     dd = {}
     for att in attrs:
         try:
-            dd[att] = np.fromiter([*[col[att] for col in data], None], dtype=object)[:-1]
+            dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in data], None], dtype=object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
     counts = np.array([z.size for z in dd['Z']], np.int32)
@@ -75,15 +69,16 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     if not np.any(data['count']):
         return 0
 
-    for attr in attrs:
-        for m in metrics:
-            m: Metric
-            name = m.entry_name(attr)
-            data[name] = np.array([m(cell_data) for cell_data in data[attr]],
-                                  m.dtype).flatten(order='C')
-
-    storage.write(dx,dy,data)
-    return data['count'].sum()
+    # doing dask compute inside the dict array because it was too fine-grained
+    # when it was outside
+    metric_data = {
+            f'{m.entry_name(attr)}': dask.compute(*[m(cell_data) for cell_data in data[attr]])
+            for attr in attrs for m in metrics
+        }
+    full_data = data | metric_data
+    storage.write(dx,dy,full_data)
+    pc = data['count'].sum()
+    return pc
 
 
 def create_pipeline(filename, chunk):
@@ -112,10 +107,10 @@ def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
     return dask.compute(m, scheduler="threads")[0]
-    # return dask.compute(m, scheduler="threads")[0]
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
+def run(leaves, config: ShatterConfig, storage: Storage):
     l = []
+    leaves = db.from_sequence(leaves)
     if config.debug:
         l = db.map(one, leaves, config, storage)
         vals = dask.compute(*l.compute())
@@ -132,7 +127,7 @@ def shatter(config: ShatterConfig, client: Client=None):
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_storage(storage, config.tile_size)
-    leaves = db.from_sequence(extents.chunk(config.filename, 1000))
+    leaves = extents.chunk(config.filename, 1000)
 
     # Begin main operations
     print('Fetching and arranging data...')
