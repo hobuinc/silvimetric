@@ -11,4 +11,5 @@ dependencies:
   - pyproj
   - gdal
   - scipy
-  - line-profiler
+  - pip:
+    - line-profiler
