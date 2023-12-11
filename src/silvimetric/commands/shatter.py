@@ -10,16 +10,19 @@ from dask.distributed import performance_report, Client
 
 from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
 
+@dask.delayed
+@profile
+def get_data(filename, chunk):
+    pipeline = create_pipeline(filename, chunk)
+    try:
+        pipeline.execute()
+    except Exception as e:
+        print(pipeline.pipeline, e)
+
+    return pipeline.arrays[0]
+
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
-
-def floor_x(points: da.Array, bounds: Bounds, resolution: float):
-    return da.array(da.floor((points - bounds.minx) / resolution),
-        np.int32)
-
-def floor_y(points: da.Array, bounds: Bounds, resolution: float):
-    return da.array(da.floor((bounds.maxy - points) / resolution),
-        np.int32)
 
 @dask.delayed
 @profile
@@ -36,38 +39,6 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     # return dask.compute(*l, scheduler="threads")
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.compute(*l, scheduler="threads")
-
-@dask.delayed
-@profile
-def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
-                storage: Storage):
-    ## data comes in as [dx, dy, { 'att': [data] }]
-    dx, dy, data = data_in
-
-    # make sure it's not empty. No empty writes
-    if not np.any(data['count']):
-        return 0
-
-    for attr in attrs:
-        for m in metrics:
-            m: Metric
-            name = m.entry_name(attr)
-            data[name] = np.array([m(cell_data) for cell_data in data[attr]],
-                                  m.dtype).flatten(order='C')
-
-    storage.write(dx,dy,data)
-    return data['count'].sum()
-
-@dask.delayed
-@profile
-def get_data(filename, chunk):
-    pipeline = create_pipeline(filename, chunk)
-    try:
-        pipeline.execute()
-    except Exception as e:
-        print(pipeline.pipeline, e)
-
-    return pipeline.arrays[0]
 
 @dask.delayed
 @profile
@@ -91,6 +62,28 @@ def arrange(chunk, data, attrs):
         dx = np.delete(dx, empties)
         dy = np.delete(dy, empties)
     return [dx, dy, dd]
+
+
+@dask.delayed
+@profile
+def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
+                storage: Storage):
+    ## data comes in as [dx, dy, { 'att': [data] }]
+    dx, dy, data = data_in
+
+    # make sure it's not empty. No empty writes
+    if not np.any(data['count']):
+        return 0
+
+    for attr in attrs:
+        for m in metrics:
+            m: Metric
+            name = m.entry_name(attr)
+            data[name] = np.array([m(cell_data) for cell_data in data[attr]],
+                                  m.dtype).flatten(order='C')
+
+    storage.write(dx,dy,data)
+    return data['count'].sum()
 
 
 def create_pipeline(filename, chunk):

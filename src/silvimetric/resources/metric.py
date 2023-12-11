@@ -4,6 +4,7 @@ from typing import Callable, Optional, Any, Union, Self
 from scipy import stats
 from inspect import getsource
 from tiledb import Attr
+import dask
 
 from .entry import Attribute, Entry
 
@@ -28,6 +29,7 @@ class Metric(Entry):
     def entry_name(self, attr: str) -> str:
         return f'm_{attr}_{self.name}'
 
+    @dask.delayed
     def do(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
@@ -57,6 +59,7 @@ class Metric(Entry):
     def __eq__(self, other):
         return super().__eq__(other) and self._method == other._method
 
+    @dask.delayed
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
