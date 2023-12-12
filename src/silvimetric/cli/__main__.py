@@ -13,6 +13,12 @@ from silvimetric.commands import shatter, extract
 
 logger = logging.getLogger(__name__)
 
+
+from json import JSONEncoder
+class MyEncoder(JSONEncoder):
+    def default(self, o):
+        return o.__dict__
+
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
 @click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
@@ -41,16 +47,32 @@ def cli(ctx, database, log_level, progress):
 def info(app):
     """Print info about Silvimetric database"""
     with Storage.from_db(app.tdb_dir) as tdb:
+
+        # We always have these
         meta = tdb.getConfig()
-        # history = tdb.get_history()['shatter']
-        shatter = tdb.getMetadata('shatter')
         atts = tdb.getAttributes()
+
+        # We don't have this until stuff has been put into the database
+        try:
+            shatter = tdb.getMetadata('shatter')
+
+            # I don't know what this is?
+        except KeyError:
+            shatter = {}
+
+        try:
+            # I don't know what this is? – hobu
+            history = tdb.get_history()['shatter']
+
+        except KeyError:
+            history = {}
         info = {
             'attributes': atts,
             'metadata': meta.to_json(),
-            'shatter': shatter
+            'shatter': shatter,
+            'history': history
         }
-        print(json.dumps(info, indent=2))
+        print(json.dumps(info, indent=2, cls=MyEncoder))
 
 class BoundsParamType(click.ParamType):
     name = "Bounds"

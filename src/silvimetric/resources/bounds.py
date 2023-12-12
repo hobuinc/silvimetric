@@ -19,7 +19,7 @@ class Bounds(dict): #for JSON serializing
     @staticmethod
     def from_string(bbox_str: str):
         """Accepts bounds from strings in the form:
-        
+
         "([1,101],[2,102],[3,103])"
         "{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}"
         "[1,101,2,102]"
@@ -32,6 +32,7 @@ class Bounds(dict): #for JSON serializing
             # ([1,101],[2,102],[3,103])
             bbox_str = bbox_str.strip()
             if bbox_str[0] != '(':
+                breakpoint()
                 raise Exception(f"Unable to load Bounds via json or PDAL bounds type {e}")
             t = ast.literal_eval(bbox_str)
             minx = t[0][0]
@@ -39,8 +40,8 @@ class Bounds(dict): #for JSON serializing
             miny = t[1][0]
             maxy = t[1][1]
             return Bounds(minx, miny, maxx, maxy)
-            
-            
+
+
         # parse explicit style
         if 'minx' in bbox:
             minx = float(bbox['minx'])
@@ -48,7 +49,7 @@ class Bounds(dict): #for JSON serializing
             maxx = float(bbox['maxx'])
             maxy = float(bbox['maxy'])
             return Bounds(minx, miny, maxx, maxy)
-            
+
         # parse GeoJSON array style
         if len(bbox) == 4:
             return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[2]),
