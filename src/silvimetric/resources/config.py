@@ -100,7 +100,7 @@ class ShatterConfig(Config):
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
-    name: uuid.UUID = field(default=uuid.uuid1())
+    name: uuid.UUID = field(default=uuid.uuid4())
     # pipeline: str=field(default=None)
 
     def __post_init__(self) -> None:
