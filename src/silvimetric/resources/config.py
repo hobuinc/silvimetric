@@ -40,9 +40,11 @@ class StorageConfig(Config):
         dims = { d['name']: d['dtype'] for d in pdal.dimensions }
         return [ Attribute(a, dims[a])
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ] ]
+
     attrs: list[Attribute] = field(default_factory=attr_make)
+
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
-        for m in Metrics.keys() ])
+                                  for m in Metrics.keys() ])
     version: str = __version__
 
     def __post_init__(self) -> None:

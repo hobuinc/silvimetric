@@ -72,5 +72,4 @@ Metrics = {
     'min' : Metric('min', np.float64, lambda data: np.min(data)),
     'max' : Metric('max', np.float64, lambda data: np.max(data)),
     'stddev' : Metric('stddev', np.float64, lambda data: np.std(data)),
-    # 'p01' : Metric('p01', np.float64, lambda data: np.std(data, keepdims=True)),
 }

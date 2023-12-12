@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import pdal
 from typing import Self, Union
 from abc import ABC, abstractmethod
 from tiledb import Attr
@@ -70,4 +71,5 @@ class Attribute(Entry):
     def __repr__(self):
         return json.dumps(self.to_json())
 
-Pdal_Attributes = { }
+# A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html
+Pdal_Attributes = { d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions }
