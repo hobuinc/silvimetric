@@ -32,7 +32,6 @@ class Bounds(dict): #for JSON serializing
             # ([1,101],[2,102],[3,103])
             bbox_str = bbox_str.strip()
             if bbox_str[0] != '(':
-                breakpoint()
                 raise Exception(f"Unable to load Bounds via json or PDAL bounds type {e}")
             t = ast.literal_eval(bbox_str)
             minx = t[0][0]
