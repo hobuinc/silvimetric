@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 # from .names import get_random_name
-from .extents import Extents, Bounds
+from .extents import Bounds
 from .metric import Metric, Metrics, Attribute
 from . import __version__
 
@@ -101,6 +101,7 @@ class StorageConfig(Config):
 class ShatterConfig(Config):
     filename: str
     tile_size: int
+    attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
     name: uuid.UUID = field(default=uuid.uuid1())
@@ -110,34 +111,27 @@ class ShatterConfig(Config):
     def __post_init__(self) -> None:
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
-        if not self.attrs:
+        if self.attrs is None:
             self.attrs = s.getAttributes()
-        if not self.metrics:
+        if self.metrics is None:
             self.metrics = s.getMetrics()
-        if not self.bounds:
+        if self.bounds is None:
             self.bounds = s.config.bounds
         self.point_count=0
 
     def to_json(self):
         d = copy.deepcopy(self.__dict__)
-        # d['tdb_dir'] = self.tdb_dir
-        # d['debug'] = self.debug
         d['name'] = str(self.name)
+        d['bounds'] = json.loads(self.bounds.to_json())
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        # d['filename'] = self.filename
-        # d['tile_size'] = self.tile_size
-        # d['point_count'] = self.point_count
-        # meta['pipeline'] = self.pipeline
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
 
-        # if 'metrics' in x:
         ms = [ Metric.from_string(m) for m in x['metrics']]
-        # if 'attrs' in x:
         attrs = [ Attribute.from_string(a) for a in x['attrs']]
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.

@@ -15,9 +15,12 @@ class Extents(object):
                  srs: str=None, root: Bounds=None):
 
         self.bounds = bounds
+
         if root is None:
-            root = bounds
-        self.root = root
+            self.root = bounds
+        else:
+            self.root = root
+
         minx, miny, maxx, maxy = self.bounds.get()
 
         if not srs:
@@ -32,10 +35,10 @@ class Extents(object):
         self.resolution = resolution
         self.tile_size = tile_size
 
-        self.x1 = math.floor((minx - root.minx) / resolution)
-        self.y1 = math.floor((root.maxy - maxy) / resolution)
-        self.x2 = math.floor((maxx - root.minx) / resolution)
-        self.y2 = math.floor((root.maxy - miny) / resolution)
+        self.x1 = math.floor((minx - self.root.minx) / resolution)
+        self.y1 = math.floor((self.root.maxy - maxy) / resolution)
+        self.x2 = math.floor((maxx - self.root.minx) / resolution)
+        self.y2 = math.floor((self.root.maxy - miny) / resolution)
         self.indices = np.array(
             [(i,j) for i in range(self.x1, self.x2)
             for j in range(self.y1, self.y2)],
@@ -43,7 +46,12 @@ class Extents(object):
         )
 
     def chunk(self, filename:str, threshold=1000) :
-        bminx, bminy, bmaxx, bmaxy = self.bounds.get()
+        if self.root is not None:
+            bminx, bminy, bmaxx, bmaxy = self.root.get()
+            r = self.root
+        else:
+            bminx, bminy, bmaxx, bmaxy = self.bounds.get()
+            r = self.bounds
 
         # buffers are only applied if the bounds do not fit on the cell line
         # in which case we're extending the bounds to the next nearest cell line
@@ -56,7 +64,7 @@ class Extents(object):
         maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.tile_size,
-                       self.srs.to_wkt(), root=self.bounds)
+                       self.srs.to_wkt(), root=r)
         self.root_chunk: Extents = chunk
 
         filtered = chunk.filter(filename, threshold)
@@ -168,10 +176,29 @@ class Extents(object):
         meta = storage.getConfig()
         base_extents = Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
         base = base_extents.bounds
-        if sub.minx < base.minx:
+
+        res = storage.config.resolution
+
+        if sub.minx <= base.minx:
             minx = base.minx
         else:
-            minx = sub.minx
+            minx = base.minx + (math.floor((sub.minx-base.minx)/res) * res)
+        if sub.maxx >= base.maxx:
+            maxx = base.maxx
+        else:
+            maxx = base.minx + (math.floor((sub.maxx-base.minx)/res) * res)
+        if sub.miny <= base.miny:
+            miny = base.miny
+        else:
+            miny = base.maxy - (math.floor(base.maxy-sub.miny)/res) * res
+        if sub.maxy >= base.maxy:
+            maxy = base.maxy
+        else:
+            maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
+
+        new_b = Bounds(minx, miny, maxx, maxy)
+        return Extents(new_b, meta.resolution, tile_size, meta.crs, base)
+
 
     @staticmethod
     def create(reader, resolution: float=30, tile_size: float=16, polygon=None):

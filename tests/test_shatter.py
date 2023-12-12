@@ -1,12 +1,12 @@
 import pytest
-import tiledb
 import numpy as np
 import dask
 import json
 import uuid
+import copy
 
 from silvimetric import shatter
-from silvimetric import Storage
+from silvimetric import Storage, Extents, ShatterConfig
 
 
 @dask.delayed
@@ -81,3 +81,17 @@ class Test_Shatter(object):
         pc = meta_j['point_count']
         assert pc == test_point_count
 
+    def test_sub_bounds(self, shatter_config, storage, test_point_count):
+        s = shatter_config
+        e = Extents.from_storage(storage, s.tile_size)
+        pc = 0
+        for b in e.split():
+            sc = ShatterConfig(s.tdb_dir, s.filename, s.tile_size, s.attrs,
+                               s.metrics, s.debug, bounds=b.bounds)
+            pc = pc + shatter(sc)
+        history = storage.get_history()['shatter']
+        assert isinstance(history, list)
+        history = [ json.loads(h) for h in history ]
+        pcs = [ h['point_count'] for h in history ]
+        assert sum(pcs) == test_point_count
+        assert pc == test_point_count
