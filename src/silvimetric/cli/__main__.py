@@ -43,8 +43,9 @@ def cli(ctx, database, log_level, progress):
 
 
 @cli.command("info")
+@click.option("--history", is_flag=True, default=False, type=bool)
 @click.pass_obj
-def info(app):
+def info(app, history):
     """Print info about Silvimetric database"""
     with Storage.from_db(app.tdb_dir) as tdb:
 
@@ -60,22 +61,22 @@ def info(app):
         except KeyError:
             shatter = {}
 
-        try:
-            # I don't know what this is? – hobu
-            history = tdb.get_history()['shatter']
-            if isinstance(history, list):
-                history = [ json.loads(h) for h in history ]
-            else:
-                history = json.loads(history)
-
-        except KeyError:
-            history = {}
         info = {
             'attributes': atts,
             'metadata': meta.to_json(),
-            'shatter': shatter,
-            'history': history
+            'shatter': shatter
         }
+        if history:
+            try:
+                # I don't know what this is? – hobu
+                history = tdb.get_history()['shatter']
+                if isinstance(history, list):
+                    history = [ json.loads(h) for h in history ]
+                else:
+                    history = json.loads(history)
+                info ['history'] = history
+            except KeyError:
+                history = {}
         print(json.dumps(info, indent=2, cls=MyEncoder))
 
 class BoundsParamType(click.ParamType):
