@@ -164,6 +164,16 @@ class Extents(object):
         return Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
 
     @staticmethod
+    def from_sub(storage: Storage, sub: Bounds, tile_size: float=16):
+        meta = storage.getConfig()
+        base_extents = Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
+        base = base_extents.bounds
+        if sub.minx < base.minx:
+            minx = base.minx
+        else:
+            minx = sub.minx
+
+    @staticmethod
     def create(reader, resolution: float=30, tile_size: float=16, polygon=None):
         # grab our bounds
         if polygon is not None:

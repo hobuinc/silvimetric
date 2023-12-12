@@ -127,6 +127,7 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
+@click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
 @click.option("--watch", default=False, type=bool)

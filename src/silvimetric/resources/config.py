@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 # from .names import get_random_name
-from .bounds import Bounds
+from .extents import Extents, Bounds
 from .metric import Metric, Metrics, Attribute
 from . import __version__
 
@@ -79,8 +79,12 @@ class StorageConfig(Config):
         bounds = Bounds(*x['bounds'])
         if 'metrics' in x:
             ms = [ Metric.from_string(m) for m in x['metrics']]
+        else:
+            ms = None
         if 'attrs' in x:
             attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        else:
+            attrs = None
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
@@ -97,10 +101,10 @@ class StorageConfig(Config):
 class ShatterConfig(Config):
     filename: str
     tile_size: int
-    attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
     name: uuid.UUID = field(default=uuid.uuid1())
+    bounds: Bounds = field(default=None)
     # pipeline: str=field(default=None)
 
     def __post_init__(self) -> None:
@@ -110,6 +114,8 @@ class ShatterConfig(Config):
             self.attrs = s.getAttributes()
         if not self.metrics:
             self.metrics = s.getMetrics()
+        if not self.bounds:
+            self.bounds = s.config.bounds
         self.point_count=0
 
     def to_json(self):
@@ -129,10 +135,12 @@ class ShatterConfig(Config):
     def from_string(cls, data: str):
         x = json.loads(data)
 
-        if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
-        if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        # if 'metrics' in x:
+        ms = [ Metric.from_string(m) for m in x['metrics']]
+        # if 'attrs' in x:
+        attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        # TODO key error if these aren't there. If we're calling from_string
+        # then these keys need to exist.
 
         n = cls(tdb_dir=x['tdb_dir'], filename=x['filename'],
                 tile_size=x['tile_size'], attrs=attrs, metrics=ms,
