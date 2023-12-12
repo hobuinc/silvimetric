@@ -2,7 +2,7 @@ import logging
 import pathlib
 
 from silvimetric.app import Application
-from silvimetric.storage import Storage, StorageConfig
+from silvimetric.resources.storage import Storage, StorageConfig
 from silvimetric.initialize import InitCommand
 
 logger = logging.getLogger(__name__)

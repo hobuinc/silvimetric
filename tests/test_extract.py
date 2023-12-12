@@ -4,9 +4,8 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric.shatter import shatter
-from silvimetric.extract import extract, ExtractConfig
-from silvimetric.metric import Metrics, Metric, Attribute
+from silvimetric import shatter, extract
+from silvimetric import Metrics, Attribute, ExtractConfig
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> str:

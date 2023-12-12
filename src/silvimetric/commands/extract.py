@@ -2,9 +2,7 @@ from osgeo import gdal, osr
 import numpy as np
 from pathlib import Path
 
-from .storage import Storage
-from .config import ExtractConfig
-from .metric import Metrics, Metric, Attribute
+from ..resources import Storage, ExtractConfig, Metric, Attribute
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -29,7 +27,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     # transform = [x, res, 0, y, 0, res]
     b = config.bounds
     transform = [b.minx, config.resolution, 0,
-                 b.maxy, 0, config.resolution]
+                 b.maxy, 0, -1* config.resolution]
 
     driver = gdal.GetDriverByName("GTiff")
     gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]

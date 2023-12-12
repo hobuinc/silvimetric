@@ -7,12 +7,17 @@ import webbrowser
 import pyproj
 
 from silvimetric.app import Application
-from silvimetric.storage import Storage, StorageConfig
-from silvimetric.shatter import shatter, ShatterConfig
-from silvimetric.extract import extract, ExtractConfig
-from silvimetric.bounds import Bounds
+from silvimetric.resources import Storage, Bounds
+from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig
+from silvimetric.commands import shatter, extract
 
 logger = logging.getLogger(__name__)
+
+
+from json import JSONEncoder
+class MyEncoder(JSONEncoder):
+    def default(self, o):
+        return o.__dict__
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -38,19 +43,41 @@ def cli(ctx, database, log_level, progress):
 
 
 @cli.command("info")
+@click.option("--history", is_flag=True, default=False, type=bool)
 @click.pass_obj
-def info(app):
+def info(app, history):
     """Print info about Silvimetric database"""
     with Storage.from_db(app.tdb_dir) as tdb:
+
+        # We always have these
         meta = tdb.getConfig()
-        shatters = tdb.getMetadata('shatter')
         atts = tdb.getAttributes()
+
+        # We don't have this until stuff has been put into the database
+        try:
+            shatter = json.loads(tdb.getMetadata('shatter'))
+
+            # I don't know what this is?
+        except KeyError:
+            shatter = {}
+
         info = {
             'attributes': atts,
             'metadata': meta.to_json(),
-            'shatter': shatters
+            'shatter': shatter
         }
-        print(json.dumps(info, indent=2))
+        if history:
+            try:
+                # I don't know what this is? – hobu
+                history = tdb.get_history()['shatter']
+                if isinstance(history, list):
+                    history = [ json.loads(h) for h in history ]
+                else:
+                    history = json.loads(history)
+                info ['history'] = history
+            except KeyError:
+                history = {}
+        print(json.dumps(info, indent=2, cls=MyEncoder))
 
 class BoundsParamType(click.ParamType):
     name = "Bounds"
@@ -102,15 +129,17 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 @click.option("--workers", type=int, default=12)
 @click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
+@click.option("--watch", default=False, type=bool)
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads):
+def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
+        if watch:
+            webbrowser.open(client.cluster.dashboard_link)
         config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
             tile_size=tilesize)
-        webbrowser.open(client.cluster.dashboard_link)
-        shatter(config)
+        shatter(config, client)
 
 
 @cli.command('extract')

@@ -12,5 +12,10 @@ stats/
 **/__schema/**
 **/__meta/**
 
+#test data sets
+**/boston_lot*/**
+**/tifs_test/**
+autzen-classified.copc.laz
+
 
 .DS_Store
