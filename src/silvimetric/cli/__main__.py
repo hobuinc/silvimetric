@@ -54,7 +54,7 @@ def info(app):
 
         # We don't have this until stuff has been put into the database
         try:
-            shatter = tdb.getMetadata('shatter')
+            shatter = json.loads(tdb.getMetadata('shatter'))
 
             # I don't know what this is?
         except KeyError:
@@ -63,6 +63,10 @@ def info(app):
         try:
             # I don't know what this is? – hobu
             history = tdb.get_history()['shatter']
+            if isinstance(history, list):
+                history = [ json.loads(h) for h in history ]
+            else:
+                history = json.loads(history)
 
         except KeyError:
             history = {}
@@ -124,14 +128,16 @@ def initialize(app: Application, bounds: Bounds, crs: pyproj.CRS, attributes: li
 @click.option("--workers", type=int, default=12)
 @click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
+@click.option("--watch", default=False, type=bool)
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads):
+def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
+        if watch:
+            webbrowser.open(client.cluster.dashboard_link)
         config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
             tile_size=tilesize)
-        webbrowser.open(client.cluster.dashboard_link)
         shatter(config, client)
 
 
