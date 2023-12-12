@@ -75,9 +75,6 @@ class Storage:
             allows_duplicates=True)
         schema.check()
 
-        if pathlib.Path(config.tdb_dir).exists():
-            raise Exception(f"Path {config.tdb_dir} already exists. " +
-                            "Please remove the directory to recreate. SilviMetric will not overrite existing databases.")
         tiledb.SparseArray.create(config.tdb_dir, schema)
         with tiledb.SparseArray(config.tdb_dir, "w") as a:
             meta = str(config)
