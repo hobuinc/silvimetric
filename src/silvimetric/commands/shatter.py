@@ -8,7 +8,7 @@ import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
 
 @dask.delayed
 @profile
@@ -122,15 +122,18 @@ def run(leaves, config: ShatterConfig, storage: Storage):
 
     return sum(vals)
 
-def shatter(config: ShatterConfig, client: Client=None):
-    print('Filtering out empty chunks...')
+def shatter(config: ShatterConfig, app: ApplicationConfig, client: Client=None):
+
+    app.log.debug('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_storage(storage, config.tile_size)
     leaves = extents.chunk(config.filename, 1000)
 
     # Begin main operations
-    print('Fetching and arranging data...')
+    app.log.debug('Fetching and arranging data...')
     pc = run(leaves, config, storage)
     config.point_count = pc.item()
+
+    app.log.debug('Saving shatter metadata')
     storage.saveMetadata('shatter', str(config))

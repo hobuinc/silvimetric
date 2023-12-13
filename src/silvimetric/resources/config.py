@@ -1,8 +1,11 @@
 import pyproj
+import pdal
+
 import json
 import copy
 import uuid
-import pdal
+import logging
+
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -28,6 +31,9 @@ class Config(ABC):
 
     def __repr__(self):
         return json.dumps(self.to_json())
+
+
+
 
 @dataclass
 class StorageConfig(Config):
@@ -88,6 +94,35 @@ class StorageConfig(Config):
         n = cls(x['tdb_dir'], bounds, x['resolution'], attrs=attrs,
                 crs=crs, metrics=ms)
 
+        return n
+
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
+@dataclass
+class ApplicationConfig(Config):
+    debug: bool = False,
+    log_level = logging.INFO,
+    logdir: str = None
+    logtype: str = "stream"
+    threads: int = 20,
+    progress: bool = False,
+
+    def to_json(self):
+        d = copy.deepcopy(self.__dict__)
+        d.pop('log')
+        return d
+
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        n = cls(x['tdb_dir'],
+                x['debug'],
+                x['log_level'],
+                x['logdir'],
+                x['logtype'],
+                x['threads'],
+                x['progress'])
         return n
 
     def __repr__(self):
