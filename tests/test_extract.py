@@ -17,8 +17,8 @@ def extract_attrs(dims)->list[str]:
     yield [Attribute('Z', dtype=dims['Z']), Attribute('Intensity', dtype=dims['Intensity'])]
 
 @pytest.fixture(scope='function')
-def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs, app_config):
-    shatter(shatter_config, app_config)
+def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
+    shatter(shatter_config)
     yield ExtractConfig(tdb_filepath, tif_filepath, extract_attrs, metrics)
 
 class Test_Extract(object):

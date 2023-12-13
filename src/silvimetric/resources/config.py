@@ -70,8 +70,11 @@ class StorageConfig(Config):
 
 
     def to_json(self):
-        # silliness because pyproj.CRS doesn't default to using to_json
-        d = copy.deepcopy(self.__dict__)
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
 
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
@@ -109,8 +112,11 @@ class ApplicationConfig(Config):
     progress: bool = False,
 
     def to_json(self):
-        d = copy.deepcopy(self.__dict__)
-        d.pop('log')
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
         return d
 
     @classmethod
@@ -136,7 +142,7 @@ class ShatterConfig(Config):
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
     name: uuid.UUID = field(default=uuid.uuid4())
-    # pipeline: str=field(default=None)
+    point_count: int = 0
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -148,16 +154,15 @@ class ShatterConfig(Config):
         self.point_count=0
 
     def to_json(self):
-        d = copy.deepcopy(self.__dict__)
-        # d['tdb_dir'] = self.tdb_dir
-        # d['debug'] = self.debug
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
+
         d['name'] = str(self.name)
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        # d['filename'] = self.filename
-        # d['tile_size'] = self.tile_size
-        # d['point_count'] = self.point_count
-        # meta['pipeline'] = self.pipeline
         return d
 
     @classmethod

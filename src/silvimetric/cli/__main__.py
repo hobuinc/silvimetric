@@ -136,7 +136,8 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch):
             webbrowser.open(client.cluster.dashboard_link)
         config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
             tile_size=tilesize)
-        shatter(config, app, client)
+        config.app = app
+        shatter(config, client)
 
 
 @cli.command('extract')

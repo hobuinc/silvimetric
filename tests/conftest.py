@@ -44,10 +44,12 @@ def app_config(tdb_filepath, debug=True):
     yield app
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
-    yield ShatterConfig(tdb_filepath, filepath, tile_size,
+def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config, storage):
+    s = ShatterConfig(tdb_filepath, filepath, tile_size,
                                storage_config.attrs, storage_config.metrics,
                                debug=True)
+    s.app = app_config
+    yield s
 
 @pytest.fixture(scope='session')
 def filepath() -> str:
