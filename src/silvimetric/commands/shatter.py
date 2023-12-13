@@ -7,7 +7,7 @@ import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
+from ..resources import Extents, Storage, Metric, ShatterConfig
 
 @dask.delayed
 @profile

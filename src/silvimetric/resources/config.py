@@ -151,19 +151,21 @@ class ExtractConfig(Config):
     out_dir: str
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
+    bounds: Bounds = field(default=None)
 
     def __post_init__(self) -> None:
         from .storage import Storage
         config = Storage.from_db(self.tdb_dir).config
-        if not self.attrs:
+        if self.attrs is None:
             self.attrs = config.attrs
-        if not self.metrics:
+        if self.metrics is None:
             self.metrics = config.metrics
+        if self.bounds is None:
+            self.bounds: Bounds = config.bounds
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)
 
-        self.bounds: Bounds = config.bounds
         self.resolution: float = config.resolution
         self.crs: pyproj.CRS = config.crs
 

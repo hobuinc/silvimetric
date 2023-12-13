@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from ..resources import Storage, ExtractConfig, Metric, Attribute
+from ..resources import Extents
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -26,6 +27,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     srs.ImportFromWkt(crs.to_wkt())
     # transform = [x, res, 0, y, 0, res]
     b = config.bounds
+
     transform = [b.minx, config.resolution, 0,
                  b.maxy, 0, -1* config.resolution]
 
@@ -46,15 +48,23 @@ def extract(config: ExtractConfig):
 
     ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)
+    root_bounds=storage.config.bounds
+
+    e = Extents(config.bounds, config.resolution, srs=config.crs, root=root_bounds)
+    i = e.indices
+    minx = i['x'].min()
+    maxx = i['x'].max()
+    miny = i['y'].min()
+    maxy = i['y'].max()
+    x1 = maxx - minx + 1
+    y1 = maxy - miny + 1
+
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, coords=True).df[:].sort_values(['Y','X'])
-        x1 = tdb.domain.dim("X").tile
-        y1 = tdb.domain.dim("Y").tile
+        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx, miny:maxy]
+        data['X'] = data['X'] - minx
+        data['Y'] = data['Y'] - miny
 
         for ma in ma_list:
-            raster_data = np.empty(shape=(y1,x1), dtype=data[ma].dtype)
-            raster_data.fill(None)
-            m_data = data[['X','Y',ma]].to_numpy()
-            for x,y,d in m_data:
-                raster_data[int(y)][int(x)]=d
-            write_tif(x1, y1, raster_data, ma, config)
+            #TODO scale x and y down
+            m_data = data[[ma]].to_numpy().reshape(y1,x1)
+            write_tif(x1, y1, m_data, ma, config)

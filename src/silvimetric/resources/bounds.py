@@ -18,11 +18,13 @@ class Bounds(dict): #for JSON serializing
 
     @staticmethod
     def from_string(bbox_str: str):
-        """Accepts bounds from strings in the form:
+        """
+        Accepts bounds from strings in the form:
 
         "([1,101],[2,102],[3,103])"
         "{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}"
-        "[1,101,2,102]"
+        "[1,2,101,102]"
+        "[1,2,3,101,102,103]"
 
         """
         try:
