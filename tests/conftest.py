@@ -2,6 +2,7 @@ import pytest
 import os
 import dask
 import pdal
+import json
 
 from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
 from silvimetric import ShatterConfig, StorageConfig
@@ -42,6 +43,15 @@ def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
                                debug=True)
 
 @pytest.fixture(scope="function")
+def secrets():
+    path = os.path.join(os.path.dirname(__file__), ".secrets")
+    assert os.path.exists(path)
+    p = os.path.abspath(path)
+    with open(p, 'r') as secret:
+        secret_json = json.loads(secret.read())
+    yield secret_json
+
+@pytest.fixture(scope="function")
 def s3_bucket():
     yield "silvimetric"
 
@@ -55,7 +65,9 @@ def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
                         svversion)
 
 @pytest.fixture(scope='function')
-def s3_storage(s3_storage_config, s3_bucket):
+def s3_storage(s3_storage_config, s3_bucket, secrets):
+    os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
+    os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
     yield Storage.create(s3_storage_config)
 
 @pytest.fixture(scope="function")

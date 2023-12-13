@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 import dask
@@ -7,7 +8,6 @@ import uuid
 
 from silvimetric import shatter
 from silvimetric import Storage, Extents, ShatterConfig
-
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
@@ -96,5 +96,7 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
-    def test_remote_creation(self, s3_shatter_config):
+    def test_remote_creation(self, s3_shatter_config, secrets):
+        os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
+        os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
         shatter(s3_shatter_config)
