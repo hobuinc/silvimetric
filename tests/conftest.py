@@ -3,8 +3,8 @@ import os
 import dask
 import pdal
 
-from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
-from silvimetric import ShatterConfig, StorageConfig
+from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
+from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
 from silvimetric.commands.shatter import create_pipeline
@@ -34,6 +34,14 @@ def metrics():
 @pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
+
+@pytest.fixture(scope='function')
+def app_config(tdb_filepath, debug=True):
+    app = ApplicationConfig(tdb_filepath)
+    app.log_level = 20 # INFO
+    app.debug = debug
+    app.log = Log(app)
+    yield app
 
 @pytest.fixture(scope='function')
 def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):

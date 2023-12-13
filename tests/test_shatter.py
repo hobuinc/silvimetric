@@ -24,8 +24,8 @@ def write(x,y,val, s:Storage, attrs, dims, metrics):
 
 class Test_Shatter(object):
 
-    def test_shatter(self, shatter_config, storage: Storage, resolution, maxy):
-        shatter(shatter_config)
+    def test_shatter(self, shatter_config, app_config, storage: Storage, resolution, maxy):
+        shatter(shatter_config, app_config)
         with storage.open('r') as a:
             y = a[:,0]['Z'].shape[0]
             x = a[0,:]['Z'].shape[0]
@@ -37,8 +37,8 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
             m = storage.get_history()
 
-        shatter_config.name = uuid.uuid1()
-        shatter(shatter_config)
+        shatter_config.name = uuid.uuid4()
+        shatter(shatter_config, app_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
             assert a[:,0]['Z'].shape[0] == 20
@@ -71,8 +71,8 @@ class Test_Shatter(object):
                 assert bool(np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx]))
                 assert bool(np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx]))
 
-    def test_config(self, shatter_config, storage, test_point_count):
-        shatter(shatter_config)
+    def test_config(self, shatter_config, app_config, storage, test_point_count):
+        shatter(shatter_config, app_config)
         try:
             meta = storage.getMetadata('shatter')
         except BaseException as e:

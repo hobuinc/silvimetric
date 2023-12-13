@@ -286,4 +286,7 @@ class Storage:
 
         with self.open('w') as tdb:
             # data = {k: v.astype(np.dtype(v.dtype)) for k,v in data.items()}
+
+            # if self.config.app.debug:
+            #     breakpoint()
             tdb[xs, ys] = data
