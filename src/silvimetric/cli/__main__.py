@@ -3,20 +3,13 @@ from dask.distributed import Client
 import webbrowser
 import pyproj
 
-import logging
 import json
+
+import logging
 
 from silvimetric.resources import Storage, Bounds, Log
 from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from silvimetric.commands import shatter, extract
-
-logger = logging.getLogger(__name__)
-
-
-from json import JSONEncoder
-class MyEncoder(JSONEncoder):
-    def default(self, o):
-        return o.__dict__
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -32,12 +25,11 @@ def cli(ctx, database, debug, log_level, log_dir, progress):
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level}")
 
-    app = ApplicationConfig(database)
-    app.log_level = numeric_level
-    app.logdir = log_dir
-    app.log = Log(app)
-    app.debug = debug
-    app.progress = progress
+    log = Log(log_level, log_dir)
+    app = ApplicationConfig(tdb_dir = database,
+                            log = log,
+                            debug = debug,
+                            progress = progress)
     ctx.obj = app
 
 @cli.command("info")
@@ -75,7 +67,7 @@ def info(app, history):
                 info ['history'] = history
             except KeyError:
                 history = {}
-        print(json.dumps(info, indent=2, cls=MyEncoder))
+        print(json.dumps(info, indent=2))
 
 class BoundsParamType(click.ParamType):
     name = "Bounds"
@@ -103,23 +95,20 @@ class CRSParamType(click.ParamType):
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
-@click.option("--name", "-a", type=str,
-              help="Working name for this SilviMetric DB (random one given if not specified)")
 @click.pass_obj
-def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS, attributes: list[str], resolution: float, name: str):
+def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS, attributes: list[str], resolution: float):
     """Initialize silvimetrics DATABASE
     """
 
     from silvimetric.cli.initialize import initialize as initializeFunction
-    storageconfig = StorageConfig(app.tdb_dir, bounds, resolution, crs)
-    if name:
-        storageconfig.name = name
-    if attributes:
-        storageconfig.attrs = attributes
-    if resolution:
-        storageconfig.resolution = resolution
-
-    storage = initializeFunction(app, storageconfig)
+    breakpoint()
+    storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
+                                  log = app.log,
+                                  bounds = bounds,
+                                  crs = crs,
+                                  attrs = attributes,
+                                  resolution = resolution)
+    storage = initializeFunction(storageconfig)
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
@@ -135,9 +124,12 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds):
     with Client(n_workers=workers, threads_per_worker=threads) as client:
         if watch:
             webbrowser.open(client.cluster.dashboard_link)
-        config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
-            tile_size=tilesize, bounds=bounds, app=app)
-        config.app = app
+        config = ShatterConfig(tdb_dir = app.tdb_dir,
+                               log = app.log,
+                               filename = pointcloud,
+                               tile_size = tilesize,
+                               bounds = bounds)
+        breakpoint()
         shatter(config, client)
 
 
@@ -154,7 +146,12 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds):
 def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE """
 
-    config = ExtractConfig(app.tdb_dir, outdir, attributes, metrics, bounds=bounds)
+    config = ExtractConfig(tdb_dir = app.tdb_dir,
+                           log = app.log,
+                           out_dir= outdir,
+                           attrs = attributes,
+                           metrics = metrics,
+                           bounds = bounds)
     extract(config)
 
 

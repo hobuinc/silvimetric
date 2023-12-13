@@ -288,5 +288,11 @@ class Storage:
             # data = {k: v.astype(np.dtype(v.dtype)) for k,v in data.items()}
 
             # if self.config.app.debug:
-            #     breakpoint()
+            #     tiledb.stats_reset()
+            #     tiledb.stats_enable()
+
             tdb[xs, ys] = data
+
+            # if self.config.app.debug:
+            #     tiledb.stats_dump()
+            #     tiledb.stats_reset()

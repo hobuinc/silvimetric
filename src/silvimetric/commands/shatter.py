@@ -119,7 +119,8 @@ def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
 
 def shatter(config: ShatterConfig, client: Client=None):
 
-    config.app.log.debug('Filtering out empty chunks...')
+    config.log.debug('Filtering out empty chunks...')
+
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_sub(storage, config.bounds, config.tile_size)
@@ -127,10 +128,10 @@ def shatter(config: ShatterConfig, client: Client=None):
     leaves = extents.chunk(config.filename, 1000)
 
     # Begin main operations
-    config.app.log.debug('Fetching and arranging data...')
+    config.log.debug('Fetching and arranging data...')
     pc = run(leaves, config, storage)
     config.point_count = int(pc)
 
-    config.app.log.debug('Saving shatter metadata')
+    config.log.debug('Saving shatter metadata')
     storage.saveMetadata('shatter', str(config))
     return config.point_count

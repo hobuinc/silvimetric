@@ -2,7 +2,7 @@ import pathlib
 
 from silvimetric.resources import Storage, StorageConfig, ApplicationConfig
 
-def initialize(app: ApplicationConfig, storage: StorageConfig):
+def initialize(storage: StorageConfig):
     """
     Initialize a Silvimetric TileDB instance for a given StorageConfig instance
 
@@ -12,7 +12,7 @@ def initialize(app: ApplicationConfig, storage: StorageConfig):
 
     """
 
-    app.log.logger.debug(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
+    storage.log.debug(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
 
     s = Storage.create(storage)
     return s

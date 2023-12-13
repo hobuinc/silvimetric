@@ -4,7 +4,7 @@ import os
 import dataclasses
 
 
-from silvimetric import StorageConfig, Bounds
+from silvimetric import StorageConfig, Bounds, Log
 
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -16,7 +16,12 @@ def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy,
            crs) -> StorageConfig:
 
     b = Bounds(minx, miny, maxx, maxy)
-    config = StorageConfig(tdb_filepath, b, resolution, crs = crs,
+    log = Log(20)
+    config = StorageConfig(tdb_dir = tdb_filepath,
+                           log = log,
+                           bounds = b,
+                           resolution = resolution,
+                           crs = crs,
                            attrs = attrs)
     yield config
 
