@@ -129,6 +129,6 @@ def shatter(config: ShatterConfig, client: Client=None):
     print('Fetching and arranging data...')
     pc = run(leaves, config, storage)
     # depending on dask setup, this could be a numpy return or an int
-    config.point_count = int(sum(pc))
+    config.point_count = int(pc)
     storage.saveMetadata('shatter', str(config))
     return config.point_count
