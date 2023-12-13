@@ -1,14 +1,13 @@
 import pdal
 import numpy as np
 from line_profiler import profile
-import itertools
 
 import dask
 import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
 
 @dask.delayed
 @profile
@@ -32,7 +31,7 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
 
     att_view = points[:][attrs]
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
-    return dask.compute(*l, scheduler="threads")
+    return dask.compute(*l)
 
 @dask.delayed
 @profile
@@ -98,7 +97,6 @@ def create_pipeline(filename, chunk):
     # return reader | crop | class_zero | rn | nor #| smrf | hag
     return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
 
-@dask.delayed
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
@@ -106,31 +104,33 @@ def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
-    return dask.compute(m, scheduler="threads")[0]
+    return dask.compute(m)[0]
 
-def run(leaves, config: ShatterConfig, storage: Storage):
+def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
+    from contextlib import nullcontext
     l = []
-    leaves = db.from_sequence(leaves)
-    if config.debug:
+
+    with (performance_report() if client is not None else nullcontext()):
+        leaves = db.from_sequence(leaves)
         l = db.map(one, leaves, config, storage)
-        vals = dask.compute(*l.compute())
-    else:
-        with performance_report(f'dask-report-1.html'):
-            for leaf in leaves:
-                l.append(one(leaf,config,storage))
-            vals = dask.compute(*l)
+        vals = l.compute()
 
     return sum(vals)
 
 def shatter(config: ShatterConfig, client: Client=None):
-    print('Filtering out empty chunks...')
+
+    config.app.log.debug('Filtering out empty chunks...')
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    extents = Extents.from_storage(storage, config.tile_size)
+    extents = Extents.from_sub(storage, config.bounds, config.tile_size)
+
     leaves = extents.chunk(config.filename, 1000)
 
     # Begin main operations
-    print('Fetching and arranging data...')
+    config.app.log.debug('Fetching and arranging data...')
     pc = run(leaves, config, storage)
-    config.point_count = pc.item()
+    config.point_count = int(pc)
+
+    config.app.log.debug('Saving shatter metadata')
     storage.saveMetadata('shatter', str(config))
+    return config.point_count

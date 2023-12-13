@@ -1,15 +1,18 @@
 import pyproj
+import pdal
+
 import json
 import copy
 import uuid
-import pdal
+import logging
+
 from pathlib import Path
 from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, field
 
 # from .names import get_random_name
-from .bounds import Bounds
+from .extents import Bounds
 from .metric import Metric, Metrics, Attribute
 from . import __version__
 
@@ -28,6 +31,9 @@ class Config(ABC):
 
     def __repr__(self):
         return json.dumps(self.to_json())
+
+
+
 
 @dataclass
 class StorageConfig(Config):
@@ -64,8 +70,11 @@ class StorageConfig(Config):
 
 
     def to_json(self):
-        # silliness because pyproj.CRS doesn't default to using to_json
-        d = copy.deepcopy(self.__dict__)
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
 
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
@@ -79,8 +88,12 @@ class StorageConfig(Config):
         bounds = Bounds(*x['bounds'])
         if 'metrics' in x:
             ms = [ Metric.from_string(m) for m in x['metrics']]
+        else:
+            ms = None
         if 'attrs' in x:
             attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        else:
+            attrs = None
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
@@ -94,45 +107,82 @@ class StorageConfig(Config):
         return json.dumps(self.to_json())
 
 @dataclass
+class ApplicationConfig(Config):
+    debug: bool = False,
+    log_level = logging.INFO,
+    logdir: str = None
+    logtype: str = "stream"
+    threads: int = 20,
+    progress: bool = False,
+
+    def to_json(self):
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
+        return d
+
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        n = cls(x['tdb_dir'],
+                x['debug'],
+                x['log_level'],
+                x['logdir'],
+                x['logtype'],
+                x['threads'],
+                x['progress'])
+        return n
+
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
+@dataclass
 class ShatterConfig(Config):
     filename: str
     tile_size: int
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
-    name: uuid.UUID = field(default=uuid.uuid1())
+    bounds: Bounds = field(default=None)
     # pipeline: str=field(default=None)
+    name: uuid.UUID = field(default=uuid.uuid4())
+    point_count: int = 0
 
     def __post_init__(self) -> None:
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
-        if not self.attrs:
+        if self.attrs is None:
             self.attrs = s.getAttributes()
-        if not self.metrics:
+        if self.metrics is None:
             self.metrics = s.getMetrics()
+        if self.bounds is None:
+            self.bounds = s.config.bounds
         self.point_count=0
+        self.app = ApplicationConfig(self.tdb_dir)
 
     def to_json(self):
-        d = copy.deepcopy(self.__dict__)
-        # d['tdb_dir'] = self.tdb_dir
-        # d['debug'] = self.debug
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
+
         d['name'] = str(self.name)
+        d['bounds'] = json.loads(self.bounds.to_json())
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        # d['filename'] = self.filename
-        # d['tile_size'] = self.tile_size
-        # d['point_count'] = self.point_count
-        # meta['pipeline'] = self.pipeline
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
 
-        if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
-        if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        ms = [ Metric.from_string(m) for m in x['metrics']]
+        attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        # TODO key error if these aren't there. If we're calling from_string
+        # then these keys need to exist.
 
         n = cls(tdb_dir=x['tdb_dir'], filename=x['filename'],
                 tile_size=x['tile_size'], attrs=attrs, metrics=ms,
@@ -149,19 +199,21 @@ class ExtractConfig(Config):
     out_dir: str
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
+    bounds: Bounds = field(default=None)
 
     def __post_init__(self) -> None:
         from .storage import Storage
         config = Storage.from_db(self.tdb_dir).config
-        if not self.attrs:
+        if self.attrs is None:
             self.attrs = config.attrs
-        if not self.metrics:
+        if self.metrics is None:
             self.metrics = config.metrics
+        if self.bounds is None:
+            self.bounds: Bounds = config.bounds
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)
 
-        self.bounds: Bounds = config.bounds
         self.resolution: float = config.resolution
         self.crs: pyproj.CRS = config.crs
 
