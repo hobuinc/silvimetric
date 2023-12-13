@@ -7,7 +7,7 @@ import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig
+from ..resources import Extents, Storage, Metric, ShatterConfig
 
 @dask.delayed
 @profile
@@ -129,6 +129,6 @@ def shatter(config: ShatterConfig, client: Client=None):
     print('Fetching and arranging data...')
     pc = run(leaves, config, storage)
     # depending on dask setup, this could be a numpy return or an int
-    config.point_count = pc.item() if isinstance(pc, np.int64) else pc
+    config.point_count = int(sum(pc))
     storage.saveMetadata('shatter', str(config))
     return config.point_count
