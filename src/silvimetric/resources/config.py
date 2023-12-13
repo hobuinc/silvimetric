@@ -1,8 +1,11 @@
 import pyproj
+import pdal
+
 import json
 import copy
 import uuid
-import pdal
+import logging
+
 from pathlib import Path
 from abc import ABC, abstractmethod
 
@@ -28,6 +31,9 @@ class Config(ABC):
 
     def __repr__(self):
         return json.dumps(self.to_json())
+
+
+
 
 @dataclass
 class StorageConfig(Config):
@@ -64,8 +70,11 @@ class StorageConfig(Config):
 
 
     def to_json(self):
-        # silliness because pyproj.CRS doesn't default to using to_json
-        d = copy.deepcopy(self.__dict__)
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
 
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
@@ -98,15 +107,48 @@ class StorageConfig(Config):
         return json.dumps(self.to_json())
 
 @dataclass
+class ApplicationConfig(Config):
+    debug: bool = False,
+    log_level = logging.INFO,
+    logdir: str = None
+    logtype: str = "stream"
+    threads: int = 20,
+    progress: bool = False,
+
+    def to_json(self):
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
+        return d
+
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        n = cls(x['tdb_dir'],
+                x['debug'],
+                x['log_level'],
+                x['logdir'],
+                x['logtype'],
+                x['threads'],
+                x['progress'])
+        return n
+
+    def __repr__(self):
+        return json.dumps(self.to_json())
+
+@dataclass
 class ShatterConfig(Config):
     filename: str
     tile_size: int
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     debug: bool = field(default=False)
-    name: uuid.UUID = field(default=uuid.uuid1())
     bounds: Bounds = field(default=None)
     # pipeline: str=field(default=None)
+    name: uuid.UUID = field(default=uuid.uuid4())
+    point_count: int = 0
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -120,7 +162,12 @@ class ShatterConfig(Config):
         self.point_count=0
 
     def to_json(self):
-        d = copy.deepcopy(self.__dict__)
+        # only return pure data, not instances
+        keys = self.__dataclass_fields__.keys()
+        d = {}
+        for k in keys:
+            d[k] = self.__dict__[k]
+
         d['name'] = str(self.name)
         d['bounds'] = json.loads(self.bounds.to_json())
         d['attrs'] = [a.to_json() for a in self.attrs]

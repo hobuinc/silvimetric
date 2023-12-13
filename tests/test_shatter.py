@@ -37,7 +37,7 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
             m = storage.get_history()
 
-        shatter_config.name = uuid.uuid1()
+        shatter_config.name = uuid.uuid4()
         shatter(shatter_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
