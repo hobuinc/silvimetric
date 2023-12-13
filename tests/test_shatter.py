@@ -88,6 +88,7 @@ class Test_Shatter(object):
         for b in e.split():
             sc = ShatterConfig(s.tdb_dir, s.filename, s.tile_size, s.attrs,
                                s.metrics, s.debug, bounds=b.bounds)
+            sc.app = s.app
             pc = pc + shatter(sc)
         history = storage.get_history()['shatter']
         assert isinstance(history, list)

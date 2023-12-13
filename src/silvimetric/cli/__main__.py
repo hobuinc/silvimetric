@@ -136,7 +136,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds):
         if watch:
             webbrowser.open(client.cluster.dashboard_link)
         config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
-            tile_size=tilesize, bounds=bounds)
+            tile_size=tilesize, bounds=bounds, app=app)
         config.app = app
         shatter(config, client)
 

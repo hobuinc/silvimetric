@@ -160,6 +160,7 @@ class ShatterConfig(Config):
         if self.bounds is None:
             self.bounds = s.config.bounds
         self.point_count=0
+        self.app = ApplicationConfig(self.tdb_dir)
 
     def to_json(self):
         # only return pure data, not instances
