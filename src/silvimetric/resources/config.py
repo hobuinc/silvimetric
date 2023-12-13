@@ -117,7 +117,7 @@ class ShatterConfig(Config):
             self.metrics = s.getMetrics()
         if self.bounds is None:
             self.bounds = s.config.bounds
-        self.point_count=0
+        self.point_count: int = 0
 
     def to_json(self):
         d = copy.deepcopy(self.__dict__)

@@ -3,7 +3,7 @@ import numpy as np
 import dask
 import json
 import uuid
-import copy
+
 
 from silvimetric import shatter
 from silvimetric import Storage, Extents, ShatterConfig
@@ -95,3 +95,6 @@ class Test_Shatter(object):
         pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
+
+    def test_remote_creation(self, s3_shatter_config):
+        shatter(s3_shatter_config)

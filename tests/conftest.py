@@ -41,6 +41,28 @@ def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
                                storage_config.attrs, storage_config.metrics,
                                debug=True)
 
+@pytest.fixture(scope="function")
+def s3_bucket():
+    yield "silvimetric"
+
+@pytest.fixture(scope='function')
+def s3_uri(s3_bucket):
+    yield f"s3://{s3_bucket}/test_copc_shatter"
+
+@pytest.fixture(scope="function")
+def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
+    yield StorageConfig(s3_uri, bounds, resolution, crs, attrs, metrics,
+                        svversion)
+
+@pytest.fixture(scope='function')
+def s3_storage(s3_storage_config, s3_bucket):
+    yield Storage.create(s3_storage_config)
+
+@pytest.fixture(scope="function")
+def s3_shatter_config(s3_storage, filepath, attrs, metrics):
+    config = s3_storage.config
+    yield ShatterConfig(config.tdb_dir, filepath, 200, attrs, metrics, True)
+
 @pytest.fixture(scope='session')
 def filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",

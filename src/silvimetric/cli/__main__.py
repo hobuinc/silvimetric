@@ -144,9 +144,6 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch):
 
 
 @cli.command('extract')
-# @click.option("--attributes", type=str, multiple=True,
-#               default=["Z","NumberOfReturns","ReturnNumber",
-#                        "HeightAboveGround","Intensity"])
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in output. Default to \
                 what's in TileDB.", default=[])

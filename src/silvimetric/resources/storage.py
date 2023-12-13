@@ -71,8 +71,7 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=10000, attrs=[count_att, *dim_atts, *metric_atts],
-            allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)

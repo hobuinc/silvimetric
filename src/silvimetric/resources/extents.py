@@ -112,6 +112,7 @@ class Extents(object):
     # set a bottom resolution of ~1km
     def filter(self, filename, threshold=1000):
         reader: pdal.Reader = pdal.Reader(filename)
+        reader._options['threads'] = 2
         reader._options['bounds'] = str(self)
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
