@@ -129,34 +129,32 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS, attribut
 @click.option("--threads", default=4, type=int)
 @click.option("--watch", default=False, type=bool)
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch):
+def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     with Client(n_workers=workers, threads_per_worker=threads) as client:
         if watch:
             webbrowser.open(client.cluster.dashboard_link)
         config = ShatterConfig(tdb_dir=app.tdb_dir, filename=pointcloud,
-            tile_size=tilesize)
+            tile_size=tilesize, bounds=bounds)
         config.app = app
         shatter(config, client)
 
 
 @cli.command('extract')
-# @click.option("--attributes", type=str, multiple=True,
-#               default=["Z","NumberOfReturns","ReturnNumber",
-#                        "HeightAboveGround","Intensity"])
 @click.option("--attributes", "-a", multiple=True,
               help="List of attributes to include in output. Default to \
                 what's in TileDB.", default=[])
 @click.option("--metrics", "-m", multiple=True,
               help="List of metrics to include in output. Default to \
                 what's in TileDB.", default=[])
+@click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--outdir", "-o", type=str, required=True)
 @click.pass_obj
-def extract_cmd(app, attributes, metrics, outdir):
+def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE """
 
-    config = ExtractConfig(app.tdb_dir, outdir, attributes, metrics)
+    config = ExtractConfig(app.tdb_dir, outdir, attributes, metrics, bounds=bounds)
     extract(config)
 
 
