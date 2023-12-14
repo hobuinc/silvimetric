@@ -37,7 +37,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    # tif.GetRasterBand(1).SetNoDataValue()
+    tif.GetRasterBand(1).SetNoDataValue(np.nan)
     tif.FlushCache()
     tif = None
 
@@ -65,6 +65,9 @@ def extract(config: ExtractConfig):
         data['Y'] = data['Y'] - miny
 
         for ma in ma_list:
-            #TODO scale x and y down
-            m_data = data[[ma]].to_numpy().reshape(y1,x1)
+            m_data = np.full(shape=(y1,x1), fill_value=np.nan, dtype=data[ma].dtype)
+            a = data[['X','Y',ma]].to_numpy()
+            for x,y,md in a[:]:
+                m_data[int(y)][int(x)] = md
+
             write_tif(x1, y1, m_data, ma, config)

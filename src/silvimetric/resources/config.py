@@ -211,9 +211,9 @@ class ExtractConfig(Config):
     def __post_init__(self) -> None:
         from .storage import Storage
         config = Storage.from_db(self.tdb_dir).config
-        if self.attrs is None:
+        if not len(self.attrs):
             self.attrs = config.attrs
-        if self.metrics is None:
+        if not len(self.metrics):
             self.metrics = config.metrics
         if self.bounds is None:
             self.bounds: Bounds = config.bounds

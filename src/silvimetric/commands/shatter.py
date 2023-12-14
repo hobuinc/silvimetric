@@ -111,10 +111,11 @@ def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
     from contextlib import nullcontext
     l = []
 
-    leaves = db.from_sequence(leaves)
-    l = db.map(one, leaves, config, storage)
-    vals = dask.compute(*l.persist())
-    return sum(vals)
+    with (performance_report() if client is not None else nullcontext()):
+        leaves = db.from_sequence(leaves)
+        l = db.map(one, leaves, config, storage)
+        vals = dask.compute(*l.persist())
+        return sum(vals)
 
 
 def shatter(config: ShatterConfig, client: Client=None):
