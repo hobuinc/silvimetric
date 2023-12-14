@@ -5,7 +5,7 @@ from osgeo import gdal
 from pyproj import CRS
 
 from silvimetric import shatter, extract
-from silvimetric import Metrics, Attribute, ExtractConfig, Extents, Storage
+from silvimetric import Metrics, Attribute, ExtractConfig, Extents, Storage, Log
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> str:
@@ -19,7 +19,15 @@ def extract_attrs(dims)->list[str]:
 @pytest.fixture(scope='function')
 def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
     shatter(shatter_config)
-    yield ExtractConfig(tdb_filepath, tif_filepath, extract_attrs, metrics)
+    log = Log(20)
+    c =  ExtractConfig(tdb_dir = tdb_filepath,
+                       log = log,
+                       out_dir = tif_filepath,
+                       attrs = extract_attrs,
+                       metrics = metrics)
+    yield c
+ 
+
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
@@ -61,9 +69,14 @@ class Test_Extract(object):
     def test_sub_bounds_extract(self, extract_config, storage):
         s = extract_config
         e = Extents.from_storage(storage)
+        log = Log(20)
 
         for b in e.split():
-            ec = ExtractConfig(s.tdb_dir, s.out_dir, s.attrs,
-                               s.metrics, b.bounds)
+            ec = ExtractConfig(tdb_dir = s.tdb_dir,
+                               log = log,
+                               out_dir = s.out_dir,
+                               attrs = s.attrs,
+                               metrics = s.metrics,
+                               bounds = b.bounds)
             extract(ec)
             tif_test(ec)

@@ -24,8 +24,15 @@ def tdb_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
-    yield StorageConfig(tdb_filepath, bounds, resolution, crs, attrs, metrics,
-                        svversion)
+    log = Log(20)
+    yield StorageConfig(tdb_dir = tdb_filepath, 
+                        log = log,
+                        crs = crs,
+                        bounds = bounds,
+                        resolution = resolution,
+                        attrs = attrs,
+                        metrics = metrics,
+                        version = svversion)
 
 @pytest.fixture(scope='function')
 def metrics():
@@ -37,18 +44,21 @@ def storage(storage_config) -> Storage:
 
 @pytest.fixture(scope='function')
 def app_config(tdb_filepath, debug=True):
-    app = ApplicationConfig(tdb_filepath)
-    app.log_level = 20 # INFO
-    app.debug = debug
-    app.log = Log(app)
+    log = Log(20) # INFO
+    app = ApplicationConfig(tdb_dir = tdb_filepath,
+                            log = log)
     yield app
 
 @pytest.fixture(scope='function')
 def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config, storage):
-    s = ShatterConfig(tdb_filepath, filepath, tile_size,
-                               storage_config.attrs, storage_config.metrics,
-                               debug=True)
-    s.app = app_config
+    log = Log(20) # INFO
+    s = ShatterConfig(tdb_dir = tdb_filepath,
+                      log = log,
+                      filename = filepath, 
+                      tile_size = tile_size,
+                      attrs = storage_config.attrs,
+                      metrics = storage_config.metrics,
+                      debug = True)
     yield s
 
 @pytest.fixture(scope='session')

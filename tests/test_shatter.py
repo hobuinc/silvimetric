@@ -6,7 +6,7 @@ import uuid
 import copy
 
 from silvimetric import shatter
-from silvimetric import Storage, Extents, ShatterConfig
+from silvimetric import Storage, Extents, ShatterConfig, Log
 
 
 @dask.delayed
@@ -86,9 +86,15 @@ class Test_Shatter(object):
         e = Extents.from_storage(storage, s.tile_size)
         pc = 0
         for b in e.split():
-            sc = ShatterConfig(s.tdb_dir, s.filename, s.tile_size, s.attrs,
-                               s.metrics, s.debug, bounds=b.bounds)
-            sc.app = s.app
+            log = Log(20)
+            sc = ShatterConfig(tdb_dir = s.tdb_dir,
+                               log = log,
+                               filename = s.filename,
+                               tile_size = s.tile_size,
+                               attrs = s.attrs,
+                               metrics = s.metrics,
+                               debug = s.debug,
+                               bounds = b.bounds)
             pc = pc + shatter(sc)
         history = storage.get_history()['shatter']
         assert isinstance(history, list)

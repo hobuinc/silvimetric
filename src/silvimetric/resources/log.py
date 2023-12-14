@@ -12,8 +12,6 @@ from typing import Any
 from typing import Dict
 from typing import TYPE_CHECKING
 
-from .config import ApplicationConfig
-
 try:
     import websocket
     from pythonjsonlogger import jsonlogger
@@ -56,7 +54,10 @@ else:
 
 
 class Log:
-    def __init__(self, config: ApplicationConfig):
+    def __init__(self,
+                 log_level: int,
+                 logdir: str = None,
+                 logtype: str = "stream"):
         """
         Creates logging formatting and structure
 
@@ -67,8 +68,13 @@ class Log:
         """
 
         self.logger = logging.getLogger("silvimetric")
-        self.logger.setLevel(config.log_level)
-        self.config = config
+        self.logger.setLevel(log_level)
+        self.log_level = log_level
+        self.logdir = logdir
+        if logdir:
+            self.logtype = 'file'
+        else:
+            self.logtype = logtype
         self.logfilename = "silvimetric-log.txt"
 
 
@@ -78,8 +84,8 @@ class Log:
         )
 
         # We only use a file handler if user specified a logdir
-        if config.logdir:
-            logpath = pathlib.Path(config.logdir)
+        if self.logdir:
+            logpath = pathlib.Path(self.logdir)
             
             # make the log directory if the user specified but 
             # it doesn't exist
@@ -89,7 +95,7 @@ class Log:
             self.logfilename = str(logpath / self.logfilename )
             file_handler = logging.FileHandler( self.logfilename )
 
-            file_handler.setLevel(config.log_level)
+            file_handler.setLevel(self.log_level)
             file_handler.setFormatter(log_format)
             self.logger.addHandler(file_handler)
 
@@ -97,11 +103,11 @@ class Log:
             self.relay = None
 
         # Supplemental Handler
-        if config.logtype == "rich":
+        if self.logtype == "rich":
             from rich.logging import RichHandler
 
             log_handler = RichHandler()
-        elif config.logtype == "websocket" and WebSocketHandler:
+        elif self.logtype == "websocket" and WebSocketHandler:
             formatter = CustomJsonFormatter()
             self.relay = websocket.WebSocket()
             url = f'ws://{config["WEBSOCKET_URL"]}/websocket'
@@ -113,16 +119,26 @@ class Log:
             log_handler.setFormatter(formatter)
         else:
             # if the user didn't specify a log dir, we just do the StreamHandler
-            if not config.logdir:
+            if not self.logdir:
                 log_handler = logging.StreamHandler()
                 log_handler.setFormatter(log_format)
                 self.logger.addHandler(log_handler)
+
+    def to_json(self):
+        return {'logdir': self.logdir,
+                'log_level': self.log_level,
+                'logtype': self.logtype ,
+                'logdir': self.logdir,
+                'logfilename': self.logfilename}
 
     def __del__(self) -> None:
         """Any special cleanups?"""
         if WebSocketHandler:
             if isinstance(self.logger, WebSocketHandler):
                 self.logger.close()
+
+    def __eq__(self, other):
+        return self.to_json() == other.to_json()
     
     def warning(self, msg: str):
         """Forward warning messages down to logger"""
@@ -139,7 +155,7 @@ class Log:
     def __repr__(self):
         """Print out where our logs are going"""
 
-        if self.config.logdir:
+        if self.logdir:
             logstring = f"{self.logfilename}"
         else:
             logstring = "stdout"
