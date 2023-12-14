@@ -160,12 +160,10 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dask
 
 
 @cli.command('extract')
-@click.option("--attributes", "-a", multiple=True,
-              help="List of attributes to include in output. Default to \
-                what's in TileDB.", default=[])
-@click.option("--metrics", "-m", multiple=True,
-              help="List of metrics to include in output. Default to \
-                what's in TileDB.", default=[])
+@click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
+              help="List of attributes to include in Database")
+@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
+              help="List of metrics to include in Database")
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--outdir", "-o", type=str, required=True)
 @click.pass_obj
