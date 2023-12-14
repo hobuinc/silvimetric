@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 
 from .log import Log
 from .extents import Bounds
-from .metric import Metric, Metrics, Attribute
+from .metric import Metric, Metrics
+from .entry import Attribute, Attributes
 from . import __version__
 
 
@@ -23,7 +24,7 @@ class SilviMetricJSONEncoder(JSONEncoder):
 @dataclass(kw_only=True)
 class Config(ABC):
     tdb_dir: str
-    log: Log
+    log: Log = field(default_factory = lambda: Log("INFO"))
     debug: bool = field(default=False)
 
     def to_json(self):
@@ -31,8 +32,8 @@ class Config(ABC):
         d = {}
         for k in keys:
             d[k] = self.__dict__[k]
-
-        d['log'] = d['log'].to_json()
+        if not isinstance(d['log'], dict):
+            d['log'] = d['log'].to_json()
         return d
 
     @classmethod
@@ -52,13 +53,9 @@ class StorageConfig(Config):
     crs: pyproj.CRS
     resolution: float = 30.0
 
-    def attr_make():
-        dims = { d['name']: d['dtype'] for d in pdal.dimensions }
-        return [ Attribute(a, dims[a])
-        for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ] ]
-
-    attrs: list[Attribute] = field(default_factory=attr_make)
-
+    attrs: list[Attribute] = field(default_factory=lambda: [
+        Attribute(a, Attributes[a])
+        for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])
     version: str = __version__
@@ -72,6 +69,11 @@ class StorageConfig(Config):
             self.crs = crs
         else:
             self.crs = pyproj.CRS.from_user_input(crs)
+        if not len(self.attrs):
+            self.attrs = [Attributes[a] for a in [ 'Z', 'NumberOfReturns',
+                                            'ReturnNumber', 'Intensity' ]]
+        if not len(self.metrics):
+            self.metrics = [ Metrics[m] for m in Metrics.keys() ]
 
         if not self.crs.is_projected:
             raise Exception(f"Given coordinate system is not a rectilinear projected coordinate system")
@@ -115,7 +117,7 @@ class StorageConfig(Config):
             crs = None
         n = cls(tdb_dir = x['tdb_dir'],
                 bounds = bounds,
-                log = None,
+                log = x['log'],
                 resolution = x['resolution'],
                 attrs = attrs,
                 crs = crs,
@@ -159,9 +161,9 @@ class ShatterConfig(Config):
     def __post_init__(self) -> None:
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
-        if self.attrs is None:
+        if not self.attrs:
             self.attrs = s.getAttributes()
-        if self.metrics is None:
+        if not self.metrics:
             self.metrics = s.getMetrics()
         if self.bounds is None:
             self.bounds = s.config.bounds

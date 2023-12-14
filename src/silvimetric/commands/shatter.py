@@ -5,7 +5,7 @@ from line_profiler import profile
 import dask
 import dask.array as da
 import dask.bag as db
-from dask.distributed import performance_report, Client
+from dask.distributed import performance_report, Client, wait
 
 from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
 
@@ -31,7 +31,7 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
 
     att_view = points[:][attrs]
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
-    return dask.compute(*l)
+    return dask.persist(*l)
 
 @dask.delayed
 @profile
@@ -71,9 +71,9 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     # doing dask compute inside the dict array because it was too fine-grained
     # when it was outside
     metric_data = {
-            f'{m.entry_name(attr)}': dask.compute(*[m(cell_data) for cell_data in data[attr]])
-            for attr in attrs for m in metrics
-        }
+        f'{m.entry_name(attr)}': dask.persist(*[m(cell_data) for cell_data in data[attr]])
+        for attr in attrs for m in metrics
+    }
     full_data = data | metric_data
     storage.write(dx,dy,full_data)
     pc = data['count'].sum()
@@ -104,18 +104,18 @@ def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
-    return dask.compute(m)[0]
+    return m
+    # return dask.compute(m)[0]
 
 def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
     from contextlib import nullcontext
     l = []
 
-    with (performance_report() if client is not None else nullcontext()):
-        leaves = db.from_sequence(leaves)
-        l = db.map(one, leaves, config, storage)
-        vals = l.compute()
-
+    leaves = db.from_sequence(leaves)
+    l = db.map(one, leaves, config, storage)
+    vals = dask.compute(*l.persist())
     return sum(vals)
+
 
 def shatter(config: ShatterConfig, client: Client=None):
 
@@ -129,7 +129,7 @@ def shatter(config: ShatterConfig, client: Client=None):
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
-    pc = run(leaves, config, storage)
+    pc = run(leaves, config, storage, client)
     config.point_count = int(pc)
 
     config.log.debug('Saving shatter metadata')

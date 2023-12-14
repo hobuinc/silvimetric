@@ -29,6 +29,7 @@ class Metric(Entry):
     def entry_name(self, attr: str) -> str:
         return f'm_{attr}_{self.name}'
 
+    @dask.delayed
     def do(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 

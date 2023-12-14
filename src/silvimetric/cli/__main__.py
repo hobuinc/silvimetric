@@ -1,5 +1,6 @@
 import click
 from dask.distributed import Client
+import dask
 import webbrowser
 import pyproj
 
@@ -8,6 +9,7 @@ import json
 import logging
 
 from silvimetric.resources import Storage, Bounds, Log
+from silvimetric.resources import Attributes, Metrics, Attribute, Metric
 from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from silvimetric.commands import shatter, extract
 
@@ -52,7 +54,7 @@ def info(app, history):
             shatter = {}
 
         info = {
-            'attributes': atts,
+            'attributes': [a.to_json() for a in atts],
             'metadata': meta.to_json(),
             'shatter': shatter
         }
@@ -89,24 +91,42 @@ class CRSParamType(click.ParamType):
         except Exception as e:
             self.fail(f"{value!r} is not a CRS type with error {e}", param, ctx)
 
+class AttrParamType(click.ParamType):
+    name="Attrs"
+    def convert(self, value, param, ctx) -> list[Attribute]:
+        try:
+            return [Attributes[a] for a in value]
+        except Exception as e:
+            self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
+
+class MetricParamType(click.ParamType):
+    name="Metrics"
+    def convert(self, value, param, ctx) -> list[Metric]:
+        try:
+            return [Metrics[m] for m in value]
+        except Exception as e:
+            self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
+
 @cli.command('initialize')
 @click.argument("bounds", type=BoundsParamType())
 @click.argument("crs", type=CRSParamType())
-@click.option("--attributes", "-a", multiple=True,
+@click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
               help="List of attributes to include in Database")
+@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
+              help="List of metrics to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
 @click.pass_obj
-def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS, attributes: list[str], resolution: float):
+def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
+               attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     """Initialize silvimetrics DATABASE
     """
-
     from silvimetric.cli.initialize import initialize as initializeFunction
-    breakpoint()
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
                                   log = app.log,
                                   bounds = bounds,
                                   crs = crs,
                                   attrs = attributes,
+                                  metrics = metrics,
                                   resolution = resolution)
     storage = initializeFunction(storageconfig)
 
@@ -116,21 +136,27 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS, attribut
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
-@click.option("--watch", default=False, type=bool)
+@click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--dasktype", default='cluster',
+              type=click.Choice(['cluster', 'threads', 'processes',
+                                 'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds):
+def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dasktype):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+    config = ShatterConfig(tdb_dir = app.tdb_dir,
+                            log = app.log,
+                            filename = pointcloud,
+                            tile_size = tilesize,
+                            bounds = bounds)
 
-    with Client(n_workers=workers, threads_per_worker=threads) as client:
-        if watch:
-            webbrowser.open(client.cluster.dashboard_link)
-        config = ShatterConfig(tdb_dir = app.tdb_dir,
-                               log = app.log,
-                               filename = pointcloud,
-                               tile_size = tilesize,
-                               bounds = bounds)
-        breakpoint()
-        shatter(config, client)
+    if dasktype == 'cluster':
+        with Client(n_workers=workers, threads_per_worker=threads) as client:
+            if watch:
+                webbrowser.open(client.cluster.dashboard_link)
+            shatter(config, client)
+    else:
+        dask.config.set(scheduler=dasktype)
+        shatter(config)
 
 
 @cli.command('extract')
