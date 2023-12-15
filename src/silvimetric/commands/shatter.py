@@ -2,6 +2,8 @@ import pdal
 import numpy as np
 from line_profiler import profile
 
+import pathlib
+
 import dask
 import dask.array as da
 import dask.bag as db
@@ -80,7 +82,59 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     return pc
 
 
+def is_pipeline(filename):
+    p = pathlib.Path(filename)
+    if p.suffix == '.json':
+        return True
+    return False
+
+
+def read_pipeline(filename, chunk):
+    j = filename.read_bytes().decode('utf-8')
+    stages = pdal.pipeline._parse_stages(j)
+
+    allowed_readers = ['copc', 'ept']
+    readers = []
+    stages = []
+
+    for stage in pipeline.stages:
+
+        stage_type, stage_kind = stage.type.split('.')
+        if stage_type == 'readers':
+            if not stage_kind in allowed_readers:
+                raise Exception(f"Readers for SilviMetric must be of type 'copc' or 'ept', not '{stage_kind}'")
+            readers.append(stage)
+
+        # we only answer to copc or ept readers
+        if stage_kind in allowed_readers:
+            stage._options['bounds'] = str(chunk)
+
+        # we don't support weird pipelines of shapes
+        # that aren't simply a line
+        if stage_type != 'writers':
+            stages.append(stage)
+
+    if len(readers) != 1:
+        raise Exception(f"Pipelines can only have one reader of type {allowed_readers}")
+
+    # Add xi and yi
+    assign_x = pdal.Filter.assign(value=f"xi = (X - {chunk.root.minx}) / {chunk.resolution}")
+    assign_y = pdal.Filter.assign(value=f"yi = ({chunk.root.maxy} - Y) / {chunk.resolution}")
+    stages.append(assign_x)
+    stagees.append(assign_y)
+
+    # return our pipeline
+    return pdal.Pipeline(stages)
+
+
 def create_pipeline(filename, chunk):
+    if is_pipeline(filename):
+        pipeline = read_pipeline(filename, chunk)
+    else:
+        pipeline = make_pipeline(filename, chunk);
+    return pipeline
+
+def make_pipeline(filename, chunk):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
     reader._options['bounds'] = str(chunk)
