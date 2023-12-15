@@ -8,6 +8,7 @@ from shapely import from_wkt
 
 from .bounds import Bounds
 from .storage import Storage
+from .data import Data
 
 class Extents(object):
 
@@ -67,7 +68,8 @@ class Extents(object):
                        self.srs.to_wkt(), root=r)
         self.root_chunk: Extents = chunk
 
-        filtered = chunk.filter(filename, threshold)
+        data = Data(filename, self.bounds, self.resolution)
+        filtered = chunk.filter(data, threshold)
 
         def flatten(il):
             ol = []
@@ -110,12 +112,9 @@ class Extents(object):
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
-    def filter(self, filename, threshold=1000):
-        reader: pdal.Reader = pdal.Reader(filename)
-        reader._options['bounds'] = str(self)
-        pipeline = reader.pipeline()
-        qi = pipeline.quickinfo[reader.type]
-        pc = qi['num_points']
+    def filter(self, data, threshold=1000):
+        pc = data.count(self.bounds)
+        # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
         # is it empty?
@@ -129,7 +128,7 @@ class Extents(object):
                 yield self
             else:
                 children = self.split()
-                yield from [c.filter(filename,threshold) for c in children]
+                yield from [c.filter(data,threshold) for c in children]
 
     def find_dims(self):
         gs = self.tile_size

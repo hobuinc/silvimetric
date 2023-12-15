@@ -7,7 +7,6 @@ from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
 from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
-from silvimetric.commands.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
@@ -84,10 +83,6 @@ def attrs(dims) -> list[str]:
 @pytest.fixture(scope="session")
 def dims():
     yield { d['name']: d['dtype'] for d in pdal.dimensions }
-
-@pytest.fixture(scope='class')
-def pipeline(filepath) -> pdal.Pipeline:
-    yield create_pipeline(filepath)
 
 @pytest.fixture(scope='class')
 def resolution() -> int:

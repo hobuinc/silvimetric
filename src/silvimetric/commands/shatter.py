@@ -9,18 +9,14 @@ import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client, wait
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, Data
 
 @dask.delayed
 @profile
-def get_data(filename, chunk):
-    pipeline = create_pipeline(filename, chunk)
-    try:
-        pipeline.execute()
-    except Exception as e:
-        print(pipeline.pipeline, e)
-
-    return pipeline.arrays[0]
+def get_data(filename, resolution, chunk):
+    data = Data(filename, chunk, resolution)
+    data.execute()
+    return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -82,79 +78,10 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     return pc
 
 
-def is_pipeline(filename):
-    p = pathlib.Path(filename)
-    if p.suffix == '.json':
-        return True
-    return False
-
-
-def read_pipeline(filename, chunk):
-    j = filename.read_bytes().decode('utf-8')
-    stages = pdal.pipeline._parse_stages(j)
-
-    allowed_readers = ['copc', 'ept']
-    readers = []
-    stages = []
-
-    for stage in pipeline.stages:
-
-        stage_type, stage_kind = stage.type.split('.')
-        if stage_type == 'readers':
-            if not stage_kind in allowed_readers:
-                raise Exception(f"Readers for SilviMetric must be of type 'copc' or 'ept', not '{stage_kind}'")
-            readers.append(stage)
-
-        # we only answer to copc or ept readers
-        if stage_kind in allowed_readers:
-            stage._options['bounds'] = str(chunk)
-
-        # we don't support weird pipelines of shapes
-        # that aren't simply a line
-        if stage_type != 'writers':
-            stages.append(stage)
-
-    if len(readers) != 1:
-        raise Exception(f"Pipelines can only have one reader of type {allowed_readers}")
-
-    # Add xi and yi
-    assign_x = pdal.Filter.assign(value=f"xi = (X - {chunk.root.minx}) / {chunk.resolution}")
-    assign_y = pdal.Filter.assign(value=f"yi = ({chunk.root.maxy} - Y) / {chunk.resolution}")
-    stages.append(assign_x)
-    stagees.append(assign_y)
-
-    # return our pipeline
-    return pdal.Pipeline(stages)
-
-
-def create_pipeline(filename, chunk):
-    if is_pipeline(filename):
-        pipeline = read_pipeline(filename, chunk)
-    else:
-        pipeline = make_pipeline(filename, chunk);
-    return pipeline
-
-def make_pipeline(filename, chunk):
-    reader = pdal.Reader(filename, tag='reader')
-    reader._options['threads'] = 2
-    reader._options['bounds'] = str(chunk)
-    class_zero = pdal.Filter.assign(value="Classification = 0")
-    rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
-    nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-    assign_x = pdal.Filter.assign(
-        value=f"xi = (X - {chunk.root.minx}) / {chunk.resolution}")
-    assign_y = pdal.Filter.assign(
-        value=f"yi = ({chunk.root.maxy} - Y) / {chunk.resolution}")
-    # smrf = pdal.Filter.smrf()
-    # hag = pdal.Filter.hag_nn()
-    # return reader | crop | class_zero | rn | nor #| smrf | hag
-    return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
-
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points = get_data(config.filename, leaf)
+    points = get_data(config.filename, storage.config.resolution, leaf)
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
