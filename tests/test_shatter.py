@@ -7,7 +7,7 @@ import uuid
 
 
 from silvimetric import shatter
-from silvimetric import Storage, Extents, ShatterConfig
+from silvimetric import Storage, Extents, ShatterConfig, Log
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
@@ -37,7 +37,7 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
             m = storage.get_history()
 
-        shatter_config.name = uuid.uuid1()
+        shatter_config.name = uuid.uuid4()
         shatter(shatter_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
@@ -86,8 +86,15 @@ class Test_Shatter(object):
         e = Extents.from_storage(storage, s.tile_size)
         pc = 0
         for b in e.split():
-            sc = ShatterConfig(s.tdb_dir, s.filename, s.tile_size, s.attrs,
-                               s.metrics, s.debug, bounds=b.bounds)
+            log = Log(20)
+            sc = ShatterConfig(tdb_dir = s.tdb_dir,
+                               log = log,
+                               filename = s.filename,
+                               tile_size = s.tile_size,
+                               attrs = s.attrs,
+                               metrics = s.metrics,
+                               debug = s.debug,
+                               bounds = b.bounds)
             pc = pc + shatter(sc)
         history = storage.get_history()['shatter']
         assert isinstance(history, list)
@@ -100,3 +107,4 @@ class Test_Shatter(object):
         os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
         os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
         shatter(s3_shatter_config)
+

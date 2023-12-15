@@ -4,8 +4,8 @@ import dask
 import pdal
 import json
 
-from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
-from silvimetric import ShatterConfig, StorageConfig
+from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
+from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
 from silvimetric.commands.shatter import create_pipeline
@@ -25,8 +25,15 @@ def tdb_filepath(tmp_path_factory) -> str:
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
-    yield StorageConfig(tdb_filepath, bounds, resolution, crs, attrs, metrics,
-                        svversion)
+    log = Log(20)
+    yield StorageConfig(tdb_dir = tdb_filepath,
+                        log = log,
+                        crs = crs,
+                        bounds = bounds,
+                        resolution = resolution,
+                        attrs = attrs,
+                        metrics = metrics,
+                        version = svversion)
 
 @pytest.fixture(scope='function')
 def metrics():
@@ -37,10 +44,23 @@ def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size, storage_config, storage):
-    yield ShatterConfig(tdb_filepath, filepath, tile_size,
-                               storage_config.attrs, storage_config.metrics,
-                               debug=True)
+def app_config(tdb_filepath, debug=True):
+    log = Log(20) # INFO
+    app = ApplicationConfig(tdb_dir = tdb_filepath,
+                            log = log)
+    yield app
+
+@pytest.fixture(scope='function')
+def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config, storage):
+    log = Log(20) # INFO
+    s = ShatterConfig(tdb_dir = tdb_filepath,
+                      log = log,
+                      filename = filepath,
+                      tile_size = tile_size,
+                      attrs = storage_config.attrs,
+                      metrics = storage_config.metrics,
+                      debug = True)
+    yield s
 
 @pytest.fixture(scope="function")
 def secrets():
@@ -61,19 +81,21 @@ def s3_uri(s3_bucket):
 
 @pytest.fixture(scope="function")
 def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
-    yield StorageConfig(s3_uri, bounds, resolution, crs, attrs, metrics,
-                        svversion)
+    yield StorageConfig(bounds, crs, resolution, attrs, metrics,
+                        svversion, tdb_dir=s3_uri)
 
 @pytest.fixture(scope='function')
 def s3_storage(s3_storage_config, s3_bucket, secrets):
+    import subprocess
     os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
     os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
     yield Storage.create(s3_storage_config)
+    subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
 
 @pytest.fixture(scope="function")
 def s3_shatter_config(s3_storage, filepath, attrs, metrics):
     config = s3_storage.config
-    yield ShatterConfig(config.tdb_dir, filepath, 200, attrs, metrics, True)
+    yield ShatterConfig(filepath, 30, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
 
 @pytest.fixture(scope='session')
 def filepath() -> str:

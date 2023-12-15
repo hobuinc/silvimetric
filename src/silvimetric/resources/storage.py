@@ -16,7 +16,7 @@ class Storage:
         # else:
         #     self.ctx = ctx
 
-        if not pathlib.Path(config.tdb_dir).exists():
+        if not tiledb.object_type(config.tdb_dir) == "array":
             raise Exception(f"Given database directory '{config.tdb_dir}' does not exist")
 
         self.config = config
@@ -285,4 +285,13 @@ class Storage:
 
         with self.open('w') as tdb:
             # data = {k: v.astype(np.dtype(v.dtype)) for k,v in data.items()}
+
+            # if self.config.app.debug:
+            #     tiledb.stats_reset()
+            #     tiledb.stats_enable()
+
             tdb[xs, ys] = data
+
+            # if self.config.app.debug:
+            #     tiledb.stats_dump()
+            #     tiledb.stats_reset()

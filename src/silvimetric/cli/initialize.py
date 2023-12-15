@@ -1,22 +1,18 @@
-import logging
 import pathlib
 
-from silvimetric.app import Application
-from silvimetric.resources.storage import Storage, StorageConfig
-from silvimetric.initialize import InitCommand
+from silvimetric.resources import Storage, StorageConfig, ApplicationConfig
 
-logger = logging.getLogger(__name__)
-
-def initialize(config: StorageConfig):
+def initialize(storage: StorageConfig):
     """
-    Initialize a Silvimetric TileDB instance for a given Application instance
+    Initialize a Silvimetric TileDB instance for a given StorageConfig instance
 
     Parameters
     ----------
-    StorageConfig : Storage StorageConfig
+    StorageConfig :  StorageConfig
 
     """
 
-    logger.debug(f"Initializing application with {config} settings")
+    storage.log.debug(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
 
-    return Storage.create(config)
+    s = Storage.create(storage)
+    return s

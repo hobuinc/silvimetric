@@ -73,3 +73,4 @@ class Attribute(Entry):
 
 # A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html
 Pdal_Attributes = { d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions }
+Attributes = Pdal_Attributes
