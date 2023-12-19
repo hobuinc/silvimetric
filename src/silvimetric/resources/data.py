@@ -1,5 +1,6 @@
 
 from . import Bounds 
+from .config import StorageConfig
 
 import pdal
 
@@ -7,10 +8,10 @@ import pathlib
 
 class Data:
 
-    def __init__(self, filename: str, bounds: Bounds, resolution: float):
+    def __init__(self, filename: str, bounds: Bounds, storageconfig: StorageConfig):
         self.filename = filename
         self.bounds = bounds
-        self.resolution = resolution
+        self.storageconfig = storageconfig
         self.reader = self.get_reader()
         self.root = self.get_root()
         self.pipeline = self.get_pipeline()
@@ -48,11 +49,12 @@ class Data:
         nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
 
+        resolution = self.storageconfig.resolution
         self.root = self.get_root()
         assign_x = pdal.Filter.assign(
-            value=f"xi = (X - {self.root.minx}) / {self.resolution}")
+            value=f"xi = (X - {self.root.minx}) / {resolution}")
         assign_y = pdal.Filter.assign(
-            value=f"yi = ({self.root.maxy} - Y) / {self.resolution}")
+            value=f"yi = ({self.root.maxy} - Y) / {resolution}")
 
         return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
 
@@ -89,10 +91,11 @@ class Data:
         if len(readers) != 1:
             raise Exception(f"Pipelines can only have one reader of type {allowed_readers}")
 
+        resolution = self.storageconfig.resolution
         # Add xi and yi
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-        assign_x = pdal.Filter.assign(value=f"xi = (X - {self.root.minx}) / {self.resolution}")
-        assign_y = pdal.Filter.assign(value=f"yi = ({self.root.maxy} - Y) / {self.resolution}")
+        assign_x = pdal.Filter.assign(value=f"xi = (X - {self.root.minx}) / {resolution}")
+        assign_y = pdal.Filter.assign(value=f"yi = ({self.root.maxy} - Y) / {resolution}")
         stages.append(ferry)
         stages.append(assign_x)
         stages.append(assign_y)
