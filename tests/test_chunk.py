@@ -3,7 +3,7 @@ import dask
 import pdal
 import pytest
 
-from silvimetric import Extents
+from silvimetric.resources import Extents
 from silvimetric.commands.shatter import run
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):

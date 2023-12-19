@@ -6,5 +6,6 @@ from .storage import Storage
 from .metric import Metric, Metrics
 from .log import Log
 from .data import Data
+from .tile import Tile
 from .entry import Attribute, Pdal_Attributes, Attributes
 from .config import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig

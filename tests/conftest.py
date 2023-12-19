@@ -3,8 +3,8 @@ import os
 import dask
 import pdal
 
-from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
-from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
+from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log
+from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
 
