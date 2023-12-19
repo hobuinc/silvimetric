@@ -1,9 +1,9 @@
-import pdal
 import tiledb
 from tiledb import object_type
 import numpy as np
 from math import floor
 import pathlib
+import contextlib
 
 from .config import StorageConfig
 from .metric import Metrics, Metric, Attribute
@@ -109,7 +109,6 @@ class Storage:
         Save StorageConfig to the Database
 
         """
-        # reopen in write mode if current mode is read
         with self.open('w') as a:
             a.meta['config'] = str(self.config)
 
@@ -122,11 +121,10 @@ class Storage:
         StorageConfig
             StorageConfig object
         """
-        # reopen in read mode if current mode is write
         with self.open('r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
-            return config
+        return config
 
     def getMetadata(self, key: str, default=None) -> str:
         """
@@ -145,11 +143,11 @@ class Storage:
         with self.open('r') as r:
             try:
                 val = r.meta[key]
-                return val
             except KeyError as e:
                 if default is not None:
                     return default
                 raise(e)
+        return val
 
     def saveMetadata(self, key: str, data: any) -> None:
         """
@@ -206,14 +204,21 @@ class Storage:
         Exception
             Path does not exist
         """
+        cfg = tiledb.Config()
+        cfg["vfs.s3.logging_level"] = "DEBUG"
+        cfg["vfs.file.max_parallel_ops"] = 1
+        cfg["vfs.s3.scheme"] = "https"
+        cfg["vfs.s3.region"] = "us-east-1"
+        cfg["vfs.s3.endpoint_override"] = ""
+        cfg["vfs.s3.use_virtual_addressing"] = "true"
 
-        if tiledb.object_type(self.config.tdb_dir) == "array":
+        ctx = tiledb.Ctx(config=cfg)
+
+        if tiledb.object_type(self.config.tdb_dir, ctx=ctx) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w',
-                                                      timestamp=timestamp, ctx=ctx)
+                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp, ctx=ctx)
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'r',
-                                                      timestamp=timestamp, ctx=ctx)
+                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp, ctx=ctx)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():

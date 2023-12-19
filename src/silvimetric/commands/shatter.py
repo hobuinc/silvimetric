@@ -58,11 +58,11 @@ def arrange(data, chunk, attrs):
 def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
                 sc: StorageConfig):
 
-    if 's3://' in sc.tdb_dir:
-        # this works around problems with tiledb and dask distributed
-        import boto3
-        s3 = boto3.resource('s3')
-        bucket = s3.Bucket(sc.tdb_dir)
+    # if 's3://' in sc.tdb_dir:
+    #     # this works around problems with tiledb and dask distributed
+    #     import boto3
+    #     s3 = boto3.resource('s3')
+    #     bucket = s3.Bucket(sc.tdb_dir)
 
     storage = Storage.from_db(sc.tdb_dir)
     ## data comes in as [dx, dy, { 'att': [data] }]
