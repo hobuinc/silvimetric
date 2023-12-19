@@ -103,8 +103,21 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
-    def test_remote_creation(self, s3_shatter_config, secrets):
+    @pytest.mark.skip(reason="Haven't added secrets to gha yet")
+    def test_remote_creation(self, s3_shatter_config, secrets, s3_storage):
         os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
         os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
-        shatter(s3_shatter_config)
+        dask.config.set(scheduler="threads")
+        resolution = s3_storage.config.resolution
+        maxy = s3_storage.config.bounds.maxy
 
+        shatter(s3_shatter_config)
+        with s3_storage.open('r') as a:
+            y = a[:,0]['Z'].shape[0]
+            x = a[0,:]['Z'].shape[0]
+            assert y == 10
+            assert x == 10
+            for xi in range(x):
+                for yi in range(y):
+                    a[xi, yi]['Z'].size == 1
+                    assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))

@@ -5,11 +5,10 @@ from line_profiler import profile
 import dask
 import dask.array as da
 import dask.bag as db
-from dask.distributed import performance_report, Client, wait
+from dask.distributed import performance_report, Client
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig, StorageConfig
 
-@dask.delayed
 @profile
 def get_data(filename, chunk):
     pipeline = create_pipeline(filename, chunk)
@@ -23,7 +22,6 @@ def get_data(filename, chunk):
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-@dask.delayed
 @profile
 def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     xis = da.floor(points[['xi']]['xi'])
@@ -33,9 +31,8 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.persist(*l)
 
-@dask.delayed
 @profile
-def arrange(chunk, data, attrs):
+def arrange(data, chunk, attrs):
     dd = {}
     for att in attrs:
         try:
@@ -57,10 +54,17 @@ def arrange(chunk, data, attrs):
     return [dx, dy, dd]
 
 
-@dask.delayed
 @profile
 def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
-                storage: Storage):
+                sc: StorageConfig):
+
+    if 's3://' in sc.tdb_dir:
+        # this works around problems with tiledb and dask distributed
+        import boto3
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket(sc.tdb_dir)
+
+    storage = Storage.from_db(sc.tdb_dir)
     ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
 
@@ -75,12 +79,13 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
         for attr in attrs for m in metrics
     }
     full_data = data | metric_data
+
     storage.write(dx,dy,full_data)
     pc = data['count'].sum()
     return pc
 
 
-def create_pipeline(filename, chunk):
+def create_pipeline(chunk, filename):
     reader = pdal.Reader(filename, tag='reader')
     reader._options['threads'] = 2
     reader._options['bounds'] = str(chunk)
@@ -100,22 +105,27 @@ def create_pipeline(filename, chunk):
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points = get_data(config.filename, leaf)
+    points = get_data(leaf, config.filename)
     att_data = get_atts(points, leaf, attrs)
-    arranged = arrange(leaf, att_data, attrs)
-    m = get_metrics(arranged, attrs, config.metrics, storage)
-    return m
+    arranged = arrange(att_data, leaf, attrs)
+    return get_metrics(arranged, attrs, config.metrics, storage)
     # return dask.compute(m)[0]
 
 def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
     from contextlib import nullcontext
     l = []
+    attrs = [a.name for a in config.attrs]
 
-    with (performance_report() if client is not None else nullcontext()):
-        leaves = db.from_sequence(leaves)
-        l = db.map(one, leaves, config, storage)
-        vals = dask.compute(*l.persist())
-        return sum(vals)
+    # with (performance_report() if client is not None else nullcontext()):
+    leaves = db.from_sequence(leaves)
+    points: db.Bag = leaves.map(get_data, config.filename).persist()
+    att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
+    arranged: db.Bag = att_data.map(arrange, leaves, attrs).persist()
+    metrics: db.Bag = arranged.map(get_metrics, attrs, config.metrics, storage.config)
+
+    vals = metrics.persist()
+
+    return sum(vals)
 
 
 def shatter(config: ShatterConfig, client: Client=None):

@@ -54,7 +54,7 @@ class StorageConfig(Config):
     resolution: float = 30.0
 
     attrs: list[Attribute] = field(default_factory=lambda: [
-        Attribute(a, Attributes[a])
+        Attribute(a, Attributes[a].dtype)
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])

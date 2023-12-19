@@ -37,7 +37,7 @@ class Entry(ABC):
 class Attribute(Entry):
 
     def __init__(self, name: str, dtype: np.dtype, deps: list[Self]=None):
-        super().__init__()
+        # super().__init__()
         self.name = name
         self.dtype = dtype
         self.dependencies = deps

@@ -95,7 +95,7 @@ def s3_storage(s3_storage_config, s3_bucket, secrets):
 @pytest.fixture(scope="function")
 def s3_shatter_config(s3_storage, filepath, attrs, metrics):
     config = s3_storage.config
-    yield ShatterConfig(filepath, 30, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
+    yield ShatterConfig(filepath, 2, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
 
 @pytest.fixture(scope='session')
 def filepath() -> str:

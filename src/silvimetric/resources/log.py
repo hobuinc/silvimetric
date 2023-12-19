@@ -64,7 +64,7 @@ class Log:
         Parameters
         ----------
         config:
-            Application config representing the runtime config 
+            Application config representing the runtime config
         """
 
         self.logger = logging.getLogger("silvimetric")
@@ -86,8 +86,8 @@ class Log:
         # We only use a file handler if user specified a logdir
         if self.logdir:
             logpath = pathlib.Path(self.logdir)
-            
-            # make the log directory if the user specified but 
+
+            # make the log directory if the user specified but
             # it doesn't exist
             if not logpath.exists():
                 logpath.mkdir()
@@ -139,7 +139,7 @@ class Log:
 
     def __eq__(self, other):
         return self.to_json() == other.to_json()
-    
+
     def warning(self, msg: str):
         """Forward warning messages down to logger"""
         self.logger.warning(msg)
