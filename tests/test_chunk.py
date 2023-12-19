@@ -81,8 +81,8 @@ def check_indexing(extents, leaf_list):
 
 class TestExtents(object):
     @pytest.fixture(scope='class', autouse=True)
-    def filtered(self, filepath, extents: Extents):
-        return list(extents.chunk(filepath, 100))
+    def filtered(self, copc_filepath, extents: Extents):
+        return list(extents.chunk(copc_filepath, 100))
 
     @pytest.fixture(scope='class')
     def unfiltered(self, filtered, extents):

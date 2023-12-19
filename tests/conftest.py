@@ -61,9 +61,16 @@ def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config
     yield s
 
 @pytest.fixture(scope='session')
-def filepath() -> str:
+def copc_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
             "test_data_2.copc.laz")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='session')
+def pipeline_filepath() -> str:
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "test_data_2.json")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 

@@ -6,17 +6,22 @@ import pdal
 
 import pathlib
 
+
 class Data:
 
     def __init__(self, filename: str, bounds: Bounds, storageconfig: StorageConfig):
         self.filename = filename
         self.bounds = bounds
+
+        self.reader_thread_count = 2
+
         self.storageconfig = storageconfig
         self.reader = self.get_reader()
         self.root = self.get_root()
         self.pipeline = self.get_pipeline()
         self.reader = self.get_reader()
         self.root = self.get_root()
+
     
     def is_pipeline(self):
         p = pathlib.Path(self.filename)
@@ -27,7 +32,7 @@ class Data:
 
     def get_root(self):
         reader = self.get_reader()
-        reader._options['threads'] = 2
+        reader._options['threads'] = self.reader_thread_count
 
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
@@ -42,7 +47,7 @@ class Data:
 
     def make_pipeline(self):
         reader = pdal.Reader(self.filename, tag='reader')
-        reader._options['threads'] = 2
+        reader._options['threads'] = self.reader_thread_count
         reader._options['bounds'] = str(self.bounds)
         class_zero = pdal.Filter.assign(value="Classification = 0")
         rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
@@ -57,6 +62,7 @@ class Data:
             value=f"yi = ({self.root.maxy} - Y) / {resolution}")
 
         return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
+
 
     def get_pipeline(self):
         if self.is_pipeline():
@@ -126,7 +132,7 @@ class Data:
                     return stage
         else:
             reader = pdal.Reader(self.filename)
-            reader._options['threads'] = 2
+            reader._options['threads'] = self.reader_thread_count
             return reader
 
 
@@ -139,4 +145,4 @@ class Data:
         pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
-        yield pc
+        return pc
