@@ -206,21 +206,8 @@ class Storage:
         Exception
             Path does not exist
         """
-        config = tiledb.Config()
-        config['vfs.s3.skip_init'] = "true"
-        config['vfs.s3.aws_access_key_id'] = 'AKIASL7ROIQGMMRS4XMG'
-        config['vfs.s3.aws_secret_access_key'] = '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'
-        config['vfs.s3.region'] = 'us-east-1'
-        config['vfs.s3.scheme'] = 'https'
-        config['vfs.s3.use_virtual_addressing'] = 'false'
-        config['vfs.s3.endpoint_override'] = ''
-        ctx = tiledb.Ctx(config)
-        try:
-            tiledb.object_type(self.config.tdb_dir, ctx=ctx) == "array"
-        except Exception as e:
-            print(e)
 
-        if True:
+        if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode == 'w':
                 tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w',
                                                       timestamp=timestamp, ctx=ctx)
