@@ -68,6 +68,13 @@ def copc_filepath() -> str:
     yield os.path.abspath(path)
 
 @pytest.fixture(scope='session')
+def autzen_filepath() -> str:
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "autzen-small.copc.laz")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='session')
 def pipeline_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
             "test_data_2.json")
