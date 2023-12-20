@@ -163,7 +163,8 @@ class Data:
     def estimate_count(self, bounds: Bounds) -> int:
         """For the provided bounds, estimate the maximum number of points that could be inside them for this instance."""
         reader = self.get_reader()
-        reader._options['bounds'] = str(bounds)
+        if bounds:
+            reader._options['bounds'] = str(bounds)
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
         pc = qi['num_points']
@@ -173,7 +174,8 @@ class Data:
     def count(self, bounds: Bounds) -> int:
         """For the provided bounds, read and count the number of points that are inside them for this instance."""
         reader = self.get_reader()
-        reader._options['bounds'] = str(bounds)
+        if bounds:
+            reader._options['bounds'] = str(bounds)
         pipeline = reader.pipeline()
         pipeline.execute()
         return len(pipeline.arrays[0])
