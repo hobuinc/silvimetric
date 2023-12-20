@@ -16,6 +16,10 @@ class Bounds(dict): #for JSON serializing
     def __ne__(self, other):
         return not other.__eq__(self)
 
+    def __bool__(self):
+        return True
+
+
     @staticmethod
     def from_string(bbox_str: str):
         """
