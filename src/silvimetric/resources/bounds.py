@@ -61,13 +61,27 @@ class Bounds(dict): #for JSON serializing
         else:
             raise Exception("Bounding boxes must have either 4 or 6 elements")
 
+
     def get(self) -> list[float]:
         return [self.minx, self.miny, self.maxx, self.maxy]
 
+
     def __repr__(self) -> str:
         return str(self.get())
+
 
     def to_string(self) -> str:
         return self.__repr__()
     def to_json(self) -> str:
         return json.dumps(self.get())
+
+
+    def bisect(self):
+        centerx = self.minx + ((self.maxx - self.minx)/ 2)
+        centery = self.miny + ((self.maxy - self.miny)/ 2)
+        yield from [
+            Bounds(self.minx, self.miny, centerx, centery), # lower left
+            Bounds(centerx, self.miny, self.maxx, centery), # lower right
+            Bounds(self.minx, centery, centerx, self.maxy), # top left
+            Bounds(centerx, centery, self.maxx, self.maxy), # top right
+        ]
