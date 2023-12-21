@@ -3,7 +3,7 @@ import os
 import dask
 import pdal
 
-from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log
+from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
 from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
@@ -67,6 +67,11 @@ def copc_filepath() -> str:
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
+@pytest.fixture(scope='function')
+def copc_data(copc_filepath, storage_config) -> Data:
+    d = Data(copc_filepath, storage_config)
+    yield d
+
 @pytest.fixture(scope='session')
 def autzen_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
@@ -83,11 +88,12 @@ def pipeline_filepath() -> str:
 
 @pytest.fixture(scope='class')
 def bounds(minx, maxx, miny, maxy) -> Bounds:
-    yield Bounds(minx, miny, maxx, maxy)
+    b =  Bounds(minx, miny, maxx, maxy)
+    yield b
 
 @pytest.fixture(scope='class')
-def extents(resolution, tile_size, bounds, crs) -> Extents:
-    yield Extents(bounds,resolution,tile_size,crs)
+def extents(resolution, tile_size, bounds) -> Extents:
+    yield Extents(bounds,resolution,tile_size)
 
 @pytest.fixture(scope="session")
 def attrs(dims) -> list[str]:

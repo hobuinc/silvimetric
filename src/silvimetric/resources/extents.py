@@ -3,7 +3,6 @@ import types
 
 import pdal
 import numpy as np
-from pyproj import CRS
 from shapely import from_wkt
 
 from .bounds import Bounds
@@ -13,7 +12,7 @@ from .data import Data
 class Extents(object):
 
     def __init__(self, bounds: Bounds, resolution: float, tile_size: int=16,
-                 srs: str=None, root: Bounds=None):
+                 root: Bounds=None):
 
         self.bounds = bounds
 
@@ -23,13 +22,6 @@ class Extents(object):
             self.root = root
 
         minx, miny, maxx, maxy = self.bounds.get()
-
-        if not srs:
-            raise Exception("Missing SRS for bounds")
-        self.srs = CRS.from_user_input(srs)
-        if self.srs.is_geographic:
-            raise Exception(f"Extents SRS({srs}) is geographic.")
-        self.epsg = self.srs.to_epsg()
 
         self.rangex = maxx - minx
         self.rangey = maxy - miny
@@ -46,7 +38,7 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, filename:str, threshold=1000) :
+    def chunk(self, data: Data, threshold=1000) :
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -65,10 +57,9 @@ class Extents(object):
         maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.tile_size,
-                       self.srs.to_wkt(), root=r)
+                       root=r)
         self.root_chunk: Extents = chunk
 
-        data = Data(filename, self.bounds, self.resolution)
         filtered = chunk.filter(data, threshold)
 
         def flatten(il):
@@ -100,20 +91,20 @@ class Extents(object):
         midy = miny + ((maxy - miny)/ 2)
         yield from [
             Extents(Bounds(minx, miny, midx, midy), self.resolution,
-                    self.tile_size, self.srs.to_wkt(), self.root), #lower left
+                    self.tile_size, self.root), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), self.root), #lower right
+                   self.tile_size, self.root), #lower right
             Extents(Bounds(minx, midy, midx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), self.root), #top left
+                   self.tile_size, self.root), #top left
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), self.root)  #top right
+                   self.tile_size, self.root)  #top right
         ]
 
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
-    def filter(self, data, threshold=1000):
-        pc = data.count(self.bounds)
+    def filter(self, data: Data, threshold=1000):
+        pc = data.estimate_count(self.bounds)
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -161,19 +152,19 @@ class Extents(object):
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
             Extents(Bounds(minx, miny, maxx, maxy), self.resolution,
-                   self.tile_size, self.srs.to_wkt(), self.root)
+                   self.tile_size, self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
 
     @staticmethod
     def from_storage(storage: Storage, tile_size: float=16):
         meta = storage.getConfig()
-        return Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
+        return Extents(meta.bounds, meta.resolution, tile_size)
 
     @staticmethod
     def from_sub(storage: Storage, sub: Bounds, tile_size: float=16):
         meta = storage.getConfig()
-        base_extents = Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
+        base_extents = Extents(meta.bounds, meta.resolution, tile_size)
         base = base_extents.bounds
 
         res = storage.config.resolution
@@ -196,60 +187,54 @@ class Extents(object):
             maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
 
         new_b = Bounds(minx, miny, maxx, maxy)
-        return Extents(new_b, meta.resolution, tile_size, meta.crs, base)
+        return Extents(new_b, meta.resolution, tile_size, base)
 
 
-    @staticmethod
-    def create(reader, resolution: float=30, tile_size: float=16, polygon=None):
-        # grab our bounds
-        if polygon is not None:
-            p = from_wkt(polygon)
-            if not p.is_valid:
-                raise Exception("Invalid polygon entered")
+    # @staticmethod
+    # def create(reader, resolution: float=30, tile_size: float=16, polygon=None):
+    #     # grab our bounds
+    #     if polygon is not None:
+    #         p = from_wkt(polygon)
+    #         if not p.is_valid:
+    #             raise Exception("Invalid polygon entered")
 
-            b = p.bounds
-            minx = b[0]
-            miny = b[1]
-            if len(b) == 4:
-                maxx = b[2]
-                maxy = b[3]
-            elif len(b) == 6:
-                maxx = b[3]
-                maxy = b[4]
-            else:
-                raise Exception("Invalid bounds found.")
+    #         b = p.bounds
+    #         minx = b[0]
+    #         miny = b[1]
+    #         if len(b) == 4:
+    #             maxx = b[2]
+    #             maxy = b[3]
+    #         elif len(b) == 6:
+    #             maxx = b[3]
+    #             maxy = b[4]
+    #         else:
+    #             raise Exception("Invalid bounds found.")
 
-            qi = pipeline.quickinfo[reader.type]
-            pc = qi['num_points']
-            if not pc:
-                raise Exception("No points found.")
-            srs = qi['srs']['wkt']
-            if not srs:
-                raise Exception("No SRS found in data.")
+    #         qi = pipeline.quickinfo[reader.type]
+    #         pc = qi['num_points']
+    #         if not pc:
+    #             raise Exception("No points found.")
 
-            extents = Extents(Bounds(minx, miny, maxx, maxy), resolution,
-                            tile_size, srs)
+    #         extents = Extents(Bounds(minx, miny, maxx, maxy), resolution,
+    #                         tile_size)
 
-            reader._options['bounds'] = str(extents)
-            pipeline = reader.pipeline()
+    #         reader._options['bounds'] = str(extents)
+    #         pipeline = reader.pipeline()
 
-        else:
-            pipeline = reader.pipeline()
-            qi = pipeline.quickinfo[reader.type]
-            pc = qi['num_points']
-            if not pc:
-                raise Exception("No points found.")
-            srs = qi['srs']['wkt']
-            if not srs:
-                raise Exception("No SRS found in data.")
+    #     else:
+    #         pipeline = reader.pipeline()
+    #         qi = pipeline.quickinfo[reader.type]
+    #         pc = qi['num_points']
+    #         if not pc:
+    #             raise Exception("No points found.")
 
-            bbox = qi['bounds']
-            minx = bbox['minx']
-            maxx = bbox['maxx']
-            miny = bbox['miny']
-            maxy = bbox['maxy']
-            extents = Extents(Bounds(minx, miny, maxx, maxy), resolution,
-                        tile_size, srs)
+    #         bbox = qi['bounds']
+    #         minx = bbox['minx']
+    #         maxx = bbox['maxx']
+    #         miny = bbox['miny']
+    #         maxy = bbox['maxy']
+    #         extents = Extents(Bounds(minx, miny, maxx, maxy), resolution,
+    #                     tile_size)
 
 
         return extents
@@ -257,7 +242,4 @@ class Extents(object):
 
     def __repr__(self):
         minx, miny, maxx, maxy = self.bounds.get()
-        # if self.srs:
-        #     return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}]) / EPSG:{self.epsg}"
-        # else:
         return f"([{minx:.2f},{maxx:.2f}],[{miny:.2f},{maxy:.2f}])"

@@ -13,8 +13,8 @@ from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, Data
 
 @dask.delayed
 @profile
-def get_data(filename, resolution, chunk):
-    data = Data(filename, chunk, resolution)
+def get_data(filename, storageconfig, bounds):
+    data = Data(filename, storageconfig, bounds = bounds)
     data.execute()
     return data.array
 
@@ -81,7 +81,7 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points = get_data(config.filename, storage.config.resolution, leaf)
+    points = get_data(config.filename, storage.config, leaf.bounds)
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
@@ -107,7 +107,8 @@ def shatter(config: ShatterConfig, client: Client=None):
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_sub(storage, config.bounds, config.tile_size)
 
-    leaves = extents.chunk(config.filename, 1000)
+    data = Data(config.filename, storage.config, extents.bounds)
+    leaves = extents.chunk(data, 1000)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

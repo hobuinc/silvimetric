@@ -80,11 +80,11 @@ def check_indexing(extents, leaf_list):
 
 
 class TestExtents(object):
-    @pytest.fixture(scope='class', autouse=True)
-    def filtered(self, copc_filepath, extents: Extents):
-        return list(extents.chunk(copc_filepath, 100))
+    @pytest.fixture(scope='function', autouse=True)
+    def filtered(self, copc_data, extents: Extents):
+        return list(extents.chunk(copc_data, 100))
 
-    @pytest.fixture(scope='class')
+    @pytest.fixture(scope='function')
     def unfiltered(self, filtered, extents):
         return list(extents.root_chunk.get_leaf_children())
 
@@ -94,11 +94,11 @@ class TestExtents(object):
         check_indexing(extents, unfiltered)
         check_for_holes(unfiltered, extents)
 
-    def test_cells(self, filepath, filtered, resolution):
+    def test_cells(self, copc_filepath, filtered, resolution):
         flag = False
         bad_chunks = []
         for leaf in filtered:
-            reader = pdal.Reader(filepath)
+            reader = pdal.Reader(copc_filepath)
             crop = pdal.Filter.crop(bounds=str(leaf))
             p = reader | crop
             count = p.execute()
@@ -114,7 +114,7 @@ class TestExtents(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, filepath, filtered, unfiltered, test_point_count, shatter_config, storage):
+    def test_pointcount(self, copc_filepath, filtered, unfiltered, test_point_count, shatter_config, storage):
 
         fc = run(filtered, shatter_config, storage)
         ufc = run(unfiltered, shatter_config, storage)

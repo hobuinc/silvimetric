@@ -27,7 +27,7 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
                        attrs = extract_attrs,
                        metrics = metrics)
     yield c
- 
+
 
 
 def tif_test(extract_config):
