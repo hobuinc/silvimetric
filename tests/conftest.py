@@ -2,7 +2,7 @@ import pytest
 import os
 import dask
 import pdal
-import json
+from uuid import uuid4
 
 from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
 from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
@@ -68,7 +68,8 @@ def s3_bucket():
 
 @pytest.fixture(scope='function')
 def s3_uri(s3_bucket):
-    yield f"s3://{s3_bucket}/test_silvimetric"
+    uuid = uuid4()
+    yield f"s3://{s3_bucket}/test_silvimetric/{uuid}"
 
 @pytest.fixture(scope="function")
 def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
