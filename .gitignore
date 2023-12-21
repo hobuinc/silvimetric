@@ -5,6 +5,7 @@ build/
 dist/
 stats/
 *.html
+.env
 
 #tiledb
 **/__fragments/**

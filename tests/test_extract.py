@@ -26,7 +26,7 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
                        attrs = extract_attrs,
                        metrics = metrics)
     yield c
- 
+
 
 
 def tif_test(extract_config):
@@ -35,7 +35,7 @@ def tif_test(extract_config):
     filenames = [Metrics[m.name].entry_name(a.name)
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
-    e = Extents.from_storage(Storage.from_db(extract_config.tdb_dir))
+    e = Extents.from_storage(extract_config.tdb_dir)
     yimin = e.indices['y'].min()
 
     for f in filenames:
@@ -66,9 +66,9 @@ class Test_Extract(object):
         extract(extract_config)
         tif_test(extract_config)
 
-    def test_sub_bounds_extract(self, extract_config, storage):
+    def test_sub_bounds_extract(self, extract_config, tile_size):
         s = extract_config
-        e = Extents.from_storage(storage)
+        e = Extents.from_storage(s.tdb_dir, tile_size)
         log = Log(20)
 
         for b in e.split():

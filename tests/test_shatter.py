@@ -1,4 +1,3 @@
-import os
 import pytest
 import numpy as np
 import dask
@@ -83,7 +82,7 @@ class Test_Shatter(object):
 
     def test_sub_bounds(self, shatter_config, storage, test_point_count):
         s = shatter_config
-        e = Extents.from_storage(storage, s.tile_size)
+        e = Extents.from_storage(s.tdb_dir, s.tile_size)
         pc = 0
         for b in e.split():
             log = Log(20)
@@ -103,14 +102,10 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
-    @pytest.mark.skip(reason="Haven't added secrets to gha yet")
-    def test_remote_creation(self, s3_shatter_config, secrets, s3_storage):
-        os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
-        os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
-        dask.config.set(scheduler="threads")
+    def test_remote_creation(self, s3_shatter_config, s3_storage):
+        dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution
         maxy = s3_storage.config.bounds.maxy
-
         shatter(s3_shatter_config)
         with s3_storage.open('r') as a:
             y = a[:,0]['Z'].shape[0]

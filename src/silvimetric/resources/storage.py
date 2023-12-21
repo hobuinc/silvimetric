@@ -102,7 +102,8 @@ class Storage:
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
-            return Storage(config)
+
+        return Storage(config)
 
     def saveConfig(self) -> None:
         """
@@ -124,6 +125,7 @@ class Storage:
         with self.open('r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
+
         return config
 
     def getMetadata(self, key: str, default=None) -> str:
@@ -147,6 +149,7 @@ class Storage:
                 if default is not None:
                     return default
                 raise(e)
+
         return val
 
     def saveMetadata(self, key: str, data: any) -> None:
@@ -186,6 +189,7 @@ class Storage:
         """
         return self.getConfig().metrics
 
+    @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
         """
         Open either a read or write stream for TileDB database
@@ -204,21 +208,11 @@ class Storage:
         Exception
             Path does not exist
         """
-        cfg = tiledb.Config()
-        cfg["vfs.s3.logging_level"] = "DEBUG"
-        cfg["vfs.file.max_parallel_ops"] = 1
-        cfg["vfs.s3.scheme"] = "https"
-        cfg["vfs.s3.region"] = "us-east-1"
-        cfg["vfs.s3.endpoint_override"] = ""
-        cfg["vfs.s3.use_virtual_addressing"] = "true"
-
-        ctx = tiledb.Ctx(config=cfg)
-
-        if tiledb.object_type(self.config.tdb_dir, ctx=ctx) == "array":
+        if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode == 'w':
-                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp, ctx=ctx)
+                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp)
             elif mode == 'r':
-                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp, ctx=ctx)
+                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
@@ -226,7 +220,11 @@ class Storage:
                             " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
-        return tdb
+
+        try:
+            yield tdb
+        finally:
+            tdb.close()
 
     def get_history(self):
         af = tiledb.array_fragments(self.config.tdb_dir)
@@ -242,7 +240,6 @@ class Storage:
                 end = af[idx].timestamp_range[1]
 
             with self.open('r', (begin, end)) as r:
-                keys = r.meta.keys()
                 for key in r.meta.keys():
                     if meta[key] is not None:
                         if not isinstance(meta[key], list):

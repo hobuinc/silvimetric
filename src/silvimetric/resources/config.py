@@ -169,6 +169,8 @@ class ShatterConfig(Config):
             self.bounds = s.config.bounds
         self.point_count: int = 0
 
+        del s
+
     def to_json(self):
         d = super().to_json()
 

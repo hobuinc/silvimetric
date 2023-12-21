@@ -38,7 +38,7 @@ requires = ["setuptools>=64.0"]
 build-backend = "setuptools.build_meta"
 
 [project.scripts]
-silvimetric = "silvimetric.cli.__main__:cli"
+silvimetric = "silvimetric.cli.cli:cli"
 
 
 [tool.pytest.ini_options]

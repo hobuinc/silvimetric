@@ -3,16 +3,15 @@ from dask.distributed import Client
 import dask
 import webbrowser
 import pyproj
-import os
 
 import json
 
 import logging
 
-from silvimetric.resources import Storage, Bounds, Log
-from silvimetric.resources import Attributes, Metrics, Attribute, Metric
-from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from silvimetric.commands import shatter, extract
+from ..resources import Storage, Bounds, Log
+from ..resources import Attributes, Metrics, Attribute, Metric
+from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from ..commands import shatter, extract
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -144,14 +143,15 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dasktype):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-    config = ShatterConfig(tdb_dir = app.tdb_dir,
-                            log = app.log,
-                            filename = pointcloud,
-                            tile_size = tilesize,
-                            bounds = bounds)
 
     if dasktype == 'cluster':
-        with Client(n_workers=workers, threads_per_worker=threads) as client:
+        with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False ) as client:
+            client.get_versions(check=True)
+            config = ShatterConfig(tdb_dir = app.tdb_dir,
+                                    log = app.log,
+                                    filename = pointcloud,
+                                    tile_size = tilesize,
+                                    bounds = bounds)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
             shatter(config, client)

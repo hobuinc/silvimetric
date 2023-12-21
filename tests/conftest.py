@@ -63,21 +63,12 @@ def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config
     yield s
 
 @pytest.fixture(scope="function")
-def secrets():
-    path = os.path.join(os.path.dirname(__file__), ".secrets")
-    assert os.path.exists(path)
-    p = os.path.abspath(path)
-    with open(p, 'r') as secret:
-        secret_json = json.loads(secret.read())
-    yield secret_json
-
-@pytest.fixture(scope="function")
 def s3_bucket():
     yield "silvimetric"
 
 @pytest.fixture(scope='function')
 def s3_uri(s3_bucket):
-    yield f"s3://{s3_bucket}/test_copc_shatter"
+    yield f"s3://{s3_bucket}/test_silvimetric"
 
 @pytest.fixture(scope="function")
 def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
@@ -85,10 +76,8 @@ def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
                         svversion, tdb_dir=s3_uri)
 
 @pytest.fixture(scope='function')
-def s3_storage(s3_storage_config, s3_bucket, secrets):
+def s3_storage(s3_storage_config):
     import subprocess
-    os.environ['AWS_ACCESS_KEY_ID'] = secrets['AWS_ACCESS_KEY_ID']
-    os.environ['AWS_SECRET_ACCESS_KEY'] = secrets['AWS_SECRET_ACCESS_KEY']
     yield Storage.create(s3_storage_config)
     subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
 

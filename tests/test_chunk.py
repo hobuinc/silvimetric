@@ -116,8 +116,8 @@ class TestExtents(object):
 
     def test_pointcount(self, filepath, filtered, unfiltered, test_point_count, shatter_config, storage):
 
-        fc = run(filtered, shatter_config, storage)
-        ufc = run(unfiltered, shatter_config, storage)
+        fc = run(filtered, shatter_config)
+        ufc = run(unfiltered, shatter_config)
 
         assert fc == ufc, f"""
             Filtered and unfiltered point counts don't match.

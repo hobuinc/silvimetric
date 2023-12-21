@@ -112,7 +112,7 @@ class Extents(object):
     # set a bottom resolution of ~1km
     def filter(self, filename, threshold=1000):
         reader: pdal.Reader = pdal.Reader(filename)
-        reader._options['threads'] = 2
+        reader._options['threads'] = 1
         reader._options['bounds'] = str(self)
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
@@ -168,17 +168,25 @@ class Extents(object):
         ]
 
     @staticmethod
-    def from_storage(storage: Storage, tile_size: float=16):
+    def from_storage(tdb_dir: str, tile_size: float=16):
+        storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
+        del storage
+
         return Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
 
     @staticmethod
-    def from_sub(storage: Storage, sub: Bounds, tile_size: float=16):
+    def from_sub(tdb_dir: str, sub: Bounds, tile_size: float=16):
+
+        storage = Storage.from_db(tdb_dir)
+
         meta = storage.getConfig()
+        res = storage.config.resolution
+        del storage
+
         base_extents = Extents(meta.bounds, meta.resolution, tile_size, meta.crs)
         base = base_extents.bounds
 
-        res = storage.config.resolution
 
         if sub.minx <= base.minx:
             minx = base.minx
@@ -198,6 +206,7 @@ class Extents(object):
             maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
 
         new_b = Bounds(minx, miny, maxx, maxy)
+
         return Extents(new_b, meta.resolution, tile_size, meta.crs, base)
 
 
