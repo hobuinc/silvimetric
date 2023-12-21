@@ -5,8 +5,8 @@ import json
 import uuid
 import copy
 
-from silvimetric import shatter
-from silvimetric import Storage, Extents, ShatterConfig, Log
+from silvimetric.commands.shatter import shatter
+from silvimetric.resources import Storage, Extents, ShatterConfig, Log
 
 
 @dask.delayed

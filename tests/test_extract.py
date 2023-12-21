@@ -4,8 +4,9 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric import shatter, extract
-from silvimetric import Metrics, Attribute, ExtractConfig, Extents, Storage, Log
+from silvimetric.commands.shatter import shatter
+from silvimetric.commands.extract import extract
+from silvimetric.resources import Metrics, Attribute, ExtractConfig, Extents, Storage, Log
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> str:
@@ -26,7 +27,7 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
                        attrs = extract_attrs,
                        metrics = metrics)
     yield c
- 
+
 
 
 def tif_test(extract_config):

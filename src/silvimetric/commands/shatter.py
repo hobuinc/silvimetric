@@ -2,23 +2,21 @@ import pdal
 import numpy as np
 from line_profiler import profile
 
+import pathlib
+
 import dask
 import dask.array as da
 import dask.bag as db
 from dask.distributed import performance_report, Client, wait
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, ApplicationConfig
+from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, Data
 
 @dask.delayed
 @profile
-def get_data(filename, chunk):
-    pipeline = create_pipeline(filename, chunk)
-    try:
-        pipeline.execute()
-    except Exception as e:
-        print(pipeline.pipeline, e)
-
-    return pipeline.arrays[0]
+def get_data(filename, storageconfig, bounds):
+    data = Data(filename, storageconfig, bounds = bounds)
+    data.execute()
+    return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
@@ -80,27 +78,10 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     return pc
 
 
-def create_pipeline(filename, chunk):
-    reader = pdal.Reader(filename, tag='reader')
-    reader._options['threads'] = 2
-    reader._options['bounds'] = str(chunk)
-    class_zero = pdal.Filter.assign(value="Classification = 0")
-    rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
-    nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-    ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-    assign_x = pdal.Filter.assign(
-        value=f"xi = (X - {chunk.root.minx}) / {chunk.resolution}")
-    assign_y = pdal.Filter.assign(
-        value=f"yi = ({chunk.root.maxy} - Y) / {chunk.resolution}")
-    # smrf = pdal.Filter.smrf()
-    # hag = pdal.Filter.hag_nn()
-    # return reader | crop | class_zero | rn | nor #| smrf | hag
-    return reader | class_zero | rn | nor | ferry | assign_x | assign_y #| smrf | hag
-
 def one(leaf: Extents, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points = get_data(config.filename, leaf)
+    points = get_data(config.filename, storage.config, leaf.bounds)
     att_data = get_atts(points, leaf, attrs)
     arranged = arrange(leaf, att_data, attrs)
     m = get_metrics(arranged, attrs, config.metrics, storage)
@@ -126,7 +107,8 @@ def shatter(config: ShatterConfig, client: Client=None):
     storage = Storage.from_db(config.tdb_dir)
     extents = Extents.from_sub(storage, config.bounds, config.tile_size)
 
-    leaves = extents.chunk(config.filename, 1000)
+    data = Data(config.filename, storage.config, extents.bounds)
+    leaves = extents.chunk(data, 1000)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

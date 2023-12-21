@@ -50,7 +50,7 @@ def extract(config: ExtractConfig):
     storage = Storage.from_db(config.tdb_dir)
     root_bounds=storage.config.bounds
 
-    e = Extents(config.bounds, config.resolution, srs=config.crs, root=root_bounds)
+    e = Extents(config.bounds, config.resolution, root=root_bounds)
     i = e.indices
     minx = i['x'].min()
     maxx = i['x'].max()
