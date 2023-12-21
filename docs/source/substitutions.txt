@@ -1,0 +1,9 @@
+.. |HOBU| replace:: `Hobu, Inc. <https://hobu.co/>`__
+.. |PDAL| replace:: `PDAL <https://pdal.io/>`__
+.. |Python| replace:: `Python <https://python.org/>`__
+.. |SciPy| replace:: `SciPy <https://scipy.org/>`__
+.. |Dask| replace:: `Dask <https://www.dask.org/>`__
+.. |TileDB| replace:: `TileDB <https://tiledb.com/>`__
+.. |PROJ| replace:: `PROJ <http://proj.org/>`__
+.. |S3| replace:: `S3 <https://aws.amazon.com/pm/serv-s3/>`__
+.. |FUSION| replace:: `FUSION <http://forsys.sefs.uw.edu/fusion/fusionlatest.html>`__

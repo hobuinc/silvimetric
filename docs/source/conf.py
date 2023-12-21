@@ -70,3 +70,8 @@ version = release
 
 
 pygments_style = 'sphinx'
+
+extensions = [
+   'sphinx.ext.autodoc',
+   'sphinx.ext.autosummary',
+]
