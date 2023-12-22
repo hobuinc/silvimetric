@@ -3,11 +3,10 @@ import numpy as np
 import dask
 import json
 import uuid
-import copy
+
 
 from silvimetric.commands.shatter import shatter
 from silvimetric.resources import Storage, Extents, ShatterConfig, Log
-
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
@@ -83,7 +82,7 @@ class Test_Shatter(object):
 
     def test_sub_bounds(self, shatter_config, storage, test_point_count):
         s = shatter_config
-        e = Extents.from_storage(storage, s.tile_size)
+        e = Extents.from_storage(s.tdb_dir, s.tile_size)
         pc = 0
         for b in e.split():
             log = Log(20)
@@ -102,3 +101,18 @@ class Test_Shatter(object):
         pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
+
+    def test_remote_creation(self, s3_shatter_config, s3_storage):
+        dask.config.set(scheduler="processes")
+        resolution = s3_storage.config.resolution
+        maxy = s3_storage.config.bounds.maxy
+        shatter(s3_shatter_config)
+        with s3_storage.open('r') as a:
+            y = a[:,0]['Z'].shape[0]
+            x = a[0,:]['Z'].shape[0]
+            assert y == 10
+            assert x == 10
+            for xi in range(x):
+                for yi in range(y):
+                    a[xi, yi]['Z'].size == 1
+                    assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))

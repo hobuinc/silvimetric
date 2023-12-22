@@ -2,6 +2,7 @@ import pytest
 import os
 import dask
 import pdal
+from uuid import uuid4
 
 from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
 from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
@@ -24,7 +25,7 @@ def tdb_filepath(tmp_path_factory) -> str:
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
     log = Log(20)
-    yield StorageConfig(tdb_dir = tdb_filepath, 
+    yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
                         bounds = bounds,
@@ -59,6 +60,31 @@ def shatter_config(tdb_filepath, copc_filepath, tile_size, storage_config, app_c
                       metrics = storage_config.metrics,
                       debug = True)
     yield s
+
+@pytest.fixture(scope="function")
+def s3_bucket():
+    yield "silvimetric"
+
+@pytest.fixture(scope='function')
+def s3_uri(s3_bucket):
+    uuid = uuid4()
+    yield f"s3://{s3_bucket}/test_silvimetric/{uuid}"
+
+@pytest.fixture(scope="function")
+def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
+    yield StorageConfig(bounds, crs, resolution, attrs, metrics,
+                        svversion, tdb_dir=s3_uri)
+
+@pytest.fixture(scope='function')
+def s3_storage(s3_storage_config):
+    import subprocess
+    yield Storage.create(s3_storage_config)
+    subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
+
+@pytest.fixture(scope="function")
+def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
+    config = s3_storage.config
+    yield ShatterConfig(copc_filepath, 2, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
 
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:

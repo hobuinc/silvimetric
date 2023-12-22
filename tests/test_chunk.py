@@ -114,10 +114,10 @@ class TestExtents(object):
                 bad_chunks.append(leaf)
         assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
 
-    def test_pointcount(self, copc_filepath, filtered, unfiltered, test_point_count, shatter_config, storage):
+    def test_pointcount(self, filtered, unfiltered, test_point_count, shatter_config, storage_config):
 
-        fc = run(filtered, shatter_config, storage)
-        ufc = run(unfiltered, shatter_config, storage)
+        fc = run(filtered, shatter_config, storage_config)
+        ufc = run(unfiltered, shatter_config, storage_config)
 
         assert fc == ufc, f"""
             Filtered and unfiltered point counts don't match.

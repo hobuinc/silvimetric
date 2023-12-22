@@ -157,17 +157,21 @@ class Extents(object):
         ]
 
     @staticmethod
-    def from_storage(storage: Storage, tile_size: float=16):
+    def from_storage(tdb_dir: str, tile_size: float=16):
+        storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
         return Extents(meta.bounds, meta.resolution, tile_size)
 
     @staticmethod
-    def from_sub(storage: Storage, sub: Bounds, tile_size: float=16):
+    def from_sub(tdb_dir: str, sub: Bounds, tile_size: float=16):
+
+        storage = Storage.from_db(tdb_dir)
+
         meta = storage.getConfig()
-        base_extents = Extents(meta.bounds, meta.resolution, tile_size)
+        res = meta.resolution
+        base_extents = Extents(meta.bounds, res, tile_size)
         base = base_extents.bounds
 
-        res = storage.config.resolution
 
         if sub.minx <= base.minx:
             minx = base.minx
@@ -187,7 +191,7 @@ class Extents(object):
             maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
 
         new_b = Bounds(minx, miny, maxx, maxy)
-        return Extents(new_b, meta.resolution, tile_size, base)
+        return Extents(new_b, res, tile_size, base)
 
 
     # @staticmethod

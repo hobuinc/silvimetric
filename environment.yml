@@ -11,5 +11,8 @@ dependencies:
   - pyproj
   - gdal
   - scipy
+  - awscli=2.13.33
+  - websocket-client
+  - python-json-logger
   - pip:
     - line-profiler

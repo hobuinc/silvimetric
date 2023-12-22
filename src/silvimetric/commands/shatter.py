@@ -1,19 +1,12 @@
-import pdal
 import numpy as np
-from line_profiler import profile
-
-import pathlib
 
 import dask
 import dask.array as da
 import dask.bag as db
-from dask.distributed import performance_report, Client, wait
 
-from ..resources import Bounds, Extents, Storage, Metric, ShatterConfig, Data
+from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig
 
-@dask.delayed
-@profile
-def get_data(filename, storageconfig, bounds):
+def get_data(bounds, filename, storageconfig):
     data = Data(filename, storageconfig, bounds = bounds)
     data.execute()
     return data.array
@@ -21,8 +14,6 @@ def get_data(filename, storageconfig, bounds):
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-@dask.delayed
-@profile
 def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
@@ -31,9 +22,7 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.persist(*l)
 
-@dask.delayed
-@profile
-def arrange(chunk, data, attrs):
+def arrange(data, chunk, attrs):
     dd = {}
     for att in attrs:
         try:
@@ -55,10 +44,10 @@ def arrange(chunk, data, attrs):
     return [dx, dy, dd]
 
 
-@dask.delayed
-@profile
 def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
-                storage: Storage):
+                tdb_dir: str):
+
+    storage = Storage.from_db(tdb_dir)
     ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
 
@@ -73,46 +62,39 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
         for attr in attrs for m in metrics
     }
     full_data = data | metric_data
+
     storage.write(dx,dy,full_data)
     pc = data['count'].sum()
     return pc
 
-
-def one(leaf: Extents, config: ShatterConfig, storage: Storage):
+def run(leaves, config: ShatterConfig, s_config: StorageConfig):
     attrs = [a.name for a in config.attrs]
 
-    points = get_data(config.filename, storage.config, leaf.bounds)
-    att_data = get_atts(points, leaf, attrs)
-    arranged = arrange(leaf, att_data, attrs)
-    m = get_metrics(arranged, attrs, config.metrics, storage)
-    return m
-    # return dask.compute(m)[0]
+    leaves = db.from_sequence(leaves)
+    points: db.Bag = leaves.map(get_data, config.filename, s_config).persist()
+    att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
+    arranged: db.Bag = att_data.map(arrange, leaves, attrs).persist()
+    metrics: db.Bag = arranged.map(get_metrics, attrs, config.metrics, config.tdb_dir)
 
-def run(leaves, config: ShatterConfig, storage: Storage, client: Client=None):
-    from contextlib import nullcontext
-    l = []
+    vals = metrics.persist()
 
-    with (performance_report() if client is not None else nullcontext()):
-        leaves = db.from_sequence(leaves)
-        l = db.map(one, leaves, config, storage)
-        vals = dask.compute(*l.persist())
-        return sum(vals)
+    return sum(vals)
 
 
-def shatter(config: ShatterConfig, client: Client=None):
+def shatter(config: ShatterConfig):
 
     config.log.debug('Filtering out empty chunks...')
 
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    extents = Extents.from_sub(storage, config.bounds, config.tile_size)
+    extents = Extents.from_sub(config.tdb_dir, config.bounds, config.tile_size)
 
     data = Data(config.filename, storage.config, extents.bounds)
     leaves = extents.chunk(data, 1000)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
-    pc = run(leaves, config, storage, client)
+    pc = run(leaves, config, storage.config)
     config.point_count = int(pc)
 
     config.log.debug('Saving shatter metadata')

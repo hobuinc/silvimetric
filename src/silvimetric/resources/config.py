@@ -54,7 +54,7 @@ class StorageConfig(Config):
     resolution: float = 30.0
 
     attrs: list[Attribute] = field(default_factory=lambda: [
-        Attribute(a, Attributes[a])
+        Attribute(a, Attributes[a].dtype)
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])
@@ -167,7 +167,9 @@ class ShatterConfig(Config):
             self.metrics = s.getMetrics()
         if self.bounds is None:
             self.bounds = s.config.bounds
-        self.point_count=0
+        self.point_count: int = 0
+
+        del s
 
     def to_json(self):
         d = super().to_json()

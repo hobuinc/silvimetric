@@ -1,8 +1,9 @@
-import pdal
 import tiledb
+from tiledb import object_type
 import numpy as np
 from math import floor
 import pathlib
+import contextlib
 
 from .config import StorageConfig
 from .metric import Metrics, Metric, Attribute
@@ -71,8 +72,7 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            capacity=10000, attrs=[count_att, *dim_atts, *metric_atts],
-            allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -102,14 +102,14 @@ class Storage:
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
-            return Storage(config)
+
+        return Storage(config)
 
     def saveConfig(self) -> None:
         """
         Save StorageConfig to the Database
 
         """
-        # reopen in write mode if current mode is read
         with self.open('w') as a:
             a.meta['config'] = str(self.config)
 
@@ -122,11 +122,11 @@ class Storage:
         StorageConfig
             StorageConfig object
         """
-        # reopen in read mode if current mode is write
         with self.open('r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
-            return config
+
+        return config
 
     def getMetadata(self, key: str, default=None) -> str:
         """
@@ -145,11 +145,12 @@ class Storage:
         with self.open('r') as r:
             try:
                 val = r.meta[key]
-                return val
             except KeyError as e:
                 if default is not None:
                     return default
                 raise(e)
+
+        return val
 
     def saveMetadata(self, key: str, data: any) -> None:
         """
@@ -188,6 +189,7 @@ class Storage:
         """
         return self.getConfig().metrics
 
+    @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
         """
         Open either a read or write stream for TileDB database
@@ -206,14 +208,11 @@ class Storage:
         Exception
             Path does not exist
         """
-
         if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode == 'w':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'w',
-                                                      timestamp=timestamp)
+                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp)
             elif mode == 'r':
-                tdb: tiledb.SparseArray = tiledb.open(self.config.tdb_dir, 'r',
-                                                      timestamp=timestamp)
+                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
@@ -221,7 +220,11 @@ class Storage:
                             " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
-        return tdb
+
+        try:
+            yield tdb
+        finally:
+            tdb.close()
 
     def get_history(self):
         af = tiledb.array_fragments(self.config.tdb_dir)
@@ -237,7 +240,6 @@ class Storage:
                 end = af[idx].timestamp_range[1]
 
             with self.open('r', (begin, end)) as r:
-                keys = r.meta.keys()
                 for key in r.meta.keys():
                     if meta[key] is not None:
                         if not isinstance(meta[key], list):
