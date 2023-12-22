@@ -11,7 +11,7 @@ import logging
 from ..resources import Storage, Bounds, Log
 from ..resources import Attributes, Metrics, Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract
+from ..commands import shatter, extract, initialize, info
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -37,39 +37,9 @@ def cli(ctx, database, debug, log_level, log_dir, progress):
 @cli.command("info")
 @click.option("--history", is_flag=True, default=False, type=bool)
 @click.pass_obj
-def info(app, history):
+def info_cmd(app, history):
     """Print info about Silvimetric database"""
-    with Storage.from_db(app.tdb_dir) as tdb:
-
-        # We always have these
-        meta = tdb.getConfig()
-        atts = tdb.getAttributes()
-
-        # We don't have this until stuff has been put into the database
-        try:
-            shatter = json.loads(tdb.getMetadata('shatter'))
-
-            # I don't know what this is?
-        except KeyError:
-            shatter = {}
-
-        info = {
-            'attributes': [a.to_json() for a in atts],
-            'metadata': meta.to_json(),
-            'shatter': shatter
-        }
-        if history:
-            try:
-                # I don't know what this is? – hobu
-                history = tdb.get_history()['shatter']
-                if isinstance(history, list):
-                    history = [ json.loads(h) for h in history ]
-                else:
-                    history = json.loads(history)
-                info ['history'] = history
-            except KeyError:
-                history = {}
-        print(json.dumps(info, indent=2))
+    info(app.tdb_dir, history)
 
 class BoundsParamType(click.ParamType):
     name = "Bounds"
@@ -116,11 +86,10 @@ class MetricParamType(click.ParamType):
               help="List of metrics to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
 @click.pass_obj
-def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
+def init_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
                attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     """Initialize silvimetrics DATABASE
     """
-    from silvimetric.cli.initialize import initialize as initializeFunction
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
                                   log = app.log,
                                   bounds = bounds,
@@ -128,7 +97,7 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
                                   attrs = attributes,
                                   metrics = metrics,
                                   resolution = resolution)
-    storage = initializeFunction(storageconfig)
+    storage = initialize(storageconfig)
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
@@ -145,7 +114,7 @@ def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dask
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     if dasktype == 'cluster':
-        with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False ) as client:
+        with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False) as client:
             client.get_versions(check=True)
             config = ShatterConfig(tdb_dir = app.tdb_dir,
                                     log = app.log,

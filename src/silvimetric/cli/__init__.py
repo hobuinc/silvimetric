@@ -1,1 +1,1 @@
-from .cli import cli, info, initialize, shatter_cmd, extract_cmd
+from .cli import cli, info_cmd, init_cmd, shatter_cmd, extract_cmd

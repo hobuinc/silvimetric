@@ -4,17 +4,44 @@ import dask
 import dask.array as da
 import dask.bag as db
 
-from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig
+from ..resources import Bounds, Extents, Storage, Metric, Data
+from ..resources import ShatterConfig, StorageConfig
 
-def get_data(bounds, filename, storageconfig):
+def get_data(bounds: Bounds, filename: str, storageconfig: StorageConfig) -> np.ndarray:
+    """
+    Retrieve point data from Data object
+
+    Parameters
+    ----------
+    bounds : Bounds
+    filename : str
+    storageconfig : StorageConfig
+
+    Returns
+    -------
+    np.ndarray
+    """
     data = Data(filename, storageconfig, bounds = bounds)
     data.execute()
     return data.array
 
-def cell_indices(xpoints, ypoints, x, y):
+def cell_indices(xpoints: np.ndarray, ypoints: np.ndarray, x: int, y: int) -> da.Array:
     return da.logical_and(xpoints == x, ypoints == y)
 
-def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
+def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.ndarray]:
+    """
+    Separate point data into respective cells and filter by requested stats
+
+    Parameters
+    ----------
+    points : np.ndarray
+    chunk : Extents
+    attrs : list[str]
+
+    Returns
+    -------
+    list[np.ndarray]
+    """
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
 
@@ -22,7 +49,28 @@ def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.persist(*l)
 
-def arrange(data, chunk, attrs):
+type MetricDataIn = tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]
+def arrange(data: np.ndarray, chunk: Extents, attrs: list[str]) -> MetricDataIn:
+    """
+    Arrange data into a format that TileDB accepts, which is a dict of
+    numpy object arrays, formated so that they won't advertize multi-dimensional
+    size.
+
+    Parameters
+    ----------
+    data : np.ndarray
+    chunk : Extents
+    attrs : list[str]
+
+    Returns
+    -------
+    MetricDataIn
+
+    Raises
+    ------
+    Exception
+        If data is missing a requested attribute, then throw.
+    """
     dd = {}
     for att in attrs:
         try:
@@ -41,11 +89,27 @@ def arrange(data, chunk, attrs):
             dd[att] = np.delete(dd[att], empties)
         dx = np.delete(dx, empties)
         dy = np.delete(dy, empties)
-    return [dx, dy, dd]
+    return (dx, dy, dd)
 
 
-def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
-                tdb_dir: str):
+def get_metrics(data_in: MetricDataIn, attrs: list[str], metrics: list[Metric],
+                tdb_dir: str)->np.int64:
+    """
+    Perform metric analysis over cell-chunked data. Runs every metric requested
+    over every cell/statistic combination that it applies to.
+
+    Parameters
+    ----------
+    data_in : MetricDataIn
+    attrs : list[str]
+    metrics : list[Metric]
+    tdb_dir : str
+
+    Returns
+    -------
+    np.int64
+        Point count of this Extent
+    """
 
     storage = Storage.from_db(tdb_dir)
     ## data comes in as [dx, dy, { 'att': [data] }]
@@ -67,7 +131,21 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     pc = data['count'].sum()
     return pc
 
-def run(leaves, config: ShatterConfig, s_config: StorageConfig):
+def run(leaves: list[Extents], config: ShatterConfig, s_config: StorageConfig) -> np.int64:
+    """
+    Coordinate order of events for the shatter process in groups of dask bags.
+
+    Parameters
+    ----------
+    leaves : list[Extents]
+    config : ShatterConfig
+    s_config : StorageConfig
+
+    Returns
+    -------
+    np.int64
+        Pointcount of the run
+    """
     attrs = [a.name for a in config.attrs]
 
     leaves = db.from_sequence(leaves)
@@ -81,7 +159,20 @@ def run(leaves, config: ShatterConfig, s_config: StorageConfig):
     return sum(vals)
 
 
-def shatter(config: ShatterConfig):
+def shatter(config: ShatterConfig) -> int:
+    """
+    Coordinate usage of ShatterConfig. Create extents, filter them so we don't
+    do empty tile work, then send that list of extents to the runner.
+
+    Parameters
+    ----------
+    config : ShatterConfig
+
+    Returns
+    -------
+    int
+        Point count of the dataset
+    """
 
     config.log.debug('Filtering out empty chunks...')
 
