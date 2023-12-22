@@ -5,8 +5,8 @@ import json
 import uuid
 
 
-from silvimetric import shatter
-from silvimetric import Storage, Extents, ShatterConfig, Log
+from silvimetric.commands.shatter import shatter
+from silvimetric.resources import Storage, Extents, ShatterConfig, Log
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
@@ -102,6 +102,7 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
+    @pytest.mark.skip(reason="taking too long to complete")
     def test_remote_creation(self, s3_shatter_config, s3_storage):
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution

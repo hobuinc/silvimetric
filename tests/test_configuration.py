@@ -4,7 +4,7 @@ import os
 import dataclasses
 
 
-from silvimetric import StorageConfig, Bounds, Log
+from silvimetric.resources import StorageConfig, Bounds, Log
 
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:

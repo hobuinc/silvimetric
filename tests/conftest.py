@@ -4,11 +4,10 @@ import dask
 import pdal
 from uuid import uuid4
 
-from silvimetric import Extents, Bounds, Metrics, Attribute, Storage, Log
-from silvimetric import ShatterConfig, StorageConfig, ApplicationConfig
+from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
+from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
 from silvimetric import __version__ as svversion
 
-from silvimetric.commands.shatter import create_pipeline
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask():
@@ -51,11 +50,11 @@ def app_config(tdb_filepath, debug=True):
     yield app
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, filepath, tile_size, storage_config, app_config, storage):
+def shatter_config(tdb_filepath, copc_filepath, tile_size, storage_config, app_config, storage):
     log = Log(20) # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
-                      filename = filepath,
+                      filename = copc_filepath,
                       tile_size = tile_size,
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
@@ -83,24 +82,44 @@ def s3_storage(s3_storage_config):
     subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
 
 @pytest.fixture(scope="function")
-def s3_shatter_config(s3_storage, filepath, attrs, metrics):
+def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
     config = s3_storage.config
-    yield ShatterConfig(filepath, 2, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
+    yield ShatterConfig(copc_filepath, 2, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
 
 @pytest.fixture(scope='session')
-def filepath() -> str:
+def copc_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
             "test_data_2.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
-@pytest.fixture(scope='class')
-def bounds(minx, maxx, miny, maxy) -> Bounds:
-    yield Bounds(minx, miny, maxx, maxy)
+@pytest.fixture(scope='function')
+def copc_data(copc_filepath, storage_config) -> Data:
+    d = Data(copc_filepath, storage_config)
+    yield d
+
+@pytest.fixture(scope='session')
+def autzen_filepath() -> str:
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "autzen-small.copc.laz")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='session')
+def pipeline_filepath() -> str:
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "test_data_2.json")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
 
 @pytest.fixture(scope='class')
-def extents(resolution, tile_size, bounds, crs) -> Extents:
-    yield Extents(bounds,resolution,tile_size,crs)
+def bounds(minx, maxx, miny, maxy) -> Bounds:
+    b =  Bounds(minx, miny, maxx, maxy)
+    yield b
+
+@pytest.fixture(scope='class')
+def extents(resolution, tile_size, bounds) -> Extents:
+    yield Extents(bounds,resolution,tile_size)
 
 @pytest.fixture(scope="session")
 def attrs(dims) -> list[str]:
@@ -110,10 +129,6 @@ def attrs(dims) -> list[str]:
 @pytest.fixture(scope="session")
 def dims():
     yield { d['name']: d['dtype'] for d in pdal.dimensions }
-
-@pytest.fixture(scope='class')
-def pipeline(filepath) -> pdal.Pipeline:
-    yield create_pipeline(filepath)
 
 @pytest.fixture(scope='class')
 def resolution() -> int:
