@@ -19,15 +19,40 @@ class Tile:
         self.storage = storage
 
     @property
-    def bounds(self):
-        minx = self.storage.config.root.minx + (self.x * self.size)
-        miny = self.storage.config.root.miny + (self.y * self.size)
+    def bounds(self) -> Bounds:
+        return Bounds(self.minx, self.miny, self.maxx, self.maxy)
 
-        maxx = self.storage.config.root.minx + ((self.x + 1) * self.size * self.storage.config.resolution)
-        maxy = self.storage.config.root.miny + ((self.y + 1) * self.size * self.storage.config.resolution)
+    @property
+    def minx(self) -> Bounds:
+        return self.storage.config.root.minx + (self.x * self.size * self.storage.config.resolution)
 
-        return Bounds(minx, miny, maxx, maxy)
+    @property
+    def miny(self) -> Bounds:
+        return self.storage.config.root.minx + (self.y * self.size * self.storage.config.resolution)
 
+    @property
+    def maxx(self) -> Bounds:
+        return self.storage.config.root.minx + ((self.x + 1) * self.size * self.storage.config.resolution)
+
+    @property
+    def maxy(self) -> Bounds:
+        return self.storage.config.root.miny + ((self.y + 1) * self.size * self.storage.config.resolution)
+
+
+    @property
+    def x1(self) -> int:
+        return math.floor((self.minx - self.storage.config.root.minx) / self.storage.config.resolution)
+    @property
+    def x2(self) -> int:
+        return math.floor((self.maxx - self.storage.config.root.minx) / self.storage.config.resolution)
+
+    @property
+    def y1(self) -> int:
+        # FIXME Y seems inverted in self.y1 below. Ask Kyle
+        return math.floor((self.miny - self.storage.config.root.miny) / self.storage.config.resolution)
+    @property
+    def y2(self) -> int:
+        return math.floor((self.maxy - self.storage.config.root.miny) / self.storage.config.resolution)
 
 class Extents(object):
 
