@@ -52,7 +52,6 @@ class StorageConfig(Config):
     bounds: Bounds
     crs: pyproj.CRS
     resolution: float = 30.0
-    capacity: int = 1000000
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
@@ -122,8 +121,7 @@ class StorageConfig(Config):
                 resolution = x['resolution'],
                 attrs = attrs,
                 crs = crs,
-                metrics = ms,
-                capacity = x['capacity'])
+                metrics = ms)
 
         return n
 
