@@ -49,7 +49,7 @@ class Config(ABC):
 
 @dataclass
 class StorageConfig(Config):
-    bounds: Bounds
+    root: Bounds
     crs: pyproj.CRS
     resolution: float = 30.0
 
@@ -96,13 +96,13 @@ class StorageConfig(Config):
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
-        d['bounds'] = json.loads(self.bounds.to_json())
+        d['root'] = json.loads(self.root.to_json())
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
-        bounds = Bounds(*x['bounds'])
+        root = Bounds(*x['root'])
         if 'metrics' in x:
             ms = [ Metric.from_string(m) for m in x['metrics']]
         else:
@@ -116,7 +116,7 @@ class StorageConfig(Config):
         else:
             crs = None
         n = cls(tdb_dir = x['tdb_dir'],
-                bounds = bounds,
+                root = root,
                 log = x['log'],
                 resolution = x['resolution'],
                 attrs = attrs,
@@ -166,7 +166,7 @@ class ShatterConfig(Config):
         if not self.metrics:
             self.metrics = s.getMetrics()
         if self.bounds is None:
-            self.bounds = s.config.bounds
+            self.bounds = s.config.root
         self.point_count: int = 0
 
         del s
@@ -218,7 +218,7 @@ class ExtractConfig(Config):
         if not len(self.metrics):
             self.metrics = config.metrics
         if self.bounds is None:
-            self.bounds: Bounds = config.bounds
+            self.bounds: Bounds = config.root
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)

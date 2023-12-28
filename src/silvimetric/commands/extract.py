@@ -48,7 +48,7 @@ def extract(config: ExtractConfig):
 
     ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)
-    root_bounds=storage.config.bounds
+    root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
     i = e.indices

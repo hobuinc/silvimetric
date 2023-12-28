@@ -118,8 +118,8 @@ class Data:
         resolution = self.storageconfig.resolution
         # Add xi and yi – only need this for PDAL < 2.6
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-        assign_x = pdal.Filter.assign(value=f"xi = (X - {self.storageconfig.bounds.minx}) / {resolution}")
-        assign_y = pdal.Filter.assign(value=f"yi = ({self.storageconfig.bounds.maxy} - Y) / {resolution}")
+        assign_x = pdal.Filter.assign(value=f"xi = (X - {self.storageconfig.root.minx}) / {resolution}")
+        assign_y = pdal.Filter.assign(value=f"yi = ({self.storageconfig.root.maxy} - Y) / {resolution}")
         stages.append(ferry)
         stages.append(assign_x)
         stages.append(assign_y)

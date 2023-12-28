@@ -9,6 +9,26 @@ from .bounds import Bounds
 from .storage import Storage
 from .data import Data
 
+
+class Tile:
+
+    def __init__(self, x: int, y: int, size: int, storage: Storage):
+        self.x = x
+        self.y = y
+        self.size = size
+        self.storage = storage
+
+    @property
+    def bounds(self):
+        minx = self.storage.config.root.minx + (self.x * self.size)
+        miny = self.storage.config.root.miny + (self.y * self.size)
+
+        maxx = self.storage.config.root.minx + ((self.x + 1) * self.size * self.storage.config.resolution)
+        maxy = self.storage.config.root.miny + ((self.y + 1) * self.size * self.storage.config.resolution)
+
+        return Bounds(minx, miny, maxx, maxy)
+
+
 class Extents(object):
 
     def __init__(self, bounds: Bounds, resolution: float, tile_size: int=16,
@@ -160,7 +180,7 @@ class Extents(object):
     def from_storage(tdb_dir: str, tile_size: float=16):
         storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
-        return Extents(meta.bounds, meta.resolution, tile_size)
+        return Extents(meta.root, meta.resolution, tile_size)
 
     @staticmethod
     def from_sub(tdb_dir: str, sub: Bounds, tile_size: float=16):
@@ -169,7 +189,7 @@ class Extents(object):
 
         meta = storage.getConfig()
         res = meta.resolution
-        base_extents = Extents(meta.bounds, res, tile_size)
+        base_extents = Extents(meta.root, res, tile_size)
         base = base_extents.bounds
 
 

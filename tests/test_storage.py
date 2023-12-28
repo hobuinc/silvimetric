@@ -32,7 +32,7 @@ class Test_Storage(object):
         storage.saveConfig()
         config = storage.getConfig()
         assert config.resolution == storage.config.resolution
-        assert config.bounds == storage.config.bounds
+        assert config.root == storage.config.root
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
 
