@@ -20,6 +20,22 @@ np_to_gdal_types = {
 
 def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
               config: ExtractConfig):
+    """
+    Write out data from a metric to a raster using GDAL
+
+    Parameters
+    ----------
+    xsize : int
+        Number of cells in x direction
+    ysize : int
+        Number of cells in y direction
+    data : np.ndarray
+
+    name : str
+        _description_
+    config : ExtractConfig
+        _description_
+    """
     osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
     crs = config.crs

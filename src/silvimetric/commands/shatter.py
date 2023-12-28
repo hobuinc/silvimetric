@@ -4,6 +4,8 @@ import dask
 import dask.array as da
 import dask.bag as db
 
+from typing import Dict
+
 from ..resources import Bounds, Extents, Storage, Metric, Data
 from ..resources import ShatterConfig, StorageConfig
 
@@ -49,7 +51,7 @@ def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.nd
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.persist(*l)
 
-type MetricDataIn = tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]
+type MetricDataIn = tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray]]
 def arrange(data: np.ndarray, chunk: Extents, attrs: list[str]) -> MetricDataIn:
     """
     Arrange data into a format that TileDB accepts, which is a dict of
