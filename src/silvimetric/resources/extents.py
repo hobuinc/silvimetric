@@ -11,8 +11,9 @@ from .data import Data
 
 class Extents(object):
 
-    def __init__(self, bounds: Bounds, resolution: float, tile_size: int=16,
-                 root: Bounds=None):
+    def __init__(self, bounds: Bounds, resolution: float,
+                 root: Bounds,
+                 tile_size: int = 16):
 
         self.bounds = bounds
 
@@ -56,8 +57,7 @@ class Extents(object):
         miny = bmaxy - ((self.y2 + y_buf) * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
-        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.tile_size,
-                       root=r)
+        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r, self.tile_size)
         self.root_chunk: Extents = chunk
 
         filtered = chunk.filter(data, threshold)
@@ -91,13 +91,13 @@ class Extents(object):
         midy = miny + ((maxy - miny)/ 2)
         yield from [
             Extents(Bounds(minx, miny, midx, midy), self.resolution,
-                    self.tile_size, self.root), #lower left
+                    self.root, self.tile_size), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution,
-                   self.tile_size, self.root), #lower right
+                    self.root, self.tile_size), #lower right
             Extents(Bounds(minx, midy, midx, maxy), self.resolution,
-                   self.tile_size, self.root), #top left
+                    self.root, self.tile_size), #top left
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution,
-                   self.tile_size, self.root)  #top right
+                    self.root, self.tile_size)  #top right
         ]
 
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
@@ -152,7 +152,7 @@ class Extents(object):
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
             Extents(Bounds(minx, miny, maxx, maxy), self.resolution,
-                   self.tile_size, self.root)
+                   self.root, self.tile_size)
             for minx,maxx,miny,maxy in coords_list
         ]
 
@@ -160,7 +160,7 @@ class Extents(object):
     def from_storage(tdb_dir: str, tile_size: float=16):
         storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
-        return Extents(meta.bounds, meta.resolution, tile_size)
+        return Extents(meta.bounds, meta.resolution, meta.bounds, tile_size)
 
     @staticmethod
     def from_sub(tdb_dir: str, sub: Bounds, tile_size: float=16):
@@ -169,7 +169,7 @@ class Extents(object):
 
         meta = storage.getConfig()
         res = meta.resolution
-        base_extents = Extents(meta.bounds, res, tile_size)
+        base_extents = Extents(meta.bounds, res, meta.bounds, tile_size)
         base = base_extents.bounds
 
 
@@ -191,7 +191,7 @@ class Extents(object):
             maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
 
         new_b = Bounds(minx, miny, maxx, maxy)
-        return Extents(new_b, res, tile_size, base)
+        return Extents(new_b, res, base, tile_size)
 
 
     # @staticmethod

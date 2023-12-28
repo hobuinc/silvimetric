@@ -117,9 +117,9 @@ def bounds(minx, maxx, miny, maxy) -> Bounds:
     b =  Bounds(minx, miny, maxx, maxy)
     yield b
 
-@pytest.fixture(scope='class')
-def extents(resolution, tile_size, bounds) -> Extents:
-    yield Extents(bounds,resolution,tile_size)
+@pytest.fixture(scope='function')
+def extents(resolution, tile_size, bounds, storage_config) -> Extents:
+    yield Extents(bounds,resolution, storage_config.bounds, tile_size)
 
 @pytest.fixture(scope="session")
 def attrs(dims) -> list[str]:
