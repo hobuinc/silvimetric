@@ -28,7 +28,7 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
-                        bounds = bounds,
+                        root = bounds,
                         resolution = resolution,
                         attrs = attrs,
                         metrics = metrics,
