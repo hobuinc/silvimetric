@@ -52,7 +52,6 @@ class StorageConfig(Config):
     root: Bounds
     crs: pyproj.CRS
     resolution: float = 30.0
-    capacity: int = 1000000
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
@@ -60,6 +59,8 @@ class StorageConfig(Config):
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])
     version: str = __version__
+    capacity: int = 1000000
+
 
     def __post_init__(self) -> None:
 
