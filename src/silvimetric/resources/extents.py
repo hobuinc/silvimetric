@@ -38,7 +38,7 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, data: Data, threshold=1000) :
+    def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -102,7 +102,7 @@ class Extents(object):
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
-    def filter(self, data: Data, threshold=1000):
+    def filter(self, data: Data, threshold_resolution=100):
         pc = data.estimate_count(self.bounds)
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
@@ -113,12 +113,11 @@ class Extents(object):
         else:
             # has it hit the threshold yet?
             area = (maxx - minx) * (maxy - miny)
-            t = threshold**2
-            if area < t:
+            if maxx - minx < threshold_resolution:
                 yield self
             else:
                 children = self.split()
-                yield from [c.filter(data,threshold) for c in children]
+                yield from [c.filter(data,threshold_resolution) for c in children]
 
     def find_dims(self):
         gs = self.tile_size
