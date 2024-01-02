@@ -92,7 +92,7 @@ def init_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
     """
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
                                   log = app.log,
-                                  bounds = bounds,
+                                  root = bounds,
                                   crs = crs,
                                   attrs = attributes,
                                   metrics = metrics,
@@ -113,20 +113,21 @@ def init_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dasktype):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
+    config = ShatterConfig(tdb_dir = app.tdb_dir,
+                           log = app.log,
+                           filename = pointcloud,
+                           tile_size = tilesize,
+                           bounds = bounds)
+
     if dasktype == 'cluster':
         with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False) as client:
             client.get_versions(check=True)
-            config = ShatterConfig(tdb_dir = app.tdb_dir,
-                                    log = app.log,
-                                    filename = pointcloud,
-                                    tile_size = tilesize,
-                                    bounds = bounds)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter(config, client)
+            shatter.shatter(config)
     else:
         dask.config.set(scheduler=dasktype)
-        shatter(config)
+        shatter.shatter(config)
 
 
 @cli.command('extract')
@@ -146,7 +147,7 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
                            attrs = attributes,
                            metrics = metrics,
                            bounds = bounds)
-    extract(config)
+    extract.extract(config)
 
 
 if __name__ == "__main__":

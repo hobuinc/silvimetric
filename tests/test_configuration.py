@@ -19,7 +19,7 @@ def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy,
     log = Log(20)
     config = StorageConfig(tdb_dir = tdb_filepath,
                            log = log,
-                           bounds = b,
+                           root = b,
                            resolution = resolution,
                            crs = crs,
                            attrs = attrs)

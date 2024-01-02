@@ -23,7 +23,7 @@ def write(x,y,val, s:Storage, attrs, dims, metrics):
 
 class Test_Shatter(object):
 
-    def test_shatter(self, shatter_config, storage: Storage, resolution, maxy):
+    def test_shatter(self, shatter_config, storage: Storage, maxy):
         shatter(shatter_config)
         with storage.open('r') as a:
             y = a[:,0]['Z'].shape[0]
@@ -33,7 +33,7 @@ class Test_Shatter(object):
             for xi in range(x):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 1
-                    assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/resolution)-yi)))
+                    assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
             m = storage.get_history()
 
         shatter_config.name = uuid.uuid4()
@@ -49,7 +49,7 @@ class Test_Shatter(object):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 2
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
-                    assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/resolution)-yi)))
+                    assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/storage.config.resolution)-yi)))
 
             m2 = storage.get_history()
             assert len(m2['shatter']) == 2
@@ -105,7 +105,7 @@ class Test_Shatter(object):
     def test_remote_creation(self, s3_shatter_config, s3_storage):
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution
-        maxy = s3_storage.config.bounds.maxy
+        maxy = s3_storage.config.root.maxy
         shatter(s3_shatter_config)
         with s3_storage.open('r') as a:
             y = a[:,0]['Z'].shape[0]
