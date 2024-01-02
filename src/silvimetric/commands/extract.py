@@ -32,9 +32,8 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     data : np.ndarray
 
     name : str
-        _description_
+        Raster file name root
     config : ExtractConfig
-        _description_
     """
     osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
@@ -61,6 +60,14 @@ def create_metric_att_list(metrics: list[Metric], attrs: list[Attribute]):
     return [ m.entry_name(a.name) for m in metrics for a in attrs ]
 
 def extract(config: ExtractConfig):
+    """
+    Coordinate extraction of cell data into raster format using user-specified
+    attributes and metrics
+
+    Parameters
+    ----------
+    config : ExtractConfig
+    """
 
     ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)

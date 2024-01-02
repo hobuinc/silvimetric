@@ -1,11 +1,12 @@
+from typing import Callable, Dict, Generator
+
 import numpy as np
 
 import dask
 import dask.array as da
 import dask.bag as db
-from typing import Callable
 
-from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig, Bounds
+from ..resources import Extents, Storage, ShatterConfig, Data, Bounds
 
 def get_data(bounds: Bounds, filename: str, storage: Storage):
     """
@@ -25,7 +26,7 @@ def get_data(bounds: Bounds, filename: str, storage: Storage):
     data.execute()
     return data.array
 
-type CellIndices = Callable[[np.ndarray, ], da.Array]
+type CellIndices = Callable[[np.ndarray, np.ndarray, int, int], da.Array]
 
 def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.ndarray]:
     """
@@ -43,7 +44,7 @@ def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.nd
     """
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
-    cell_indices:  = lambda xs, ys, x, y: da.logical_and(xs == x, ys == y)
+    cell_indices: CellIndices = lambda xs, ys, x, y: da.logical_and(xs == x, ys == y)
 
     att_view = points[:][attrs]
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
@@ -92,30 +93,23 @@ def arrange(data: np.ndarray, chunk: Extents, attrs: list[str]) -> MetricDataIn:
     return (dx, dy, dd)
 
 
-<<<<<<< HEAD
-def get_metrics(data_in: MetricDataIn, attrs: list[str], metrics: list[Metric],
-                tdb_dir: str)->np.int64:
+
+def get_metrics(data_in: MetricDataIn, attrs: list[str], storage: Storage) -> int:
     """
-    Perform metric analysis over cell-chunked data. Runs every metric requested
-    over every cell/statistic combination that it applies to.
+    Run metric methods over each cell's attribute data.
 
     Parameters
     ----------
     data_in : MetricDataIn
     attrs : list[str]
-    metrics : list[Metric]
-    tdb_dir : str
+    storage : Storage
 
     Returns
     -------
-    np.int64
-        Point count of this Extent
+    int
+        Sum of work cell point counts
     """
-=======
-def get_metrics(data_in, attrs: list[str], storage: Storage):
->>>>>>> main
 
-    ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
 
     # make sure it's not empty. No empty writes
@@ -134,25 +128,22 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     pc = data['count'].sum()
     return pc
 
-<<<<<<< HEAD
-def run(leaves: list[Extents], config: ShatterConfig, s_config: StorageConfig) -> np.int64:
+type Leaves = Generator[Extents]
+def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
-    Coordinate order of events for the shatter process in groups of dask bags.
+    Coordinate workflow
 
     Parameters
     ----------
-    leaves : list[Extents]
+    leaves : Generator[Extents]
     config : ShatterConfig
-    s_config : StorageConfig
+    storage : Storage
 
     Returns
     -------
-    np.int64
-        Pointcount of the run
+    int
+        Sum of all point counts
     """
-=======
-def run(leaves, config: ShatterConfig, storage: Storage):
->>>>>>> main
     attrs = [a.name for a in config.attrs]
 
     leaves = db.from_sequence(leaves)
