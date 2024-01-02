@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Generator
+from typing import Callable, Dict, Generator, TypeAlias
 
 import numpy as np
 
@@ -26,7 +26,7 @@ def get_data(bounds: Bounds, filename: str, storage: Storage):
     data.execute()
     return data.array
 
-type CellIndices = Callable[[np.ndarray, np.ndarray, int, int], da.Array]
+CellIndices: TypeAlias = Callable[[np.ndarray, np.ndarray, int, int], da.Array]
 
 def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.ndarray]:
     """
@@ -50,7 +50,7 @@ def get_atts(points: np.ndarray, chunk: Extents, attrs: list[str]) -> list[np.nd
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
     return dask.persist(*l)
 
-type MetricDataIn = tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray]]
+MetricDataIn: TypeAlias = tuple[np.ndarray, np.ndarray, Dict[str, np.ndarray]]
 def arrange(data: np.ndarray, chunk: Extents, attrs: list[str]) -> MetricDataIn:
     """
     Arrange data into a format that TileDB accepts, which is a dict of
@@ -128,7 +128,7 @@ def get_metrics(data_in: MetricDataIn, attrs: list[str], storage: Storage) -> in
     pc = data['count'].sum()
     return pc
 
-type Leaves = Generator[Extents]
+Leaves: TypeAlias = Generator[Extents, None, None]
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate workflow
