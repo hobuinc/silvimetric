@@ -56,8 +56,8 @@ class Storage:
             ctx = tiledb.default_ctx()
 
         # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
-        xi = floor((config.bounds.maxx - config.bounds.minx) / float(config.resolution))
-        yi = floor((config.bounds.maxy - config.bounds.miny) / float(config.resolution))
+        xi = floor((config.root.maxx - config.root.minx) / float(config.resolution))
+        yi = floor((config.root.maxy - config.root.miny) / float(config.resolution))
 
         dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.int32)
         dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)

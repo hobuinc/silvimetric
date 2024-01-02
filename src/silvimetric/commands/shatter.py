@@ -4,10 +4,10 @@ import dask
 import dask.array as da
 import dask.bag as db
 
-from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig
+from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig, Bounds
 
-def get_data(bounds, filename, storageconfig):
-    data = Data(filename, storageconfig, bounds = bounds)
+def get_data(bounds: Bounds, filename: str, storage: Storage):
+    data = Data(filename, storage.config, bounds = bounds)
     data.execute()
     return data.array
 
@@ -44,10 +44,8 @@ def arrange(data, chunk, attrs):
     return [dx, dy, dd]
 
 
-def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
-                tdb_dir: str):
+def get_metrics(data_in, attrs: list[str], storage: Storage):
 
-    storage = Storage.from_db(tdb_dir)
     ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
 
@@ -59,7 +57,7 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     # when it was outside
     metric_data = {
         f'{m.entry_name(attr)}': dask.persist(*[m(cell_data) for cell_data in data[attr]])
-        for attr in attrs for m in metrics
+        for attr in attrs for m in storage.config.metrics
     }
     full_data = data | metric_data
 
@@ -67,14 +65,14 @@ def get_metrics(data_in, attrs: list[str], metrics: list[Metric],
     pc = data['count'].sum()
     return pc
 
-def run(leaves, config: ShatterConfig, s_config: StorageConfig):
+def run(leaves, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
     leaves = db.from_sequence(leaves)
-    points: db.Bag = leaves.map(get_data, config.filename, s_config).persist()
+    points: db.Bag = leaves.map(get_data, config.filename, storage).persist()
     att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
     arranged: db.Bag = att_data.map(arrange, leaves, attrs).persist()
-    metrics: db.Bag = arranged.map(get_metrics, attrs, config.metrics, config.tdb_dir)
+    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
 
     vals = metrics.persist()
 
@@ -90,11 +88,11 @@ def shatter(config: ShatterConfig):
     extents = Extents.from_sub(config.tdb_dir, config.bounds, config.tile_size)
 
     data = Data(config.filename, storage.config, extents.bounds)
-    leaves = extents.chunk(data, 1000)
+    leaves = extents.chunk(data, 100)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
-    pc = run(leaves, config, storage.config)
+    pc = run(leaves, config, storage)
     config.point_count = int(pc)
 
     config.log.debug('Saving shatter metadata')

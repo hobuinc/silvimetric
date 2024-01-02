@@ -28,7 +28,7 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
-                        bounds = bounds,
+                        root = bounds,
                         resolution = resolution,
                         attrs = attrs,
                         metrics = metrics,
@@ -119,7 +119,7 @@ def bounds(minx, maxx, miny, maxy) -> Bounds:
 
 @pytest.fixture(scope='class')
 def extents(resolution, tile_size, bounds) -> Extents:
-    yield Extents(bounds,resolution,tile_size)
+    yield Extents(bounds,resolution,bounds, tile_size)
 
 @pytest.fixture(scope="session")
 def attrs(dims) -> list[str]:
