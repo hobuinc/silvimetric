@@ -119,7 +119,7 @@ class StorageConfig(Config):
             crs = None
         n = cls(tdb_dir = x['tdb_dir'],
                 root = root,
-                log = x['log'],
+                log = Log(**x['log']),
                 resolution = x['resolution'],
                 attrs = attrs,
                 crs = crs,

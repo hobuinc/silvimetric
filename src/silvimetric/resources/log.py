@@ -57,7 +57,8 @@ class Log:
     def __init__(self,
                  log_level: int,
                  logdir: str = None,
-                 logtype: str = "stream"):
+                 logtype: str = "stream",
+                 logfilename: str = "silvimetric-log.txt"):
         """
         Creates logging formatting and structure
 
@@ -75,7 +76,7 @@ class Log:
             self.logtype = 'file'
         else:
             self.logtype = logtype
-        self.logfilename = "silvimetric-log.txt"
+        self.logfilename = logfilename
 
 
         # File Handler for Logging
@@ -92,8 +93,8 @@ class Log:
             if not logpath.exists():
                 logpath.mkdir()
 
-            self.logfilename = str(logpath / self.logfilename )
-            file_handler = logging.FileHandler( self.logfilename )
+            logfilename = str(logpath / self.logfilename )
+            file_handler = logging.FileHandler( logfilename )
 
             file_handler.setLevel(self.log_level)
             file_handler.setFormatter(log_format)
