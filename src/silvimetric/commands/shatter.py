@@ -5,6 +5,9 @@ import numpy as np
 import dask
 import dask.array as da
 import dask.bag as db
+from dask.distributed import Client
+
+import webbrowser
 
 from ..resources import Extents, Storage, ShatterConfig, Data, Bounds
 
@@ -156,6 +159,28 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     return sum(vals)
 
+def set_dask_config(config: ShatterConfig) -> None:
+    """
+    Create dask config from the shatter config fields.
+
+    Parameters
+    ----------
+    config : ShatterConfig
+    """
+    if config.dasktype == 'cluster':
+        client = Client(n_workers=config.workers,
+                    threads_per_worker=config.threads,
+                    silence_logs=False,
+                    set_as_default=True)
+
+        client.get_versions(check=True)
+        if config.watch:
+            webbrowser.open(client.cluster.dashboard_link)
+    else:
+        dask.config.set(scheduler=config.dasktype,
+                        n_workers=config.workers,
+                        threads_per_worker=config.threads)
+
 
 def shatter(config: ShatterConfig) -> int:
     """
@@ -171,6 +196,8 @@ def shatter(config: ShatterConfig) -> int:
     int
         Point count of the dataset
     """
+
+    set_dask_config(config)
 
     config.log.debug('Filtering out empty chunks...')
 

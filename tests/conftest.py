@@ -3,6 +3,8 @@ import os
 import dask
 import pdal
 from uuid import uuid4
+import boto3
+s3 = boto3.resource('s3')
 
 from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
 from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
@@ -68,7 +70,12 @@ def s3_bucket():
 @pytest.fixture(scope='function')
 def s3_uri(s3_bucket):
     uuid = uuid4()
-    yield f"s3://{s3_bucket}/test_silvimetric/{uuid}"
+    prefix = f'test_silvimetric/{uuid}/'
+    yield f"s3://{s3_bucket}/{prefix}"
+
+    bucket = s3.Bucket(s3_bucket)
+    objects = bucket.objects.filter(Prefix=prefix)
+    objects.delete()
 
 @pytest.fixture(scope="function")
 def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
@@ -79,7 +86,6 @@ def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
 def s3_storage(s3_storage_config):
     import subprocess
     yield Storage.create(s3_storage_config)
-    subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
 
 @pytest.fixture(scope="function")
 def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):

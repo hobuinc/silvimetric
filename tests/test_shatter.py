@@ -21,6 +21,12 @@ def write(x,y,val, s:Storage, attrs, dims, metrics):
     with s.open('w') as w:
         w[x,y] = data
 
+@pytest.mark.parametrize(argnames='dask_type',
+                         argvalues=[
+                             'processes',
+                             'threaded',
+                             'single-threaded',
+                             'cluster'])
 class Test_Shatter(object):
 
     def test_shatter(self, shatter_config, storage: Storage, maxy):
@@ -54,7 +60,7 @@ class Test_Shatter(object):
             m2 = storage.get_history()
             assert len(m2['shatter']) == 2
 
-    def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
+    def test_parallel(self, storage, attrs, dims, metrics):
         # test that writing in parallel doesn't affect ordering of values
         # constrained by NumberOfReturns being uint8
 

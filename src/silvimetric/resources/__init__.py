@@ -7,4 +7,4 @@ from .metric import Metric, Metrics
 from .log import Log
 from .data import Data
 from .entry import Attribute, Pdal_Attributes, Attributes
-from .config import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from .config import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig, DaskConfig

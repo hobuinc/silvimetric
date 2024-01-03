@@ -1,14 +1,15 @@
 import pyproj
-import pdal
 
 import json
 from json import JSONEncoder
 import uuid
+import dask
 
 from pathlib import Path
 from abc import ABC, abstractmethod
 
 from dataclasses import dataclass, field
+from typing import Literal
 
 from .log import Log
 from .extents import Bounds
@@ -212,6 +213,12 @@ class ExtractConfig(Config):
     attrs: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
     bounds: Bounds = field(default=None)
+
+    ## dask configuration
+    dasktype: Literal['cluster', 'threaded', 'single-threaded', 'processes'] = field(default='threaded')
+    workers: int = field(default=12)
+    threads: int = field(default=4)
+    watch: bool = field(default=False)
 
     def __post_init__(self) -> None:
         from .storage import Storage
