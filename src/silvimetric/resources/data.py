@@ -130,6 +130,7 @@ class Data:
     def execute(self):
         try:
             self.pipeline.execute()
+            # self.storageconfig.log.debug(f"PDAL log: {self.pipeline.log}")
         except Exception as e:
             print(self.pipeline.pipeline, e)
             raise e
