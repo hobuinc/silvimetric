@@ -3,6 +3,7 @@ import numpy as np
 import dask
 import dask.array as da
 import dask.bag as db
+from dask.delayed import Delayed
 
 from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig, Bounds
 

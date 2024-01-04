@@ -1,15 +1,11 @@
 import math
-import types
-
-import pdal
 import numpy as np
-from shapely import from_wkt
+import dask
+import dask.bag as db
 
 from .bounds import Bounds
 from .storage import Storage
 from .data import Data
-
-
 
 class Extents(object):
 
@@ -37,6 +33,7 @@ class Extents(object):
             for j in range(self.y1, self.y2)],
             dtype=[('x', np.int32), ('y', np.int32)]
         )
+        self.leaf = False
 
     def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
@@ -59,36 +56,53 @@ class Extents(object):
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r, self.tile_size)
         self.root_chunk: Extents = chunk
 
-        filtered = chunk.filter(data, threshold)
+        filtered = []
+        curr = db.from_delayed(self.filter(data, threshold))
+        while True:
+            vals = curr.compute()
+            nxt = [one for one in vals if not isinstance(one, Extents)]
+            print(any([isinstance(x, Extents) for x in nxt]))
 
-        def flatten(il):
-            ol = []
-            for s in il:
-                if isinstance(s, list):
-                    ol.append(flatten(il))
-                ol.append(s)
-            return ol
+            to_add = [one for one in vals if isinstance(one, Extents)]
+            if to_add:
+                filtered.append(to_add)
 
-        def get_leaves(c):
-            l = []
-            while True:
-                try:
-                    n = next(c)
-                    if isinstance(n, types.GeneratorType):
-                        l += flatten(get_leaves(n))
-                    elif isinstance(n, Extents):
-                        l.append(n)
-                except StopIteration:
-                    return l
+            curr = db.from_delayed(nxt)
 
-        leaves: list[Extents] = get_leaves(filtered)
-        yield from [bounds for leaf in leaves for bounds in leaf.get_leaf_children()]
+
+
+
+        return db.from_sequence(filtered)
+
+        # filtered = chunk.filter(data, threshold)
+        # def flatten(il):
+        #     ol = []
+        #     for s in il:
+        #         if isinstance(s, list):
+        #             ol.append(flatten(il))
+        #         ol.append(s)
+        #     return ol
+
+        # def get_leaves(c):
+        #     l = []
+        #     while True:
+        #         try:
+        #             n = next(c)
+        #             if isinstance(n, types.GeneratorType):
+        #                 l += flatten(get_leaves(n))
+        #             elif isinstance(n, Extents):
+        #                 l.append(n)
+        #         except StopIteration:
+        #             return l
+
+        # leaves: list[Extents] = get_leaves(filtered)
+        # yield from [bounds for leaf in leaves for bounds in leaf.get_leaf_children()]
 
     def split(self):
         minx, miny, maxx, maxy = self.bounds.get()
         midx = minx + ((maxx - minx)/ 2)
         midy = miny + ((maxy - miny)/ 2)
-        yield from [
+        return [
             Extents(Bounds(minx, miny, midx, midy), self.resolution,
                     self.root, self.tile_size), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution,
@@ -102,22 +116,26 @@ class Extents(object):
     # create quad tree of chunks for this bounds, run pdal quickinfo over this
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
+    @dask.delayed
     def filter(self, data: Data, threshold_resolution=100):
+        if self.leaf:
+            return self
+
         pc = data.estimate_count(self.bounds)
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
         # is it empty?
         if not pc:
-            yield None
+            return [ ]
         else:
             # has it hit the threshold yet?
             area = (maxx - minx) * (maxy - miny)
             if maxx - minx < threshold_resolution:
-                yield self
+                self.leaf = True
+                return self
             else:
-                children = self.split()
-                yield from [c.filter(data,threshold_resolution) for c in children]
+                return [ ch.filter(data, threshold_resolution) for ch in self.split() ]
 
     def find_dims(self):
         gs = self.tile_size
