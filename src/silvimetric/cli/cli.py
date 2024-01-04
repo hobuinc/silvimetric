@@ -134,20 +134,18 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
 @click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--dasktype", default='cluster',
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dasktype):
+def shatter_cmd(app, pointcloud, workers, threads, watch, bounds, dasktype):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                            log = app.log,
                            filename = pointcloud,
-                           tile_size = tilesize,
                            bounds = bounds)
 
     if dasktype == 'cluster':

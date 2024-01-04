@@ -50,12 +50,11 @@ def app_config(tdb_filepath, debug=True):
     yield app
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, copc_filepath, tile_size, storage_config, app_config, storage):
+def shatter_config(tdb_filepath, copc_filepath, storage_config, app_config, storage):
     log = Log(20) # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,
-                      tile_size = tile_size,
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
                       debug = True)
@@ -118,8 +117,8 @@ def bounds(minx, maxx, miny, maxy) -> Bounds:
     yield b
 
 @pytest.fixture(scope='class')
-def extents(resolution, tile_size, bounds) -> Extents:
-    yield Extents(bounds,resolution,bounds, tile_size)
+def extents(resolution, bounds) -> Extents:
+    yield Extents(bounds,resolution,bounds)
 
 @pytest.fixture(scope="session")
 def attrs(dims) -> list[str]:
@@ -133,10 +132,6 @@ def dims():
 @pytest.fixture(scope='class')
 def resolution() -> int:
     yield 30
-
-@pytest.fixture(scope='class')
-def tile_size() -> int:
-    yield 4
 
 @pytest.fixture(scope='class')
 def test_point_count() -> int:

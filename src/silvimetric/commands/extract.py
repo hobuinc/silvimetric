@@ -51,7 +51,7 @@ def extract(config: ExtractConfig):
     root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
-    i = e.indices
+    i = e.indices()
     minx = i['x'].min()
     maxx = i['x'].max()
     miny = i['y'].min()

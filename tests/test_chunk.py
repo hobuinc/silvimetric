@@ -86,7 +86,7 @@ class TestExtents(object):
 
     @pytest.fixture(scope='function')
     def unfiltered(self, filtered, extents):
-        return list(extents.root_chunk.get_leaf_children())
+        return list(extents.root_chunk)
 
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)
@@ -102,8 +102,8 @@ class TestExtents(object):
             crop = pdal.Filter.crop(bounds=str(leaf))
             p = reader | crop
             count = p.execute()
-            xs = np.unique(leaf.indices['x'])
-            ys = np.unique(leaf.indices['y'])
+            xs = np.unique(leaf.indices()['x'])
+            ys = np.unique(leaf.indices()['y'])
             chunk_pc = (resolution - 1)**2 * xs.size * ys.size
             if count == 0:
                 continue

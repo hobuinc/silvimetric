@@ -82,7 +82,7 @@ class Test_Shatter(object):
 
     def test_sub_bounds(self, shatter_config, storage, test_point_count):
         s = shatter_config
-        e = Extents.from_storage(s.tdb_dir, s.tile_size)
+        e = Extents.from_storage(s.tdb_dir)
         pc = 0
         for b in e.split():
             log = Log(20)

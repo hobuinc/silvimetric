@@ -15,19 +15,27 @@ def get_data(bounds: Bounds, filename: str, storage: Storage):
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def get_atts(points: da.Array, chunk: Extents, attrs: list[str]):
+def get_atts(points: da.Array, attrs: list[str]):
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
 
-    att_view = points[:][attrs]
-    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in chunk.indices]
-    return dask.persist(*l)
+    indices = np.array(
+        [(i,j) for i in range(int(xis.min()), int(xis.max()))
+        for j in range(int(yis.min()), int(yis.max()))],
+        dtype=[('x', np.int32), ('y', np.int32)]
+    )
 
-def arrange(data, chunk, attrs):
+    att_view = points[:][attrs]
+    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in indices]
+    return (indices['x'], indices['y'], dask.persist(*l))
+
+def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
+    dx, dy, di = data
+
     dd = {}
     for att in attrs:
         try:
-            dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in data], None], dtype=object)[:-1]
+            dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in di], None], dtype=object)[:-1]
         except Exception as e:
             raise Exception(f"Missing attribute {att}: {e}")
     counts = np.array([z.size for z in dd['Z']], np.int32)
@@ -35,8 +43,6 @@ def arrange(data, chunk, attrs):
     ## remove empty indices
     empties = np.where(counts == 0)[0]
     dd['count'] = counts
-    dx = chunk.indices['x']
-    dy = chunk.indices['y']
     if bool(empties.size):
         for att in dd:
             dd[att] = np.delete(dd[att], empties)
@@ -66,13 +72,12 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     pc = data['count'].sum()
     return pc
 
-def run(leaves, config: ShatterConfig, storage: Storage):
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    leaves = db.from_sequence(leaves)
     points: db.Bag = leaves.map(get_data, config.filename, storage).persist()
-    att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
-    arranged: db.Bag = att_data.map(arrange, leaves, attrs).persist()
+    att_data: db.Bag = points.map(get_atts, attrs).persist()
+    arranged: db.Bag = att_data.map(arrange, attrs).persist()
     metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
 
     vals = metrics.persist()
@@ -86,7 +91,7 @@ def shatter(config: ShatterConfig):
 
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    extents = Extents.from_sub(config.tdb_dir, config.bounds, config.tile_size)
+    extents = Extents.from_sub(config.tdb_dir, config.bounds)
 
     data = Data(config.filename, storage.config, extents.bounds)
     leaves = extents.chunk(data, 100)
