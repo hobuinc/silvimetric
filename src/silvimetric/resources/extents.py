@@ -6,6 +6,7 @@ import dask.array as da
 import dask.bag as db
 
 from typing import Self
+from line_profiler import profile
 
 from .bounds import Bounds
 from .storage import Storage
@@ -31,14 +32,18 @@ class Extents(object):
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
         self.x2 = math.floor((maxx - self.root.minx) / resolution)
         self.y2 = math.floor((self.root.maxy - miny) / resolution)
+        self.indices = None
 
-    def indices(self):
-        return np.array(
-            [(i,j) for i in range(self.x1, self.x2)
-             for j in range(self.y1, self.y2)],
-             dtype=[('x', np.int32), ('y', np.int32)]
-        )
+    def get_indices(self):
+        if self.indices is None:
+            self.indices =  np.array(
+                [(i,j) for i in range(self.x1, self.x2)
+                for j in range(self.y1, self.y2)],
+                dtype=[('x', np.int32), ('y', np.int32)]
+            )
+        return self.indices
 
+    @profile
     def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
@@ -67,11 +72,11 @@ class Extents(object):
         curr = db.from_delayed(chunk.filter(data, threshold))
 
         while curr.npartitions > 0:
-            to_add = curr.filter(lambda x: isinstance(x, Bounds)).compute()
+            to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
             if to_add:
                 filtered = filtered + to_add
 
-            curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Bounds)))
+            curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Extents)))
 
         return filtered
 
@@ -95,7 +100,7 @@ class Extents(object):
 
 
         pc = data.estimate_count(self.bounds)
-        target_pc = 6*10**5
+        target_pc = 3*10**5
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -112,9 +117,9 @@ class Extents(object):
             # the point count is less than the threshold (600k) then use this
             # tile as the work unit.
             if next_split_x < self.resolution or next_split_y < self.resolution:
-                return [ self.bounds ]
+                return [ self ]
             elif pc < target_pc:
-                return [ self.bounds ]
+                return [ self ]
             elif area < threshold_resolution**2:
                 pc_per_cell = pc / (area / self.resolution**2)
                 cell_estimate = target_pc / pc_per_cell
@@ -151,7 +156,7 @@ class Extents(object):
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         return [
-            Bounds(minx, miny, maxx, maxy)
+            Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.root)
             for minx,maxx,miny,maxy in coords_list
         ]
 

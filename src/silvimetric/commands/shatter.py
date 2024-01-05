@@ -3,17 +3,20 @@ import numpy as np
 import dask
 import dask.array as da
 import dask.bag as db
+from line_profiler import profile
 
 from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig, Bounds
 
-def get_data(bounds: Bounds, filename: str, storage: Storage):
-    data = Data(filename, storage.config, bounds = bounds)
+@profile
+def get_data(extents: Extents, filename: str, storage: Storage):
+    data = Data(filename, storage.config, bounds = extents.bounds)
     data.execute()
     return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
+@profile
 def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
     if points.size == 0:
         return None
@@ -21,21 +24,22 @@ def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
 
-    indices = np.array(
-        [(i,j) for i in range(int(xis.min()), int(xis.max()))
-        for j in range(int(yis.min()), int(yis.max()))],
-        dtype=[('x', np.int32), ('y', np.int32)]
-    )
+    # indices = np.array(
+    #     [(i,j) for i in range(int(xis.min()), int(xis.max()))
+    #     for j in range(int(yis.min()), int(yis.max()))],
+    #     dtype=[('x', np.int32), ('y', np.int32)]
+    # )
 
     att_view = points[:][attrs]
-    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in indices]
-    return (indices['x'], indices['y'], dask.persist(*l))
+    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in leaf.get_indices()]
+    return dask.persist(*l)
 
-def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
+@profile
+def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs):
     if data is None:
         return None
 
-    dx, dy, di = data
+    di = data
 
     dd = {}
     for att in attrs:
@@ -48,6 +52,8 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
     ## remove empty indices
     empties = np.where(counts == 0)[0]
     dd['count'] = counts
+    dx = leaf.get_indices()['x']
+    dy = leaf.get_indices()['y']
     if bool(empties.size):
         for att in dd:
             dd[att] = np.delete(dd[att], empties)
@@ -56,6 +62,7 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
     return [dx, dy, dd]
 
 
+@profile
 def get_metrics(data_in, attrs: list[str], storage: Storage):
     if data_in is None:
         return 0
@@ -82,9 +89,9 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points: db.Bag = leaves.map(get_data, config.filename, storage).persist()
-    att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
-    arranged: db.Bag = att_data.map(arrange, attrs).persist()
+    points: db.Bag = leaves.map(get_data, config.filename, storage)
+    att_data: db.Bag = points.map(get_atts, leaves, attrs)
+    arranged: db.Bag = att_data.map(arrange, leaves, attrs)
     metrics: db.Bag = arranged.map(get_metrics, attrs, storage).persist()
 
     pc = sum(metrics)
