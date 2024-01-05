@@ -9,7 +9,6 @@ from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageCo
 def get_data(bounds: Bounds, filename: str, storage: Storage):
     data = Data(filename, storage.config, bounds = bounds)
     data.execute()
-    xis = data.array[['xi']]['xi']
     return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
