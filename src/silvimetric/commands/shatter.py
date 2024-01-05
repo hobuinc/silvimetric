@@ -3,19 +3,22 @@ import numpy as np
 import dask
 import dask.array as da
 import dask.bag as db
-from dask.delayed import Delayed
 
 from ..resources import Extents, Storage, Metric, ShatterConfig, Data, StorageConfig, Bounds
 
 def get_data(bounds: Bounds, filename: str, storage: Storage):
     data = Data(filename, storage.config, bounds = bounds)
     data.execute()
+    xis = data.array[['xi']]['xi']
     return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def get_atts(points: da.Array, attrs: list[str]):
+def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
+    if points.size == 0:
+        return None
+
     xis = da.floor(points[['xi']]['xi'])
     yis = da.floor(points[['yi']]['yi'])
 
@@ -30,6 +33,9 @@ def get_atts(points: da.Array, attrs: list[str]):
     return (indices['x'], indices['y'], dask.persist(*l))
 
 def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
+    if data is None:
+        return None
+
     dx, dy, di = data
 
     dd = {}
@@ -52,6 +58,8 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], attrs):
 
 
 def get_metrics(data_in, attrs: list[str], storage: Storage):
+    if data_in is None:
+        return 0
 
     ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
@@ -76,13 +84,15 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
     points: db.Bag = leaves.map(get_data, config.filename, storage).persist()
-    att_data: db.Bag = points.map(get_atts, attrs).persist()
+    att_data: db.Bag = points.map(get_atts, leaves, attrs).persist()
     arranged: db.Bag = att_data.map(arrange, attrs).persist()
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
+    metrics: db.Bag = arranged.map(get_metrics, attrs, storage).persist()
 
-    vals = metrics.persist()
-
-    return sum(vals)
+    pc = sum(metrics)
+    avg = metrics.mean()
+    print('pc', pc)
+    print('avc', avg)
+    return pc
 
 
 def shatter(config: ShatterConfig):
@@ -94,7 +104,7 @@ def shatter(config: ShatterConfig):
     extents = Extents.from_sub(config.tdb_dir, config.bounds)
 
     data = Data(config.filename, storage.config, extents.bounds)
-    leaves = extents.chunk(data, 100)
+    leaves = db.from_sequence(extents.chunk(data, 200))
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

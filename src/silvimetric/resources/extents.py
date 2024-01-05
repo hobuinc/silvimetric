@@ -65,21 +65,16 @@ class Extents(object):
 
         filtered = []
         curr = db.from_delayed(chunk.filter(data, threshold))
-        while True:
-            # prev = curr.compute()
 
-            # to_add = [one for one in curr if isinstance(one, Extents)]
-            to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
+        while curr.npartitions > 0:
+            to_add = curr.filter(lambda x: isinstance(x, Bounds)).compute()
             if to_add:
-                filtered.append(db.from_sequence(to_add))
-                if len(to_add) == curr.npartitions:
-                    break
+                filtered = filtered + to_add
 
-            # nxt = [one for one in curr if not isinstance(one, Extents)]
-            curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Extents)))
+            curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Bounds)))
 
+        return filtered
 
-        return db.concat(filtered)
 
     def split(self):
         minx, miny, maxx, maxy = self.bounds.get()
@@ -97,9 +92,10 @@ class Extents(object):
     # set a bottom resolution of ~1km
     @dask.delayed
     def filter(self, data: Data, threshold_resolution=100) -> Self:
-        res = max(self.resolution, threshold_resolution)
+
 
         pc = data.estimate_count(self.bounds)
+        target_pc = 6*10**5
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -108,7 +104,7 @@ class Extents(object):
             return [ ]
         else:
             # has it hit the threshold yet?
-            xside = maxx - minx
+            area = (maxx - minx) * (maxy - miny)
             next_split_x = (maxx-minx) / 2
             next_split_y = (maxy-miny) / 2
 
@@ -116,11 +112,48 @@ class Extents(object):
             # the point count is less than the threshold (600k) then use this
             # tile as the work unit.
             if next_split_x < self.resolution or next_split_y < self.resolution:
-                return [ self ]
-            if pc < 6*10**5:
-                return [ self ]
+                return [ self.bounds ]
+            elif pc < target_pc:
+                return [ self.bounds ]
+            elif area < threshold_resolution**2:
+                pc_per_cell = pc / (area / self.resolution**2)
+                cell_estimate = target_pc / pc_per_cell
+                return self.get_leaf_children(int(cell_estimate))
             else:
-                return [ ch.filter(data, res) for ch in self.split() ]
+                return [ ch.filter(data, threshold_resolution) for ch in self.split() ]
+
+    def _find_dims(self, tile_size):
+        s = math.sqrt(tile_size)
+        if int(s) == s:
+            return [s, s]
+        rng = np.arange(1, tile_size+1, dtype=np.int32)
+        factors = rng[np.where(tile_size % rng == 0)]
+        idx = int((factors.size/2)-1)
+        x = factors[idx]
+        y = int(tile_size/ x)
+        return [x, y]
+
+    def get_leaf_children(self, tile_size):
+        res = self.resolution
+        xnum, ynum = self._find_dims(tile_size)
+
+        local_xs = np.array([
+                [x, min(x+xnum, self.x2)]
+                for x in range(self.x1, self.x2, int(xnum))
+            ], dtype=np.float64)
+        dx = (res * local_xs) + self.root.minx
+
+        local_ys = np.array([
+                [min(y+ynum, self.y2), y]
+                for y in range(self.y1, self.y2, int(ynum))
+            ], dtype=np.float64)
+        dy = self.root.maxy - (res * local_ys)
+
+        coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
+        return [
+            Bounds(minx, miny, maxx, maxy)
+            for minx,maxx,miny,maxy in coords_list
+        ]
 
     @staticmethod
     def from_storage(tdb_dir: str):
