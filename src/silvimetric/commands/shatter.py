@@ -59,46 +59,64 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attr
             dd[att] = np.delete(dd[att], empties)
         dx = np.delete(dx, empties)
         dy = np.delete(dy, empties)
-    return [dx, dy, dd]
+    return (dx, dy, dd)
 
 
 @profile
 def get_metrics(data_in, attrs: list[str], storage: Storage):
     if data_in is None:
-        return 0
+        return None
 
     ## data comes in as [dx, dy, { 'att': [data] }]
     dx, dy, data = data_in
 
     # make sure it's not empty. No empty writes
     if not np.any(data['count']):
-        return 0
+        return None
 
     # doing dask compute inside the dict array because it was too fine-grained
     # when it was outside
     metric_data = {
-        f'{m.entry_name(attr)}': dask.persist(*[m(cell_data) for cell_data in data[attr]])
+        f'{m.entry_name(attr)}': [m(cell_data) for cell_data in data[attr]]
         for attr in attrs for m in storage.config.metrics
     }
     full_data = data | metric_data
+    return (dx,dy,full_data)
 
-    storage.write(dx,dy,full_data)
+    # storage.write(dx,dy,full_data)
+    # pc = data['count'].sum()
+    # return pc
+
+@profile
+def write(data_in, tdb):
+    if data_in is None:
+        return 0
+    dx, dy, data = data_in
+    tdb[dx,dy] = data
     pc = data['count'].sum()
+    del dx, dy, data, data_in
     return pc
 
+@profile
+def clean(pc, m, a, ad, p, lb):
+    del m, lb, p, ad, a
+    return pc
+
+@profile
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     attrs = [a.name for a in config.attrs]
 
-    points: db.Bag = leaves.map(get_data, config.filename, storage)
-    att_data: db.Bag = points.map(get_atts, leaves, attrs)
-    arranged: db.Bag = att_data.map(arrange, leaves, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage).persist()
+    with storage.open('w') as a:
 
-    pc = sum(metrics)
-    avg = metrics.mean()
-    print('pc', pc)
-    print('avc', avg)
-    return pc
+        leaf_bag = db.from_sequence(leaves)
+        points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+        att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
+        arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
+        metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
+        writes: db.Bag = metrics.map(write, a)
+        pcs = writes.map(clean, metrics, arranged, att_data, points, leaf_bag).persist()
+
+    return sum(pcs)
 
 
 def shatter(config: ShatterConfig):
@@ -110,7 +128,7 @@ def shatter(config: ShatterConfig):
     extents = Extents.from_sub(config.tdb_dir, config.bounds)
 
     data = Data(config.filename, storage.config, extents.bounds)
-    leaves = db.from_sequence(extents.chunk(data, 200))
+    leaves = extents.chunk(data, 100)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

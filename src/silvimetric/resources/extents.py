@@ -100,7 +100,7 @@ class Extents(object):
 
 
         pc = data.estimate_count(self.bounds)
-        target_pc = 3*10**5
+        target_pc = 100000
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -123,6 +123,7 @@ class Extents(object):
             elif area < threshold_resolution**2:
                 pc_per_cell = pc / (area / self.resolution**2)
                 cell_estimate = target_pc / pc_per_cell
+                cell_estimate = 30
                 return self.get_leaf_children(int(cell_estimate))
             else:
                 return [ ch.filter(data, threshold_resolution) for ch in self.split() ]

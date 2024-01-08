@@ -1,5 +1,5 @@
 import click
-from dask.distributed import Client
+from dask.distributed import Client, performance_report
 import dask
 import webbrowser
 import pyproj
@@ -136,11 +136,12 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--threads", default=4, type=int)
 @click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--report", is_flag=True, default=False, type=bool)
 @click.option("--dasktype", default='cluster',
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, threads, watch, bounds, dasktype):
+def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
 
     config = ShatterConfig(tdb_dir = app.tdb_dir,
@@ -153,7 +154,13 @@ def shatter_cmd(app, pointcloud, workers, threads, watch, bounds, dasktype):
             client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter.shatter(config)
+            if report:
+                report_path = f'{config.name}.html'
+                with performance_report(report_path) as pr:
+                    shatter.shatter(config)
+                print(f'Writing report to {report_path}.')
+            else:
+                shatter.shatter(config)
     else:
         dask.config.set(scheduler=dasktype)
         shatter.shatter(config)

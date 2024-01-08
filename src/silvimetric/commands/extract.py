@@ -7,7 +7,7 @@ from ..resources import Extents
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
-    np.dtype(np.int8).str: gdal.GDT_Int8,
+    np.dtype(np.int8).str: gdal.GDT_Int16,
     np.dtype(np.uint16).str: gdal.GDT_UInt16,
     np.dtype(np.int16).str: gdal.GDT_Int16,
     np.dtype(np.uint32).str: gdal.GDT_UInt32,

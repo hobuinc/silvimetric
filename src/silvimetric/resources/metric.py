@@ -31,7 +31,7 @@ class Metric(Entry):
         return f'm_{attr}_{self.name}'
 
     @dask.delayed
-    def do(self, data: np.ndarray) -> np.ndarray:
+    def delayed(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
     def to_json(self) -> dict[str, any]:
@@ -68,30 +68,23 @@ class Metric(Entry):
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
-@profile
 def m_mean(data):
     return np.mean(data)
 
-@profile
 def m_mode(data):
     return stats.mode(data).mode
 
-@profile
 def m_median(data):
     return np.median(data)
 
-@profile
 def m_min(data):
     return np.min(data)
 
-@profile
 def m_max(data):
     return np.max(data)
 
-@profile
 def m_stddev(data):
     return np.std(data)
-
 
 Metrics = {
     'mean' : Metric('mean', np.float64, m_mean),

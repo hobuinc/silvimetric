@@ -6,6 +6,7 @@ import numpy as np
 import pdal
 
 import pathlib
+from line_profiler import profile
 
 
 class Data:
@@ -33,23 +34,7 @@ class Data:
         return False
 
 
-    def get_root(self) -> Bounds:
-        """Fetch the reader and grab its bounds with PDAL quickinfo."""
-
-        reader = self.get_reader()
-        reader._options['threads'] = self.reader_thread_count
-
-        pipeline = reader.pipeline()
-        qi = pipeline.quickinfo[reader.type]
-        pc = qi['num_points']
-
-        b = qi['bounds']
-        return Bounds(b['minx'],
-                      b['miny'],
-                      b['maxx'],
-                      b['maxy'])
-
-
+    @profile
     def make_pipeline(self) -> pdal.Pipeline:
         """Take a COPC or EPT endpoint and generate a PDAL pipeline for it"""
 
@@ -62,15 +47,12 @@ class Data:
         nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
 
-        resolution = self.storageconfig.resolution
-        self.root = self.get_root()
         # assign_x = pdal.Filter.assign(
         #     value=f"xi = (X - {self.root.minx}) / {resolution}")
         # assign_y = pdal.Filter.assign(
         #     value=f"yi = ({self.root.maxy} - Y) / {resolution}")
 
         return reader | class_zero | rn | nor #| ferry | assign_x | assign_y #| smrf | hag
-
 
     def get_pipeline(self):
         """Fetch the pipeline for the instance"""
@@ -134,7 +116,7 @@ class Data:
             print(self.pipeline.pipeline, e)
             raise e
 
-    def get_array(self) -> np.array:
+    def get_array(self) -> np.ndarray:
         """Fetch the array from the execute()'d pipeline"""
         return self.pipeline.arrays[0]
     array = property(get_array)
