@@ -30,19 +30,19 @@ def check_for_holes(leaves: list[Extents], chunk: Extents):
         if idx + 1 < len(yrange):
             assert minmax + 1 == yrange[idx + 1], f"Hole in derived extents between {minmax} {yrange[idx + 1]}"
 
-def check_indexing(extents, leaf_list):
+def check_indexing(extents: Extents, leaf_list):
     # gather indices from the chunks to match with extents
-    indices = np.array([], dtype=extents.indices.dtype)
-    b_indices = extents.indices
+    indices = np.array([], dtype=extents.get_indices().dtype)
+    b_indices = extents.get_indices()
     count = 0
 
     #check that mins and maxes are correct first
 
     for ch in leaf_list:
         if not np.any(indices['x']):
-            indices = ch.indices
+            indices = ch.get_indices()
         else:
-            indices = np.append(indices, ch.indices)
+            indices = np.append(indices, ch.get_indices())
         count += 1
 
     assert b_indices['x'].min() == indices['x'].min(), f"""X Minimum indices do not match. \
@@ -85,8 +85,8 @@ class TestExtents(object):
         return list(extents.chunk(copc_data, 100))
 
     @pytest.fixture(scope='function')
-    def unfiltered(self, filtered, extents):
-        return list(extents.root_chunk.get_leaf_children())
+    def unfiltered(self, extents: Extents):
+        return list(extents.get_leaf_children(30))
 
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)
@@ -102,8 +102,8 @@ class TestExtents(object):
             crop = pdal.Filter.crop(bounds=str(leaf))
             p = reader | crop
             count = p.execute()
-            xs = np.unique(leaf.indices['x'])
-            ys = np.unique(leaf.indices['y'])
+            xs = np.unique(leaf.get_indices()['x'])
+            ys = np.unique(leaf.get_indices()['y'])
             chunk_pc = (resolution - 1)**2 * xs.size * ys.size
             if count == 0:
                 continue

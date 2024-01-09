@@ -1,5 +1,5 @@
 import click
-from dask.distributed import Client
+from dask.distributed import Client, performance_report
 import dask
 import webbrowser
 import pyproj
@@ -133,29 +133,36 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
-@click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--tilesize", type=int, default=16)
 @click.option("--threads", default=4, type=int)
+@click.option("--bounds", type=BoundsParamType(), default=None)
+@click.option("--tilesize", type=int, default=0)
 @click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--report", is_flag=True, default=False, type=bool)
 @click.option("--dasktype", default='cluster',
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, tilesize, threads, watch, bounds, dasktype):
+def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype, tilesize):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-
+    ts = tilesize if tilesize != 0 else None
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                            log = app.log,
                            filename = pointcloud,
-                           tile_size = tilesize,
-                           bounds = bounds)
+                           bounds = bounds,
+                           tile_size=ts)
 
     if dasktype == 'cluster':
         with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False ) as client:
             client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
-            shatter.shatter(config)
+            if report:
+                report_path = f'reports/{config.name}.html'
+                with performance_report(report_path) as pr:
+                    shatter.shatter(config)
+                print(f'Writing report to {report_path}.')
+            else:
+                shatter.shatter(config)
     else:
         dask.config.set(scheduler=dasktype)
         shatter.shatter(config)

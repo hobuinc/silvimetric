@@ -292,7 +292,6 @@ class Storage:
             # if self.config.app.debug:
             #     tiledb.stats_reset()
             #     tiledb.stats_enable()
-
             tdb[xs, ys] = data
 
             # if self.config.app.debug:

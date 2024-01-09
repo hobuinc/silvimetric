@@ -7,7 +7,7 @@ from ..resources import Extents
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
-    np.dtype(np.int8).str: gdal.GDT_Int8,
+    np.dtype(np.int8).str: gdal.GDT_Int16,
     np.dtype(np.uint16).str: gdal.GDT_UInt16,
     np.dtype(np.int16).str: gdal.GDT_Int16,
     np.dtype(np.uint32).str: gdal.GDT_UInt32,
@@ -51,7 +51,7 @@ def extract(config: ExtractConfig):
     root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
-    i = e.indices
+    i = e.get_indices()
     minx = i['x'].min()
     maxx = i['x'].max()
     miny = i['y'].min()

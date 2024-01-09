@@ -154,11 +154,11 @@ class ApplicationConfig(Config):
 @dataclass
 class ShatterConfig(Config):
     filename: str
-    tile_size: int
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     bounds: Bounds = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
+    tile_size: int = field(default=None)
     point_count: int = 0
 
     def __post_init__(self) -> None:
@@ -194,7 +194,6 @@ class ShatterConfig(Config):
 
         n = cls(tdb_dir = x['tdb_dir'],
                 filename = x['filename'],
-                tile_size = x['tile_size'],
                 attrs = attrs,
                 metrics = ms,
                 debug = x['debug'],
@@ -245,7 +244,7 @@ class ExtractConfig(Config):
             ms = [ Metric.from_string(m) for m in x['metrics']]
         if 'attrs' in x:
             attrs = [ Attribute.from_string(a) for a in x['attrs']]
-        n = cls(x['out_dir'], x['tile_size'], attrs, ms, x['debug'])
+        n = cls(x['out_dir'], attrs, ms, x['debug'])
 
         return n
 

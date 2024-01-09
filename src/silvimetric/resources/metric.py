@@ -5,6 +5,7 @@ from scipy import stats
 from inspect import getsource
 from tiledb import Attr
 import dask
+from line_profiler import profile
 
 from .entry import Attribute, Entry
 
@@ -30,7 +31,7 @@ class Metric(Entry):
         return f'm_{attr}_{self.name}'
 
     @dask.delayed
-    def do(self, data: np.ndarray) -> np.ndarray:
+    def delayed(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
     def to_json(self) -> dict[str, any]:
@@ -66,11 +67,30 @@ class Metric(Entry):
         return getsource(self._method)
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
+
+def m_mean(data):
+    return np.mean(data)
+
+def m_mode(data):
+    return stats.mode(data).mode
+
+def m_median(data):
+    return np.median(data)
+
+def m_min(data):
+    return np.min(data)
+
+def m_max(data):
+    return np.max(data)
+
+def m_stddev(data):
+    return np.std(data)
+
 Metrics = {
-    'mean' : Metric('mean', np.float64, lambda data: np.mean(data)),
-    'mode' : Metric('mode', np.float64, lambda data: stats.mode(data).mode),
-    'median' : Metric('median', np.float64, lambda data: np.median(data, axis=0)),
-    'min' : Metric('min', np.float64, lambda data: np.min(data)),
-    'max' : Metric('max', np.float64, lambda data: np.max(data)),
-    'stddev' : Metric('stddev', np.float64, lambda data: np.std(data)),
+    'mean' : Metric('mean', np.float64, m_mean),
+    # 'mode' : Metric('mode', np.float64, m_mode),
+    'median' : Metric('median', np.float64, m_median),
+    'min' : Metric('min', np.float64, m_min),
+    'max' : Metric('max', np.float64, m_max),
+    'stddev' : Metric('stddev', np.float64, m_stddev),
 }
