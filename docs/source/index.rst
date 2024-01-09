@@ -21,7 +21,7 @@ SilviMetric is also available on `Google Slides <https://docs.google.com/present
    about
    cli/index
    api
-   Tutorial <tutorial>
+   QuickStart <quickstart>
    development
 
 
