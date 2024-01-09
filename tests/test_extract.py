@@ -37,7 +37,7 @@ def tif_test(extract_config):
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
     e = Extents.from_storage(extract_config.tdb_dir)
-    yimin = e.indices['y'].min()
+    yimin = e.get_indices()['y'].min()
 
     for f in filenames:
         path = Path(extract_config.out_dir) / f'{f}.tif'
@@ -67,9 +67,9 @@ class Test_Extract(object):
         extract(extract_config)
         tif_test(extract_config)
 
-    def test_sub_bounds_extract(self, extract_config, tile_size):
+    def test_sub_bounds_extract(self, extract_config):
         s = extract_config
-        e = Extents.from_storage(s.tdb_dir, tile_size)
+        e = Extents.from_storage(s.tdb_dir)
         log = Log(20)
 
         for b in e.split():
