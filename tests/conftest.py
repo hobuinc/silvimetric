@@ -83,7 +83,8 @@ def s3_storage(s3_storage_config):
 @pytest.fixture(scope="function")
 def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
     config = s3_storage.config
-    yield ShatterConfig(copc_filepath, 2, attrs, metrics, debug=True, tdb_dir=config.tdb_dir)
+    yield ShatterConfig(filename=copc_filepath, attrs=attrs, metrics=metrics,
+                        debug=True, tdb_dir=config.tdb_dir)
 
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:
