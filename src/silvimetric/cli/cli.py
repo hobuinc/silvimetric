@@ -133,21 +133,23 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
-@click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--threads", default=4, type=int)
+@click.option("--bounds", type=BoundsParamType(), default=None)
+@click.option("--tilesize", type=int, default=0)
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--report", is_flag=True, default=False, type=bool)
 @click.option("--dasktype", default='cluster',
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype):
+def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype, tilesize):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-
+    ts = tilesize if tilesize != 0 else None
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                            log = app.log,
                            filename = pointcloud,
-                           bounds = bounds)
+                           bounds = bounds,
+                           tile_size=ts)
 
     if dasktype == 'cluster':
         with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False ) as client:
@@ -155,7 +157,7 @@ def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, daskty
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)
             if report:
-                report_path = f'{config.name}.html'
+                report_path = f'reports/{config.name}.html'
                 with performance_report(report_path) as pr:
                     shatter.shatter(config)
                 print(f'Writing report to {report_path}.')

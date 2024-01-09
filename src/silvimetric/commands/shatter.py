@@ -105,7 +105,10 @@ def shatter(config: ShatterConfig):
     extents = Extents.from_sub(config.tdb_dir, config.bounds)
 
     data = Data(config.filename, storage.config, extents.bounds)
-    leaves = extents.chunk(data, 100)
+    if config.tile_size is not None:
+        leaves = extents.get_leaf_children(config.tile_size)
+    else:
+        leaves = extents.chunk(data, 100)
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

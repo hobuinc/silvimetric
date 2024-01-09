@@ -30,9 +30,9 @@ def check_for_holes(leaves: list[Extents], chunk: Extents):
         if idx + 1 < len(yrange):
             assert minmax + 1 == yrange[idx + 1], f"Hole in derived extents between {minmax} {yrange[idx + 1]}"
 
-def check_indexing(extents, leaf_list):
+def check_indexing(extents: Extents, leaf_list):
     # gather indices from the chunks to match with extents
-    indices = np.array([], dtype=extents.indices.dtype)
+    indices = np.array([], dtype=extents.get_indices().dtype)
     b_indices = extents.indices
     count = 0
 
@@ -85,8 +85,8 @@ class TestExtents(object):
         return list(extents.chunk(copc_data, 100))
 
     @pytest.fixture(scope='function')
-    def unfiltered(self, filtered, extents):
-        return list(extents.root_chunk)
+    def unfiltered(self, extents: Extents):
+        return list(extents.get_leaf_children(30))
 
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)

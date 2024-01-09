@@ -158,6 +158,7 @@ class ShatterConfig(Config):
     metrics: list[Metric] = field(default_factory=list)
     bounds: Bounds = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
+    tile_size: int = field(default=None)
     point_count: int = 0
 
     def __post_init__(self) -> None:
