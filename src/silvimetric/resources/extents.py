@@ -6,7 +6,7 @@ import dask.array as da
 import dask.bag as db
 
 from typing import Self
-from line_profiler import profile
+from math import ceil
 
 from .bounds import Bounds
 from .storage import Storage
@@ -43,7 +43,6 @@ class Extents(object):
             )
         return self.indices
 
-    @profile
     def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
@@ -100,7 +99,7 @@ class Extents(object):
 
 
         pc = data.estimate_count(self.bounds)
-        target_pc = 100000
+        target_pc = 600000
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -122,9 +121,9 @@ class Extents(object):
                 return [ self ]
             elif area < threshold_resolution**2:
                 pc_per_cell = pc / (area / self.resolution**2)
-                cell_estimate = target_pc / pc_per_cell
-                cell_estimate = 30
-                return self.get_leaf_children(int(cell_estimate))
+                cell_estimate = max(30, ceil(target_pc / pc_per_cell))
+
+                return self.get_leaf_children(cell_estimate)
             else:
                 return [ ch.filter(data, threshold_resolution) for ch in self.split() ]
 

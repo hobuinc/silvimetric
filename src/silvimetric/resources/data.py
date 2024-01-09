@@ -6,7 +6,6 @@ import numpy as np
 import pdal
 
 import pathlib
-from line_profiler import profile
 
 
 class Data:
@@ -34,7 +33,6 @@ class Data:
         return False
 
 
-    @profile
     def make_pipeline(self) -> pdal.Pipeline:
         """Take a COPC or EPT endpoint and generate a PDAL pipeline for it"""
 
