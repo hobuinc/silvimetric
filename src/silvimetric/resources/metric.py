@@ -24,7 +24,7 @@ class Metric(Entry):
 
     def schema(self, attr: str):
         entry_name = self.entry_name(attr)
-        return Attr(name=entry_name, dtype=self.dtype)
+        return Attr(name=entry_name, dtype=self.dtype, fill=False)
 
     # common name, storage name
     def entry_name(self, attr: str) -> str:

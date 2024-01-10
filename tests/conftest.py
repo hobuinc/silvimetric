@@ -89,7 +89,7 @@ def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data_2.copc.laz")
+            "test_data.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
@@ -108,7 +108,7 @@ def autzen_filepath() -> str:
 @pytest.fixture(scope='session')
 def pipeline_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data_2.json")
+            "test_data.json")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
@@ -136,7 +136,7 @@ def resolution() -> int:
 
 @pytest.fixture(scope='class')
 def test_point_count() -> int:
-    yield 84100
+    yield 90000
 
 @pytest.fixture(scope='class')
 def minx() -> float:

@@ -46,7 +46,7 @@ class Attribute(Entry):
         return self.name
 
     def schema(self) -> Attr:
-        return Attr(name=self.name, dtype=self.dtype, var=True)
+        return Attr(name=self.name, dtype=self.dtype, var=True, fill=False)
 
     def to_json(self) -> object:
         return {

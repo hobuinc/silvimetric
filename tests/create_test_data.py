@@ -15,7 +15,7 @@ filename = './data/test_data.copc.laz'
 cell_size = 30
 
 # has a nice square root of 300
-num_points = 90000 # has different value in end after points on cell lines stripped out
+num_points = 90000
 split = sqrt(num_points)
 interval = 1
 
@@ -27,13 +27,13 @@ maxy = maxx
 # to easily make datasets with consistently different values
 diff_maker = 0
 
-pos = np.arange(minx, maxx, interval, dtype=np.float32)
-positions = pos[np.where(pos % cell_size != 0)]
+pos = np.arange(minx, maxx+1, interval, dtype=np.float32)
+# positions = pos[np.where(pos % cell_size != 0)]
 
 alg = lambda y: ceil(y/cell_size) + diff_maker
 
 data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
-                  for x in positions for y in positions ],
+                  for x in pos for y in pos],
     dtype=[
         ('X', np.float32),
         ('Y', np.float32),
