@@ -7,12 +7,13 @@ from silvimetric.resources import Extents
 from silvimetric.commands.shatter import run
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):
-    ind = np.array([], dtype=chunk.indices.dtype)
+    ind = np.array([], dtype=chunk.get_indices().dtype)
     for leaf in leaves:
+        a = leaf.get_indices()
         if ind.size == 0:
-            ind = leaf.indices
+            ind = a
         else:
-            ind = np.concatenate([ind, leaf.indices])
+            ind = np.concatenate([ind, a])
     dx = ind['x']
     dy = ind['y']
 
@@ -32,13 +33,14 @@ def check_for_holes(leaves: list[Extents], chunk: Extents):
 
 def check_indexing(extents: Extents, leaf_list):
     # gather indices from the chunks to match with extents
-    indices = np.array([], dtype=extents.get_indices().dtype)
     b_indices = extents.get_indices()
+    indices = np.array([], dtype=b_indices.dtype)
     count = 0
 
     #check that mins and maxes are correct first
 
     for ch in leaf_list:
+        ch: Extents
         if not np.any(indices['x']):
             indices = ch.get_indices()
         else:
@@ -82,7 +84,7 @@ def check_indexing(extents: Extents, leaf_list):
 class TestExtents(object):
     @pytest.fixture(scope='function', autouse=True)
     def filtered(self, copc_data, extents: Extents):
-        return list(extents.chunk(copc_data, 100))
+        return list(extents.chunk(copc_data, 1))
 
     @pytest.fixture(scope='function')
     def unfiltered(self, extents: Extents):
@@ -102,9 +104,10 @@ class TestExtents(object):
             crop = pdal.Filter.crop(bounds=str(leaf))
             p = reader | crop
             count = p.execute()
-            xs = np.unique(leaf.get_indices()['x'])
-            ys = np.unique(leaf.get_indices()['y'])
-            chunk_pc = (resolution - 1)**2 * xs.size * ys.size
+            idx = leaf.get_indices()
+            xs = np.unique(idx['x'])
+            ys = np.unique(idx['y'])
+            chunk_pc = resolution**2 * xs.size * ys.size
             if count == 0:
                 continue
             if count == chunk_pc:
@@ -112,7 +115,7 @@ class TestExtents(object):
             else:
                 flag = True
                 bad_chunks.append(leaf)
-        assert flag == False, f"{[str(leaf) for leaf in bad_chunks]}"
+        assert flag == False, f"{[str(leaf) for leaf in bad_chunks]} are bad chunks"
 
     def test_pointcount(self, filtered, unfiltered, test_point_count, shatter_config, storage):
 
