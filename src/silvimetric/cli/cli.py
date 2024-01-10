@@ -152,7 +152,7 @@ def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, daskty
                            tile_size=ts)
 
     if dasktype == 'cluster':
-        with Client(n_workers=workers, threads_per_worker=threads,silence_logs=False ) as client:
+        with Client(n_workers=workers, threads_per_worker=threads) as client:
             client.get_versions(check=True)
             if watch:
                 webbrowser.open(client.cluster.dashboard_link)

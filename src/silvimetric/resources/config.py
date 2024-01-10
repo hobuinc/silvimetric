@@ -164,12 +164,11 @@ class ShatterConfig(Config):
     def __post_init__(self) -> None:
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
+
         if not self.attrs:
             self.attrs = s.getAttributes()
         if not self.metrics:
             self.metrics = s.getMetrics()
-        if self.bounds is None:
-            self.bounds = s.config.root
         self.point_count: int = 0
 
         del s
@@ -178,7 +177,7 @@ class ShatterConfig(Config):
         d = super().to_json()
 
         d['name'] = str(self.name)
-        d['bounds'] = json.loads(self.bounds.to_json())
+        d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         return d

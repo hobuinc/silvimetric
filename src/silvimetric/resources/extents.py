@@ -32,16 +32,13 @@ class Extents(object):
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
         self.x2 = math.floor((maxx - self.root.minx) / resolution)
         self.y2 = math.floor((self.root.maxy - miny) / resolution)
-        self.indices = None
 
     def get_indices(self):
-        if self.indices is None:
-            self.indices =  np.array(
-                [(i,j) for i in range(self.x1, self.x2)
-                for j in range(self.y1, self.y2)],
-                dtype=[('x', np.int32), ('y', np.int32)]
-            )
-        return self.indices
+        return np.array(
+            [(i,j) for i in range(self.x1, self.x2)
+            for j in range(self.y1, self.y2)],
+            dtype=[('x', np.int32), ('y', np.int32)]
+        )
 
     def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
