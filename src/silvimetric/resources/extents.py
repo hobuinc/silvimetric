@@ -30,8 +30,8 @@ class Extents(object):
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
-        self.x2 = math.floor((maxx - self.root.minx) / resolution)
-        self.y2 = math.floor((self.root.maxy - miny) / resolution)
+        self.x2 = math.ceil((maxx - self.root.minx) / resolution)
+        self.y2 = math.ceil((self.root.maxy - miny) / resolution)
 
     def get_indices(self):
         return np.array(
@@ -48,21 +48,16 @@ class Extents(object):
             bminx, bminy, bmaxx, bmaxy = self.bounds.get()
             r = self.bounds
 
-        sbminx, sbminy, sbmaxx, sbmaxy = self.bounds.get()
-        # buffers are only applied if the bounds do not fit on the cell line
-        # in which case we're extending the bounds to the next nearest cell line
-        x_buf = 1 if sbmaxx % self.resolution != 0 else 0
-        y_buf = 1 if sbmaxy % self.resolution != 0 else 0
         # make bounds in scale with the desired resolution
         minx = bminx + (self.x1 * self.resolution)
-        maxx = bminx + ((self.x2 + x_buf + 1) * self.resolution)
-        miny = bmaxy - ((self.y2 + y_buf) * self.resolution)
+        maxx = bminx + (self.x2 * self.resolution)
+        miny = bmaxy - (self.y2 * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r)
 
         if self.bounds == self.root:
-            self.root = chunk
+            self.root = chunk.bounds
 
         filtered = []
         curr = db.from_delayed(chunk.filter(data, threshold))
@@ -84,7 +79,7 @@ class Extents(object):
         y_adjusted = math.floor((maxy - miny) / 2 / self.resolution)
 
         midx = minx + (x_adjusted * self.resolution)
-        midy = miny + (y_adjusted * self.resolution)
+        midy = maxy - (y_adjusted * self.resolution)
 
         return [
             Extents(Bounds(minx, miny, midx, midy), self.resolution, self.root), #lower left

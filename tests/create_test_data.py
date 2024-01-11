@@ -27,13 +27,14 @@ maxy = maxx
 # to easily make datasets with consistently different values
 diff_maker = 0
 
-pos = np.arange(minx, maxx+1, interval, dtype=np.float32)
+x_pos = np.arange(minx, maxx, interval, dtype=np.float32)
+y_pos = np.arange(maxy, miny, -1*interval, dtype=np.float32)
 # positions = pos[np.where(pos % cell_size != 0)]
 
 alg = lambda y: ceil(y/cell_size) + diff_maker
 
 data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
-                  for x in pos for y in pos],
+                  for x in x_pos for y in y_pos],
     dtype=[
         ('X', np.float32),
         ('Y', np.float32),
