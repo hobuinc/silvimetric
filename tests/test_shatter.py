@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 import dask
@@ -80,9 +81,12 @@ class Test_Shatter(object):
         pc = meta_j['point_count']
         assert pc == test_point_count
 
-    def test_sub_bounds(self, shatter_config, storage, test_point_count):
-        s = shatter_config
+    @pytest.mark.parametrize('sh_cfg', ['shatter_config', 'uneven_shatter_config'])
+    def test_sub_bounds(self, sh_cfg, test_point_count, request):
+        s = request.getfixturevalue(sh_cfg)
+        storage = Storage.from_db(s.tdb_dir)
         e = Extents.from_storage(s.tdb_dir)
+
         pc = 0
         for b in e.split():
             log = Log(20)
@@ -102,6 +106,11 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
+    @pytest.mark.skipif(
+        os.environ.get('AWS_SECRET_ACCESS_KEY') is None or
+        os.environ.get('AWS_ACCESS_KEY_ID') is None,
+        reason='Missing necessary AWS environment variables'
+    )
     def test_remote_creation(self, s3_shatter_config, s3_storage):
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution

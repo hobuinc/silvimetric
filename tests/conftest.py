@@ -60,6 +60,32 @@ def shatter_config(tdb_filepath, copc_filepath, storage_config, app_config, stor
                       debug = True)
     yield s
 
+@pytest.fixture(scope='function')
+def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics):
+    log = Log(20)
+    yield StorageConfig(tdb_dir = tdb_filepath,
+                        log = log,
+                        crs = crs,
+                        root = bounds,
+                        resolution = 7,
+                        attrs = attrs,
+                        metrics = metrics,
+                        version = svversion)
+@pytest.fixture(scope='function')
+def uneven_storage(uneven_storage_config):
+    yield Storage.create(uneven_storage_config)
+
+@pytest.fixture(scope='function')
+def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, storage):
+    log = Log(20) # INFO
+    s = ShatterConfig(tdb_dir = tdb_filepath,
+                      log = log,
+                      filename = copc_filepath,
+                      attrs = uneven_storage_config.attrs,
+                      metrics = uneven_storage_config.metrics,
+                      debug = True)
+    yield s
+
 @pytest.fixture(scope="function")
 def s3_bucket():
     yield "silvimetric"
@@ -89,7 +115,7 @@ def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:
     path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data_2.copc.laz")
+            "test_data.copc.laz")
     assert os.path.exists(path)
     yield os.path.abspath(path)
 
@@ -97,20 +123,6 @@ def copc_filepath() -> str:
 def copc_data(copc_filepath, storage_config) -> Data:
     d = Data(copc_filepath, storage_config)
     yield d
-
-@pytest.fixture(scope='session')
-def autzen_filepath() -> str:
-    path = os.path.join(os.path.dirname(__file__), "data",
-            "autzen-small.copc.laz")
-    assert os.path.exists(path)
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope='session')
-def pipeline_filepath() -> str:
-    path = os.path.join(os.path.dirname(__file__), "data",
-            "test_data_2.json")
-    assert os.path.exists(path)
-    yield os.path.abspath(path)
 
 @pytest.fixture(scope='class')
 def bounds(minx, maxx, miny, maxy) -> Bounds:
@@ -136,7 +148,7 @@ def resolution() -> int:
 
 @pytest.fixture(scope='class')
 def test_point_count() -> int:
-    yield 84100
+    yield 90000
 
 @pytest.fixture(scope='class')
 def minx() -> float:

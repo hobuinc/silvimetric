@@ -1,6 +1,5 @@
 import numpy as np
 
-import dask
 import dask.array as da
 import dask.bag as db
 
@@ -22,8 +21,9 @@ def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
     yis = da.floor(points[['yi']]['yi'])
 
     att_view = points[:][attrs]
-    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in leaf.get_indices()]
-    return dask.persist(*l)
+    idx = leaf.get_indices()
+    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
+    return l
 
 def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs):
     if data is None:
@@ -41,13 +41,14 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attr
     ## remove empty indices
     empties = np.where(counts == 0)[0]
     dd['count'] = counts
-    dx = leaf.get_indices()['x']
-    dy = leaf.get_indices()['y']
+    idx = leaf.get_indices()
     if bool(empties.size):
         for att in dd:
             dd[att] = np.delete(dd[att], empties)
-        dx = np.delete(dx, empties)
-        dy = np.delete(dy, empties)
+        idx = np.delete(idx, empties)
+
+    dx = idx['x']
+    dy = idx['y']
     return (dx, dy, dd)
 
 def get_metrics(data_in, attrs: list[str], storage: Storage):
@@ -78,6 +79,7 @@ def write(data_in, tdb):
     dx, dy, dd = data_in
     tdb[dx,dy] = dd
     pc = int(dd['count'].sum())
+    del data_in
 
     return pc
 
@@ -102,9 +104,9 @@ def shatter(config: ShatterConfig):
 
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
-    extents = Extents.from_sub(config.tdb_dir, config.bounds)
+    data = Data(config.filename, storage.config, config.bounds)
+    extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
-    data = Data(config.filename, storage.config, extents.bounds)
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:

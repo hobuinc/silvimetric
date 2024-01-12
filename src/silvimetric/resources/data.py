@@ -6,7 +6,7 @@ import numpy as np
 import pdal
 
 import pathlib
-
+import json
 
 class Data:
 
@@ -22,6 +22,8 @@ class Data:
         self.storageconfig = storageconfig
         self.reader = self.get_reader()
         self.pipeline = self.get_pipeline()
+        if self.bounds is None:
+            self.bounds = Data.get_bounds(self.reader)
 
 
     def is_pipeline(self) -> bool:
@@ -137,6 +139,11 @@ class Data:
             reader._options['threads'] = self.reader_thread_count
             return reader
 
+    @staticmethod
+    def get_bounds(reader: pdal.Reader) -> Bounds:
+        p = reader.pipeline()
+        qi = p.quickinfo[reader.type]
+        return Bounds.from_string(json.dumps(qi['bounds']))
 
     def estimate_count(self, bounds: Bounds) -> int:
         """For the provided bounds, estimate the maximum number of points that could be inside them for this instance."""

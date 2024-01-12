@@ -30,18 +30,15 @@ class Extents(object):
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
-        self.x2 = math.floor((maxx - self.root.minx) / resolution)
-        self.y2 = math.floor((self.root.maxy - miny) / resolution)
-        self.indices = None
+        self.x2 = math.ceil((maxx - self.root.minx) / resolution)
+        self.y2 = math.ceil((self.root.maxy - miny) / resolution)
 
     def get_indices(self):
-        if self.indices is None:
-            self.indices =  np.array(
-                [(i,j) for i in range(self.x1, self.x2)
-                for j in range(self.y1, self.y2)],
-                dtype=[('x', np.int32), ('y', np.int32)]
-            )
-        return self.indices
+        return np.array(
+            [(i,j) for i in range(self.x1, self.x2)
+            for j in range(self.y1, self.y2)],
+            dtype=[('x', np.int32), ('y', np.int32)]
+        )
 
     def chunk(self, data: Data, threshold=100) :
         if self.root is not None:
@@ -51,21 +48,16 @@ class Extents(object):
             bminx, bminy, bmaxx, bmaxy = self.bounds.get()
             r = self.bounds
 
-        # buffers are only applied if the bounds do not fit on the cell line
-        # in which case we're extending the bounds to the next nearest cell line
-        x_buf = 1 if bmaxx % self.resolution != 0 else 0
-        y_buf = 1 if bmaxy % self.resolution != 0 else 0
         # make bounds in scale with the desired resolution
         minx = bminx + (self.x1 * self.resolution)
-        maxx = bminx + ((self.x2 + x_buf) * self.resolution)
-        miny = bmaxy - ((self.y2 + y_buf) * self.resolution)
+        maxx = bminx + (self.x2 * self.resolution)
+        miny = bmaxy - (self.y2 * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r)
-        self.root_chunk: Extents = chunk
 
         if self.bounds == self.root:
-            self.root = self.root_chunk.bounds
+            self.root = chunk.bounds
 
         filtered = []
         curr = db.from_delayed(chunk.filter(data, threshold))
@@ -82,8 +74,13 @@ class Extents(object):
 
     def split(self):
         minx, miny, maxx, maxy = self.bounds.get()
-        midx = minx + ((maxx - minx)/ 2)
-        midy = miny + ((maxy - miny)/ 2)
+
+        x_adjusted = math.floor((maxx - minx) / 2 / self.resolution)
+        y_adjusted = math.floor((maxy - miny) / 2 / self.resolution)
+
+        midx = minx + (x_adjusted * self.resolution)
+        midy = maxy - (y_adjusted * self.resolution)
+
         return [
             Extents(Bounds(minx, miny, midx, midy), self.resolution, self.root), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution, self.root), #lower right
@@ -176,25 +173,25 @@ class Extents(object):
         base_extents = Extents(meta.root, res, meta.root)
         base = base_extents.bounds
 
-        if sub.minx <= base.minx:
-            minx = base.minx
-        else:
-            minx = base.minx + (math.floor((sub.minx-base.minx)/res) * res)
-        if sub.maxx >= base.maxx:
-            maxx = base.maxx
-        else:
-            maxx = base.minx + (math.floor((sub.maxx-base.minx)/res) * res)
-        if sub.miny <= base.miny:
-            miny = base.miny
-        else:
-            miny = base.maxy - (math.floor(base.maxy-sub.miny)/res) * res
-        if sub.maxy >= base.maxy:
-            maxy = base.maxy
-        else:
-            maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
+        # if sub.minx <= base.minx:
+        #     minx = base.minx
+        # else:
+        #     minx = base.minx + (math.floor((sub.minx-base.minx)/res) * res)
+        # if sub.maxx >= base.maxx:
+        #     maxx = base.maxx
+        # else:
+        #     maxx = base.minx + (math.floor((sub.maxx-base.minx)/res) * res)
+        # if sub.miny <= base.miny:
+        #     miny = base.miny
+        # else:
+        #     miny = base.maxy - (math.floor(base.maxy-sub.miny)/res) * res
+        # if sub.maxy >= base.maxy:
+        #     maxy = base.maxy
+        # else:
+        #     maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
 
-        new_b = Bounds(minx, miny, maxx, maxy)
-        return Extents(new_b, res, base)
+        # new_b = Bounds(minx, miny, maxx, maxy)
+        return Extents(sub, res, base)
 
     def __repr__(self):
         minx, miny, maxx, maxy = self.bounds.get()
