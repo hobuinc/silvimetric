@@ -8,7 +8,7 @@ import json
 
 import logging
 
-from ..resources import Storage, Bounds, Log
+from ..resources import Storage, Bounds, Log, Data, Extents
 from ..resources import Attributes, Metrics, Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract
@@ -107,6 +107,46 @@ class MetricParamType(click.ParamType):
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
+@cli.command("scan")
+@click.argument("pointcloud", type=str)
+@click.option("--resolution", type=float, default=100)
+@click.option("--point_count", type=int, default=600000)
+@click.option("--bounds", type=BoundsParamType(), default=None)
+@click.option("--workers", type=int, default=12)
+@click.option("--threads", type=int, default=4)
+@click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--dasktype", default='cluster',
+              type=click.Choice(['cluster', 'threads', 'processes',
+                                 'single-threaded']))
+@click.pass_obj
+def scan(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
+         threads, watch):
+    """Scan point cloud and determine the optimal tile size."""
+    import numpy as np
+
+    if dasktype == 'cluster':
+        with Client(n_workers=workers, threads_per_worker=threads) as client:
+            client.get_versions(check=True)
+            if watch:
+                webbrowser.open(client.cluster.dashboard_link)
+            with Storage.from_db(app.tdb_dir) as tdb:
+                data = Data(pointcloud, tdb.config, bounds)
+                extents = Extents.from_sub(app.tdb_dir, data.bounds)
+                leaves = extents.chunk(data, resolution, point_count)
+
+                total = np.array([l.cell_count for l in leaves])
+
+                std = np.std(total)
+                mean = np.mean(total)
+                print(f'''
+Tiling information:
+    Mean tile size: {mean}
+    Std deviation: {std}
+                      ''')
+            client.close()
+
+
+
 @cli.command('initialize')
 @click.argument("bounds", type=BoundsParamType())
 @click.argument("crs", type=CRSParamType())
@@ -135,7 +175,7 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.option("--workers", type=int, default=12)
 @click.option("--threads", default=4, type=int)
 @click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--tilesize", type=int, default=0)
+@click.option("--tilesize", type=int, default=None)
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--report", is_flag=True, default=False, type=bool)
 @click.option("--dasktype", default='cluster',
@@ -144,12 +184,11 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype, tilesize):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-    ts = tilesize if tilesize != 0 else None
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                            log = app.log,
                            filename = pointcloud,
                            bounds = bounds,
-                           tile_size=ts)
+                           tile_size=tilesize)
 
     if dasktype == 'cluster':
         with Client(n_workers=workers, threads_per_worker=threads) as client:

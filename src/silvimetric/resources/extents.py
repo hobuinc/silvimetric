@@ -27,6 +27,7 @@ class Extents(object):
         self.rangex = maxx - minx
         self.rangey = maxy - miny
         self.resolution = resolution
+        self.cell_count = int((self.rangex * self.rangey) / self.resolution ** 2)
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
@@ -40,7 +41,7 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, data: Data, threshold=100) :
+    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000) :
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -60,7 +61,7 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed(chunk.filter(data, threshold))
+        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold))
 
         while curr.npartitions > 0:
             to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
@@ -92,11 +93,11 @@ class Extents(object):
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
     @dask.delayed
-    def filter(self, data: Data, threshold_resolution=100) -> Self:
+    def filter(self, data: Data, res_threshold=100, pc_threshold=600000) -> Self:
 
 
         pc = data.estimate_count(self.bounds)
-        target_pc = 600000
+        target_pc = pc_threshold
         # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
@@ -116,13 +117,13 @@ class Extents(object):
                 return [ self ]
             elif pc < target_pc:
                 return [ self ]
-            elif area < threshold_resolution**2:
+            elif area < res_threshold**2:
                 pc_per_cell = pc / (area / self.resolution**2)
-                cell_estimate = max(30, ceil(target_pc / pc_per_cell))
+                cell_estimate = ceil(target_pc / pc_per_cell)
 
                 return self.get_leaf_children(cell_estimate)
             else:
-                return [ ch.filter(data, threshold_resolution) for ch in self.split() ]
+                return [ ch.filter(data, res_threshold) for ch in self.split() ]
 
     def _find_dims(self, tile_size):
         s = math.sqrt(tile_size)
