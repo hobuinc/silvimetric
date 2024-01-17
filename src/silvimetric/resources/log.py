@@ -128,7 +128,6 @@ class Log:
         return {'logdir': self.logdir,
                 'log_level': self.log_level,
                 'logtype': self.logtype ,
-                'logdir': self.logdir,
                 'logfilename': self.logfilename}
 
     def __del__(self) -> None:

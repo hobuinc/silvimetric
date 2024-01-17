@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
+import logging
 import dask
-import dask.array as da
 import dask.bag as db
 
 from typing import Self
@@ -41,7 +41,7 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000) :
+    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000):
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -62,13 +62,17 @@ class Extents(object):
 
         filtered = []
         curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold))
+        depth = 0
 
+        logger = logging.getLogger('silvimetric')
         while curr.npartitions > 0:
+            logger.info(f'Chunking {curr.npartitions} tiles at depth {depth}')
             to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
             if to_add:
                 filtered = filtered + to_add
 
             curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Extents)))
+            depth += 1
 
         return filtered
 
@@ -98,7 +102,6 @@ class Extents(object):
 
         pc = data.estimate_count(self.bounds)
         target_pc = pc_threshold
-        # pc = qi['num_points']
         minx, miny, maxx, maxy = self.bounds.get()
 
         # is it empty?
@@ -174,24 +177,6 @@ class Extents(object):
         base_extents = Extents(meta.root, res, meta.root)
         base = base_extents.bounds
 
-        # if sub.minx <= base.minx:
-        #     minx = base.minx
-        # else:
-        #     minx = base.minx + (math.floor((sub.minx-base.minx)/res) * res)
-        # if sub.maxx >= base.maxx:
-        #     maxx = base.maxx
-        # else:
-        #     maxx = base.minx + (math.floor((sub.maxx-base.minx)/res) * res)
-        # if sub.miny <= base.miny:
-        #     miny = base.miny
-        # else:
-        #     miny = base.maxy - (math.floor(base.maxy-sub.miny)/res) * res
-        # if sub.maxy >= base.maxy:
-        #     maxy = base.maxy
-        # else:
-        #     maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
-
-        # new_b = Bounds(minx, miny, maxx, maxy)
         return Extents(sub, res, base)
 
     def __repr__(self):

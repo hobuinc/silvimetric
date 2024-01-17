@@ -1,5 +1,6 @@
 import click
 from dask.distributed import Client, performance_report
+from dask.diagnostics import ProgressBar
 import dask
 import webbrowser
 import pyproj
@@ -11,7 +12,7 @@ import logging
 from ..resources import Storage, Bounds, Log, Data, Extents
 from ..resources import Attributes, Metrics, Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract
+from ..commands import shatter, extract, scan
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -107,6 +108,28 @@ class MetricParamType(click.ParamType):
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
+def dask_handle(dasktype, workers, threads, watch):
+    dask_config = {
+        'n_workers': workers,
+        'threads_per_worker': threads
+    }
+    if dasktype == 'cluster':
+        client = Client(n_workers=workers, threads_per_worker=threads)
+        client.get_versions(check=True)
+        dask_config['scheduler']='distributed'
+        dask_config['distributed.client']=client
+
+    else:
+        dask_config['scheduler']=dasktype
+    dask.config.set(dask_config)
+
+    if watch:
+        if dasktype == 'cluster':
+            webbrowser.open(client.cluster.dashboard_link)
+        else:
+            p = ProgressBar()
+            p.register()
+
 @cli.command("scan")
 @click.argument("pointcloud", type=str)
 @click.option("--resolution", type=float, default=100)
@@ -119,32 +142,11 @@ class MetricParamType(click.ParamType):
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def scan(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
+def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
          threads, watch):
     """Scan point cloud and determine the optimal tile size."""
-    import numpy as np
-
-    if dasktype == 'cluster':
-        with Client(n_workers=workers, threads_per_worker=threads) as client:
-            client.get_versions(check=True)
-            if watch:
-                webbrowser.open(client.cluster.dashboard_link)
-            with Storage.from_db(app.tdb_dir) as tdb:
-                data = Data(pointcloud, tdb.config, bounds)
-                extents = Extents.from_sub(app.tdb_dir, data.bounds)
-                leaves = extents.chunk(data, resolution, point_count)
-
-                total = np.array([l.cell_count for l in leaves])
-
-                std = np.std(total)
-                mean = np.mean(total)
-                print(f'''
-Tiling information:
-    Mean tile size: {mean}
-    Std deviation: {std}
-                      ''')
-            client.close()
-
+    dask_handle(dasktype, workers, threads, watch)
+    return scan(app.tdb_dir, pointcloud, bounds, point_count, resolution)
 
 
 @cli.command('initialize')
@@ -182,28 +184,25 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
               type=click.Choice(['cluster', 'threads', 'processes',
                                  'single-threaded']))
 @click.pass_obj
-def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report, dasktype, tilesize):
+def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
+                dasktype, tilesize):
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+    dask_handle(dasktype, workers, threads, watch)
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                            log = app.log,
                            filename = pointcloud,
                            bounds = bounds,
                            tile_size=tilesize)
 
-    if dasktype == 'cluster':
-        with Client(n_workers=workers, threads_per_worker=threads) as client:
-            client.get_versions(check=True)
-            if watch:
-                webbrowser.open(client.cluster.dashboard_link)
-            if report:
-                report_path = f'reports/{config.name}.html'
-                with performance_report(report_path) as pr:
-                    shatter.shatter(config)
-                print(f'Writing report to {report_path}.')
-            else:
-                shatter.shatter(config)
+    if report:
+        if dasktype != 'cluster':
+            app.log.warning('Report option is incompatible with dask type'
+                            '{dasktype}, skipping.')
+        report_path = f'reports/{config.name}.html'
+        with performance_report(report_path) as pr:
+            shatter.shatter(config)
+        print(f'Writing report to {report_path}.')
     else:
-        dask.config.set(scheduler=dasktype)
         shatter.shatter(config)
 
 
