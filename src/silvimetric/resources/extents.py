@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
+import logging
 import dask
-import dask.array as da
 import dask.bag as db
 
 from typing import Self
@@ -27,6 +27,7 @@ class Extents(object):
         self.rangex = maxx - minx
         self.rangey = maxy - miny
         self.resolution = resolution
+        self.cell_count = int((self.rangex * self.rangey) / self.resolution ** 2)
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
@@ -40,7 +41,7 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, data: Data, threshold=100) :
+    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000):
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -60,14 +61,18 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed(chunk.filter(data, threshold))
+        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold))
+        depth = 0
 
+        logger = logging.getLogger('silvimetric')
         while curr.npartitions > 0:
+            logger.info(f'Chunking {curr.npartitions} tiles at depth {depth}')
             to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
             if to_add:
                 filtered = filtered + to_add
 
             curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Extents)))
+            depth += 1
 
         return filtered
 
@@ -92,12 +97,11 @@ class Extents(object):
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
     @dask.delayed
-    def filter(self, data: Data, threshold_resolution=100) -> Self:
+    def filter(self, data: Data, res_threshold=100, pc_threshold=600000) -> Self:
 
 
         pc = data.estimate_count(self.bounds)
-        target_pc = 600000
-        # pc = qi['num_points']
+        target_pc = pc_threshold
         minx, miny, maxx, maxy = self.bounds.get()
 
         # is it empty?
@@ -116,13 +120,13 @@ class Extents(object):
                 return [ self ]
             elif pc < target_pc:
                 return [ self ]
-            elif area < threshold_resolution**2:
+            elif area < res_threshold**2:
                 pc_per_cell = pc / (area / self.resolution**2)
-                cell_estimate = max(30, ceil(target_pc / pc_per_cell))
+                cell_estimate = ceil(target_pc / pc_per_cell)
 
                 return self.get_leaf_children(cell_estimate)
             else:
-                return [ ch.filter(data, threshold_resolution) for ch in self.split() ]
+                return [ ch.filter(data, res_threshold) for ch in self.split() ]
 
     def _find_dims(self, tile_size):
         s = math.sqrt(tile_size)
@@ -173,24 +177,6 @@ class Extents(object):
         base_extents = Extents(meta.root, res, meta.root)
         base = base_extents.bounds
 
-        # if sub.minx <= base.minx:
-        #     minx = base.minx
-        # else:
-        #     minx = base.minx + (math.floor((sub.minx-base.minx)/res) * res)
-        # if sub.maxx >= base.maxx:
-        #     maxx = base.maxx
-        # else:
-        #     maxx = base.minx + (math.floor((sub.maxx-base.minx)/res) * res)
-        # if sub.miny <= base.miny:
-        #     miny = base.miny
-        # else:
-        #     miny = base.maxy - (math.floor(base.maxy-sub.miny)/res) * res
-        # if sub.maxy >= base.maxy:
-        #     maxy = base.maxy
-        # else:
-        #     maxy = base.maxy - math.floor((base.maxy-sub.maxy)/res) * res
-
-        # new_b = Bounds(minx, miny, maxx, maxy)
         return Extents(sub, res, base)
 
     def __repr__(self):
