@@ -1,6 +1,4 @@
-import pathlib
-
-from silvimetric.resources import Storage, StorageConfig, ApplicationConfig
+from silvimetric.resources import Storage, StorageConfig
 
 def initialize(storage: StorageConfig):
     """

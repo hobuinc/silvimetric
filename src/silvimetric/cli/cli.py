@@ -1,18 +1,14 @@
 import click
-from dask.distributed import Client, performance_report
-from dask.diagnostics import ProgressBar
-import dask
-import webbrowser
+from dask.distributed import performance_report
 import pyproj
-
-import json
 
 import logging
 
-from ..resources import Storage, Bounds, Log, Data, Extents
-from ..resources import Attributes, Metrics, Attribute, Metric
+from ..resources import Bounds, Log
+from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract, scan
+from ..commands import shatter, extract, scan, info, initialize
+from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType, dask_handle
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -35,100 +31,13 @@ def cli(ctx, database, debug, log_level, log_dir, progress):
                             progress = progress)
     ctx.obj = app
 
+
 @cli.command("info")
 @click.option("--history", is_flag=True, default=False, type=bool)
 @click.pass_obj
-def info(app, history):
-    """Print info about Silvimetric database"""
-    with Storage.from_db(app.tdb_dir) as tdb:
+def info_cmd(app, history):
+    info.info(app.tdb_dir, history)
 
-        # We always have these
-        meta = tdb.getConfig()
-        atts = tdb.getAttributes()
-
-        # We don't have this until stuff has been put into the database
-        try:
-            shatter = json.loads(tdb.getMetadata('shatter'))
-
-            # I don't know what this is?
-        except KeyError:
-            shatter = {}
-
-        info = {
-            'attributes': [a.to_json() for a in atts],
-            'metadata': meta.to_json(),
-            'shatter': shatter
-        }
-        if history:
-            try:
-                # I don't know what this is? – hobu
-                history = tdb.get_history()['shatter']
-                if isinstance(history, list):
-                    history = [ json.loads(h) for h in history ]
-                else:
-                    history = json.loads(history)
-                info ['history'] = history
-            except KeyError:
-                history = {}
-        print(json.dumps(info, indent=2))
-
-class BoundsParamType(click.ParamType):
-    name = "Bounds"
-
-    def convert(self, value, param, ctx):
-        try:
-            b = Bounds.from_string(value)
-            return b
-        except ValueError:
-            self.fail(f"{value!r} is not a bounds type", param, ctx)
-
-class CRSParamType(click.ParamType):
-    name = "CRS"
-
-    def convert(self, value, param, ctx):
-        try:
-            crs = pyproj.CRS.from_user_input(value)
-            return crs
-        except Exception as e:
-            self.fail(f"{value!r} is not a CRS type with error {e}", param, ctx)
-
-class AttrParamType(click.ParamType):
-    name="Attrs"
-    def convert(self, value, param, ctx) -> list[Attribute]:
-        try:
-            return [Attributes[a] for a in value]
-        except Exception as e:
-            self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
-
-class MetricParamType(click.ParamType):
-    name="Metrics"
-    def convert(self, value, param, ctx) -> list[Metric]:
-        try:
-            return [Metrics[m] for m in value]
-        except Exception as e:
-            self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
-
-def dask_handle(dasktype, workers, threads, watch):
-    dask_config = {
-        'n_workers': workers,
-        'threads_per_worker': threads
-    }
-    if dasktype == 'cluster':
-        client = Client(n_workers=workers, threads_per_worker=threads)
-        client.get_versions(check=True)
-        dask_config['scheduler']='distributed'
-        dask_config['distributed.client']=client
-
-    else:
-        dask_config['scheduler']=dasktype
-    dask.config.set(dask_config)
-
-    if watch:
-        if dasktype == 'cluster':
-            webbrowser.open(client.cluster.dashboard_link)
-        else:
-            p = ProgressBar()
-            p.register()
 
 @cli.command("scan")
 @click.argument("pointcloud", type=str)
@@ -138,15 +47,14 @@ def dask_handle(dasktype, workers, threads, watch):
 @click.option("--workers", type=int, default=12)
 @click.option("--threads", type=int, default=4)
 @click.option("--watch", is_flag=True, default=False, type=bool)
-@click.option("--dasktype", default='cluster',
-              type=click.Choice(['cluster', 'threads', 'processes',
-                                 'single-threaded']))
+@click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
+              'threads', 'processes', 'single-threaded']))
 @click.pass_obj
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
          threads, watch):
     """Scan point cloud and determine the optimal tile size."""
     dask_handle(dasktype, workers, threads, watch)
-    return scan(app.tdb_dir, pointcloud, bounds, point_count, resolution)
+    return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution)
 
 
 @cli.command('initialize')
@@ -158,11 +66,10 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype, workers
               help="List of metrics to include in Database")
 @click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
 @click.pass_obj
-def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
+def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
                attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     """Initialize silvimetrics DATABASE
     """
-    from silvimetric.cli.initialize import initialize as initializeFunction
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
                                   log = app.log,
                                   root = bounds,
@@ -170,7 +77,8 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
                                   attrs = attributes,
                                   metrics = metrics,
                                   resolution = resolution)
-    storage = initializeFunction(storageconfig)
+    return initialize.initialize(storageconfig)
+
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
@@ -180,9 +88,8 @@ def initialize(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.option("--tilesize", type=int, default=None)
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--report", is_flag=True, default=False, type=bool)
-@click.option("--dasktype", default='cluster',
-              type=click.Choice(['cluster', 'threads', 'processes',
-                                 'single-threaded']))
+@click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
+              'threads', 'processes', 'single-threaded']))
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
                 dasktype, tilesize):
