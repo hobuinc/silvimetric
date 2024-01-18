@@ -226,30 +226,30 @@ class Storage:
         finally:
             tdb.close()
 
-    def get_history(self):
+    def get_history(self, start_time, end_time):
         af = tiledb.array_fragments(self.config.tdb_dir)
         with self.open('r') as r:
             meta = dict(r.meta)
 
-        for idx in range(len(af)):
+        # for idx in range(len(af)):
 
-            begin = af[idx].timestamp_range[0]
-            if len(af) > idx + 1:
-                end = af[idx+1].timestamp_range[1]
-            else:
-                end = af[idx].timestamp_range[1]
+        #     begin = af[idx].timestamp_range[0]
+        #     if len(af) > idx + 1:
+        #         end = af[idx+1].timestamp_range[1]
+        #     else:
+        #         end = af[idx].timestamp_range[1]
 
-            with self.open('r', (begin, end)) as r:
-                for key in r.meta.keys():
-                    if meta[key] is not None:
-                        if not isinstance(meta[key], list):
-                            meta[key] = [ meta[key] ]
-                        if not isinstance(r.meta[key], list):
-                            meta[key] = meta[key] + [ r.meta[key] ]
-                        else:
-                            meta[key] = meta[key] + r.meta[key]
+        with self.open('r', (start_time, end_time)) as r:
+            for key in r.meta.keys():
+                if meta[key] is not None:
+                    if not isinstance(meta[key], list):
+                        meta[key] = [ meta[key] ]
+                    if not isinstance(r.meta[key], list):
+                        meta[key] = meta[key] + [ r.meta[key] ]
                     else:
-                        meta[key] = r.meta[key]
+                        meta[key] = meta[key] + r.meta[key]
+                else:
+                    meta[key] = r.meta[key]
         return meta
 
     #TODO what are we reading? queries are probably going to be specific
