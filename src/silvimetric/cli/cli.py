@@ -8,7 +8,8 @@ from ..resources import Bounds, Log
 from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize
-from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType, dask_handle
+from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
+from .common import DateParamType, dask_handle
 
 @click.group()
 @click.argument("database", type=click.Path(exists=False))
@@ -33,10 +34,22 @@ def cli(ctx, database, debug, log_level, log_dir, progress):
 
 
 @cli.command("info")
-@click.option("--history", is_flag=True, default=False, type=bool)
+@click.option("--bounds", type=BoundsParamType(), default=None)
+@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']), multiple=True, default=None)
+@click.option("--name", type=str, default=None)
 @click.pass_obj
-def info_cmd(app, history):
-    info.info(app.tdb_dir, history)
+def info_cmd(app, bounds, date, name):
+    import numpy as np
+    if len(date) == 1:
+        start_date = date[0]
+        end_date = np.datetime64('now')
+    elif len(date) == 2:
+        start_date = date[0]
+        end_date = date[1]
+    else:
+        raise Exception('"--date" must be either 1 or 2 values.')
+
+    info.info(app.tdb_dir, bounds, start_date, end_date, name)
 
 
 @cli.command("scan")
@@ -83,23 +96,27 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
 @click.option("--workers", type=int, default=12)
-@click.option("--threads", default=4, type=int)
+@click.option("--threads", type=int, default=4)
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--tilesize", type=int, default=None)
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--report", is_flag=True, default=False, type=bool)
+@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']), required=True, multiple=True)
 @click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
               'threads', 'processes', 'single-threaded']))
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
-                dasktype, tilesize):
+                dasktype, tilesize, date):
+    if len(date) > 2:
+        raise Exception('"--date" must be either 1 or 2 values.')
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     dask_handle(dasktype, workers, threads, watch)
     config = ShatterConfig(tdb_dir = app.tdb_dir,
-                           log = app.log,
-                           filename = pointcloud,
-                           bounds = bounds,
-                           tile_size=tilesize)
+                            date=date,
+                            log = app.log,
+                            filename = pointcloud,
+                            bounds = bounds,
+                            tile_size=tilesize)
 
     if report:
         if dasktype != 'cluster':

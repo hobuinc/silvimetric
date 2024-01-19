@@ -1,3 +1,5 @@
+import uuid
+
 from silvimetric.commands import scan, info, shatter
 from silvimetric.resources import Bounds
 
@@ -12,18 +14,20 @@ class TestCommands(object):
 
     def test_info(self, shatter_config):
         tdb_dir = shatter_config.tdb_dir
-        i = info.info(tdb_dir, True)
-        assert not bool(i['shatter'])
+        i = info.info(tdb_dir)
+        assert not bool(i['history'])
 
-        s = shatter.shatter(shatter_config)
-        i = info.info(tdb_dir, True)
-        assert bool(i['shatter'])
+        shatter.shatter(shatter_config)
+        i = info.info(tdb_dir)
+        assert bool(i['history'])
+
+        shatter_config.name = uuid.uuid4()
+        shatter(shatter_config)
 
         # TODO bounds filtering
         b: Bounds = shatter_config.bounds
         b1 = b.bisect()[0]
-        i = info.info(tdb_dir, b1)
-
+        i = info.info(tdb_dir, bounds=b1)
 
 
         # TODO shatter process name filtering

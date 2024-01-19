@@ -107,6 +107,9 @@ def shatter(config: ShatterConfig):
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
+    if config.bounds is None:
+        config.bounds = data.bounds
+
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:

@@ -1,11 +1,12 @@
 import pyproj
 
 import json
-from json import JSONEncoder
 import uuid
+import numpy as np
 
 from pathlib import Path
 from abc import ABC, abstractmethod
+from typing import Union, Tuple
 
 from dataclasses import dataclass, field
 
@@ -16,7 +17,7 @@ from .entry import Attribute, Attributes
 from . import __version__
 
 
-class SilviMetricJSONEncoder(JSONEncoder):
+class SilviMetricJSONEncoder(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
 
@@ -153,6 +154,7 @@ class ApplicationConfig(Config):
 @dataclass
 class ShatterConfig(Config):
     filename: str
+    date: Union[np.datetime64, Tuple[np.datetime64, np.datetime64]]
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     bounds: Bounds = field(default=None)
@@ -179,6 +181,10 @@ class ShatterConfig(Config):
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
+        if isinstance(self.date, list):
+            d['date'] = [ str(dt.astype('str')) for dt in self.date]
+        else:
+            d['date'] = str(self.date.astype('str'))
         return d
 
     @classmethod

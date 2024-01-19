@@ -1,12 +1,14 @@
 import tiledb
-from tiledb import object_type
 import numpy as np
-from math import floor
 import pathlib
 import contextlib
+import json
+
+from math import floor
 
 from .config import StorageConfig
 from .metric import Metrics, Metric, Attribute
+from ..resources import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -226,30 +228,47 @@ class Storage:
         finally:
             tdb.close()
 
-    def get_history(self, start_time, end_time):
-        af = tiledb.array_fragments(self.config.tdb_dir)
-        with self.open('r') as r:
+    def get_history(self, start_time: int, end_time: int, bounds: Bounds, name:str=None):
+        af = tiledb.array_fragments(self.config.tdb_dir, True)
+        with self.open('r', (start_time, end_time)) as r:
             meta = dict(r.meta)
 
-        # for idx in range(len(af)):
 
-        #     begin = af[idx].timestamp_range[0]
-        #     if len(af) > idx + 1:
-        #         end = af[idx+1].timestamp_range[1]
-        #     else:
-        #         end = af[idx].timestamp_range[1]
+        for idx in range(len(af)):
 
-        with self.open('r', (start_time, end_time)) as r:
-            for key in r.meta.keys():
-                if meta[key] is not None:
-                    if not isinstance(meta[key], list):
-                        meta[key] = [ meta[key] ]
-                    if not isinstance(r.meta[key], list):
-                        meta[key] = meta[key] + [ r.meta[key] ]
-                    else:
-                        meta[key] = meta[key] + r.meta[key]
-                else:
-                    meta[key] = r.meta[key]
+            begin = af[idx].timestamp_range[0]
+            if len(af) > idx + 1:
+                end = af[idx+1].timestamp_range[1]
+            else:
+                end = af[idx].timestamp_range[1]
+
+            if begin < start_time:
+                continue
+            if end > end_time:
+                break
+
+            with self.open('r', (begin, end)) as r:
+                if not r.meta['shatter']:
+                    continue
+                s = json.loads(r.meta['shatter'])
+
+                b = Bounds(s['bounds'])
+                if b.disjoint(bounds): # skip this fragment
+                    continue
+
+                if name is not None and name != s['name']:
+                    continue
+
+                # for key in r.meta.keys():
+                #     if meta[key] is not None:
+                #         if not isinstance(meta[key], list):
+                #             meta[key] = [ meta[key] ]
+                #         if not isinstance(r.meta[key], list):
+                #             meta[key] = meta[key] + [ r.meta[key] ]
+                #         else:
+                #             meta[key] = meta[key] + r.meta[key]
+                #     else:
+                #         meta[key] = r.meta[key]
         return meta
 
     #TODO what are we reading? queries are probably going to be specific
