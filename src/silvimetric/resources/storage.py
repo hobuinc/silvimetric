@@ -3,11 +3,13 @@ import numpy as np
 import pathlib
 import contextlib
 import json
+import uuid
+from typing import Any
 
 from math import floor
 
 from .config import StorageConfig
-from .metric import Metrics, Metric, Attribute
+from .metric import Metric, Attribute
 from ..resources import Bounds
 
 class Storage:
@@ -154,7 +156,7 @@ class Storage:
 
         return val
 
-    def saveMetadata(self, key: str, data: any) -> None:
+    def saveMetadata(self, key: str, data: Any) -> None:
         """
         Save metadata to storage
 
@@ -166,7 +168,6 @@ class Storage:
             Metadata value. Must be translatable to and from string.
         """
         with self.open('w') as w:
-            w: tiledb.SparseArray
             w.meta[key] = data
 
     def getAttributes(self) -> list[Attribute]:
@@ -228,48 +229,53 @@ class Storage:
         finally:
             tdb.close()
 
-    def get_history(self, start_time: int, end_time: int, bounds: Bounds, name:str=None):
+    def get_history(self, start_time: np.datetime64, end_time: np.datetime64,
+                    bounds: Bounds, name:str=None):
+
+        from ..resources import ShatterConfig
+
         af = tiledb.array_fragments(self.config.tdb_dir, True)
-        with self.open('r', (start_time, end_time)) as r:
-            meta = dict(r.meta)
-
-
+        m = [ ]
         for idx in range(len(af)):
 
-            begin = af[idx].timestamp_range[0]
-            if len(af) > idx + 1:
-                end = af[idx+1].timestamp_range[1]
-            else:
-                end = af[idx].timestamp_range[1]
+            # if processes are too short, begin and end times can be the same
+            # so it's necessary to adjust time bounds so we can grab information
 
-            if begin < start_time:
-                continue
-            if end > end_time:
-                break
+            if idx == 0:
+                begin = 0
+            else:
+                begin = af[idx-1].timestamp_range[1]
+
+            end = af[idx].timestamp_range[1]
 
             with self.open('r', (begin, end)) as r:
-                if not r.meta['shatter']:
-                    continue
-                s = json.loads(r.meta['shatter'])
+                try:
+                    if not bool(r.meta['shatter']):
+                        continue
 
-                b = Bounds(s['bounds'])
-                if b.disjoint(bounds): # skip this fragment
+                    s = ShatterConfig.from_string(r.meta['shatter'])
+
+                    # filter bounds
+                    if s.bounds.disjoint(bounds):
+                        continue
+
+                    # filter name
+                    if name is not None and name != s.name:
+                        continue
+
+                    # filter dates
+                    if isinstance(s.date, tuple):
+                        if s.date[1] < start_time or s.date[0] > end_time:
+                            continue
+                    else:
+                        if s.date < start_time or s.date > end_time:
+                            continue
+
+                    m.append(json.loads(r.meta['shatter']))
+                except KeyError:
                     continue
 
-                if name is not None and name != s['name']:
-                    continue
-
-                # for key in r.meta.keys():
-                #     if meta[key] is not None:
-                #         if not isinstance(meta[key], list):
-                #             meta[key] = [ meta[key] ]
-                #         if not isinstance(r.meta[key], list):
-                #             meta[key] = meta[key] + [ r.meta[key] ]
-                #         else:
-                #             meta[key] = meta[key] + r.meta[key]
-                #     else:
-                #         meta[key] = r.meta[key]
-        return meta
+        return m
 
     #TODO what are we reading? queries are probably going to be specific
     def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:

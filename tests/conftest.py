@@ -51,15 +51,17 @@ def app_config(tdb_filepath, debug=True):
     yield app
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, copc_filepath, storage_config, app_config, storage, date):
+def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds, app_config, storage, date):
     log = Log(20) # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
+                      bounds=bounds,
                       debug = True,
                       date=date)
+
     yield s
 
 @pytest.fixture(scope='function')

@@ -157,9 +157,9 @@ class ShatterConfig(Config):
     date: Union[np.datetime64, Tuple[np.datetime64, np.datetime64]]
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
-    bounds: Bounds = field(default=None)
+    bounds: Union[Bounds, None] = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
-    tile_size: int = field(default=None)
+    tile_size: Union[int, None] = field(default=None)
     point_count: int = 0
 
     def __post_init__(self) -> None:
@@ -201,7 +201,9 @@ class ShatterConfig(Config):
                 attrs = attrs,
                 metrics = ms,
                 debug = x['debug'],
-                name = uuid.UUID(x['name']))
+                name = uuid.UUID(x['name']),
+                bounds=Bounds(*x['bounds']),
+                date= np.datetime64(x['date']))
 
         return n
 

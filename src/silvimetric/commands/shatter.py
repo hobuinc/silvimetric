@@ -3,6 +3,8 @@ import numpy as np
 import dask.array as da
 import dask.bag as db
 
+from tiledb import SparseArray
+
 from ..resources import Extents, Storage, ShatterConfig, Data
 
 def get_data(extents: Extents, filename: str, storage: Storage):
@@ -83,18 +85,17 @@ def write(data_in, tdb):
 
     return pc
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage, tdb: SparseArray):
     attrs = [a.name for a in config.attrs]
 
-    with storage.open('w') as tdb:
 
-        leaf_bag: db.Bag = db.from_sequence(leaves)
-        points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-        att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
-        arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
-        metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
-        writes: db.Bag = metrics.map(write, tdb)
-        return sum(writes)
+    leaf_bag: db.Bag = db.from_sequence(leaves)
+    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
+    arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
+    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
+    writes: db.Bag = metrics.map(write, tdb)
+    return sum(writes)
 
 
 
@@ -107,19 +108,20 @@ def shatter(config: ShatterConfig):
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
-    if config.bounds is None:
-        config.bounds = data.bounds
+    with storage.open('w') as tdb:
+        if config.bounds is None:
+            config.bounds = data.bounds
 
-    if config.tile_size is not None:
-        leaves = extents.get_leaf_children(config.tile_size)
-    else:
-        leaves = extents.chunk(data, 100)
+        if config.tile_size is not None:
+            leaves = extents.get_leaf_children(config.tile_size)
+        else:
+            leaves = extents.chunk(data, 100)
 
-    # Begin main operations
-    config.log.debug('Fetching and arranging data...')
-    pc = run(leaves, config, storage)
-    config.point_count = int(pc)
+        # Begin main operations
+        config.log.debug('Fetching and arranging data...')
+        pc = run(leaves, config, storage, tdb)
+        config.point_count = int(pc)
 
-    config.log.debug('Saving shatter metadata')
-    storage.saveMetadata('shatter', str(config))
-    return config.point_count
+        config.log.debug('Saving shatter metadata')
+        tdb.meta['shatter'] = str(config)
+        return config.point_count

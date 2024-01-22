@@ -100,7 +100,7 @@ class Test_Shatter(object):
                                attrs = s.attrs,
                                metrics = s.metrics,
                                debug = s.debug,
-                               bounds = b.bounds
+                               bounds = b.bounds,
                                date=s.date)
             pc = pc + shatter(sc)
         history = storage.get_history()['shatter']
