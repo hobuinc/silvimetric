@@ -8,6 +8,7 @@ import platform
 
 
 from silvimetric.commands.shatter import shatter
+from silvimetric.commands.info import info
 from silvimetric.resources import Storage, Extents, ShatterConfig, Log
 
 @dask.delayed
@@ -38,7 +39,6 @@ class Test_Shatter(object):
                 for yi in range(y):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
-            m = storage.get_history()
 
         shatter_config.name = uuid.uuid4()
         shatter(shatter_config)
@@ -55,8 +55,8 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/storage.config.resolution)-yi)))
 
-            m2 = storage.get_history()
-            assert len(m2['shatter']) == 2
+            m = info(storage.config.tdb_dir)
+            assert len(m['history']) == 2
 
     def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
@@ -103,9 +103,8 @@ class Test_Shatter(object):
                                bounds = b.bounds,
                                date=s.date)
             pc = pc + shatter(sc)
-        history = storage.get_history()['shatter']
+        history = info(s.tdb_dir)['history']
         assert isinstance(history, list)
-        history = [ json.loads(h) for h in history ]
         pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
