@@ -1,12 +1,12 @@
-import numpy as np
+from datetime import datetime
 from uuid import UUID
 
 from ..resources import Storage, Bounds
 
 def check_values(start_time, end_time, bounds, name):
-    if start_time is not None and not isinstance(start_time, np.datetime64):
+    if start_time is not None and not isinstance(start_time, datetime):
         raise TypeError(f'Incorrect type of "start_time" argument.')
-    if end_time is not None and not isinstance(end_time, np.datetime64):
+    if end_time is not None and not isinstance(end_time, datetime):
         raise TypeError(f'Incorrect type of "end_time" argument.')
     if bounds is not None and not isinstance(bounds, Bounds):
         raise TypeError(f'Incorrect type of "bounds" argument.')
@@ -16,16 +16,16 @@ def check_values(start_time, end_time, bounds, name):
         except:
             raise TypeError(f'Incorrect type of "name" argument.')
 
-def info(tdb_dir, start_time:np.datetime64=None, end_time:np.datetime64=None,
+def info(tdb_dir, start_time:datetime=None, end_time:datetime=None,
           bounds:Bounds=None, name:str=None):
     """Print info about Silvimetric database"""
     check_values(start_time, end_time, bounds, name)
 
     with Storage.from_db(tdb_dir) as tdb:
         if start_time is None:
-            start_time = np.datetime64(0, 'ms')
+            start_time = datetime.fromtimestamp(0)
         if end_time is None:
-            end_time = np.datetime64('now')
+            end_time = datetime.now()
         if bounds is None:
             bounds = tdb.config.root
         if name is not None:

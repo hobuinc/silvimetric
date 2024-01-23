@@ -3,7 +3,7 @@ import os
 import dask
 import pdal
 from uuid import uuid4
-import numpy as np
+from datetime import datetime
 
 from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
 from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
@@ -14,14 +14,14 @@ from silvimetric import __version__ as svversion
 def configure_dask():
     dask.config.set(scheduler="single-threaded")
 
-@pytest.fixture(scope="function")
-def threaded_dask():
-    dask.config.set(scheduler="threads")
-
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
     path = tmp_path_factory.mktemp("test_tdb")
     yield os.path.abspath(path)
+
+@pytest.fixture(scope="function")
+def threaded_dask():
+    dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
@@ -34,10 +34,6 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
-
-@pytest.fixture(scope='function')
-def metrics():
-    yield [Metrics['mean'], Metrics['median']]
 
 @pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:
@@ -75,6 +71,7 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics):
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
+
 @pytest.fixture(scope='function')
 def uneven_storage(uneven_storage_config):
     yield Storage.create(uneven_storage_config)
@@ -116,6 +113,10 @@ def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics, date):
     config = s3_storage.config
     yield ShatterConfig(filename=copc_filepath, attrs=attrs, metrics=metrics,
                         debug=True, tdb_dir=config.tdb_dir, date=date)
+
+@pytest.fixture(scope='session')
+def metrics():
+    yield [Metrics['mean'], Metrics['median']]
 
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:
@@ -177,4 +178,4 @@ def crs():
 
 @pytest.fixture(scope='class')
 def date():
-    yield np.datetime64('2011-01-01')
+    yield datetime(2011, 1, 1)

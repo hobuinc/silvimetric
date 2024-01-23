@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 from abc import ABC, abstractmethod
 from typing import Union, Tuple
+from datetime import datetime
 
 from dataclasses import dataclass, field
 
@@ -154,7 +155,7 @@ class ApplicationConfig(Config):
 @dataclass
 class ShatterConfig(Config):
     filename: str
-    date: Union[np.datetime64, Tuple[np.datetime64, np.datetime64]]
+    date: Union[datetime, Tuple[datetime, datetime]]
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
     bounds: Union[Bounds, None] = field(default=None)
@@ -181,18 +182,22 @@ class ShatterConfig(Config):
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        if isinstance(self.date, list):
-            d['date'] = [ str(dt.astype('str')) for dt in self.date]
+        if isinstance(self.date, tuple):
+            d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
         else:
-            d['date'] = str(self.date.astype('str'))
+            d['date'] = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
 
-        ms = [ Metric.from_string(m) for m in x['metrics']]
-        attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        ms = list([ Metric.from_string(m) for m in x['metrics']])
+        attrs = list([ Attribute.from_string(a) for a in x['attrs']])
+        if isinstance(x['date'], list):
+            date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
+        else:
+            date = datetime.strptime(x['date'], '%Y-%m-%dT%H:%M:%SZ')
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
@@ -203,7 +208,7 @@ class ShatterConfig(Config):
                 debug = x['debug'],
                 name = uuid.UUID(x['name']),
                 bounds=Bounds(*x['bounds']),
-                date= np.datetime64(x['date']))
+                date= date)
 
         return n
 

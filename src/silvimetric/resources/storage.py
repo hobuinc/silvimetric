@@ -1,9 +1,9 @@
 import tiledb
 import numpy as np
+from datetime import datetime
 import pathlib
 import contextlib
 import json
-import uuid
 from typing import Any
 
 from math import floor
@@ -229,7 +229,7 @@ class Storage:
         finally:
             tdb.close()
 
-    def get_history(self, start_time: np.datetime64, end_time: np.datetime64,
+    def get_history(self, start_time: datetime, end_time: datetime,
                     bounds: Bounds, name:str=None):
 
         from ..resources import ShatterConfig
