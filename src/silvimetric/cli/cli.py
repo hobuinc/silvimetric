@@ -34,12 +34,19 @@ def cli(ctx, database, debug, log_level, log_dir, progress):
 
 @cli.command("info")
 @click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--end_date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']), default=None)
-@click.option("--start_date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']), default=None)
+@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']))
+@click.option("--dates", type=click.Tuple([
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
 @click.option("--name", type=str, default=None)
 @click.pass_obj
-def info_cmd(app, bounds, start_date, end_date, name):
+def info_cmd(app, bounds, date, dates, name):
     import json
+    if date is not None and dates is not None:
+        app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
+
+    start_date = dates[0] if dates else date
+    end_date = dates[1] if dates else date
 
     i = info.info(app.tdb_dir, bounds=bounds, start_time=start_date,
         end_time=end_date, name=name)
@@ -96,7 +103,9 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.option("--watch", is_flag=True, default=False, type=bool)
 @click.option("--report", is_flag=True, default=False, type=bool)
 @click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']))
-@click.option("--dates", type=click.Tuple([click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']), click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
+@click.option("--dates", type=click.Tuple([
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
 @click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
               'threads', 'processes', 'single-threaded']))
 @click.pass_obj
