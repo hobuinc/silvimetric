@@ -119,15 +119,16 @@ class TestExtents(object):
 
     def test_pointcount(self, filtered, unfiltered, test_point_count, shatter_config, storage):
 
-        fc = run(filtered, shatter_config, storage)
-        ufc = run(unfiltered, shatter_config, storage)
+        with storage.open('w') as tdb:
+            fc = run(filtered, shatter_config, storage, tdb)
+            ufc = run(unfiltered, shatter_config, storage, tdb)
 
-        assert fc == ufc, f"""
-            Filtered and unfiltered point counts don't match.
-            Filtered: {fc}, Unfiltered: {ufc}"""
-        assert test_point_count == fc, f"""
-            Filtered point counts don't match.
-            Expected {test_point_count}, got {fc}"""
-        assert test_point_count == ufc, f"""
-            Unfiltered point counts don't match.
-            Expected {test_point_count}, got {ufc}"""
+            assert fc == ufc, f"""
+                Filtered and unfiltered point counts don't match.
+                Filtered: {fc}, Unfiltered: {ufc}"""
+            assert test_point_count == fc, f"""
+                Filtered point counts don't match.
+                Expected {test_point_count}, got {fc}"""
+            assert test_point_count == ufc, f"""
+                Unfiltered point counts don't match.
+                Expected {test_point_count}, got {ufc}"""

@@ -3,6 +3,7 @@ import os
 import dask
 import pdal
 from uuid import uuid4
+from datetime import datetime
 
 from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage, Log, Data
 from silvimetric.resources.config import ShatterConfig, StorageConfig, ApplicationConfig
@@ -13,14 +14,14 @@ from silvimetric import __version__ as svversion
 def configure_dask():
     dask.config.set(scheduler="single-threaded")
 
-@pytest.fixture(scope="function")
-def threaded_dask():
-    dask.config.set(scheduler="threads")
-
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
     path = tmp_path_factory.mktemp("test_tdb")
     yield os.path.abspath(path)
+
+@pytest.fixture(scope="function")
+def threaded_dask():
+    dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
@@ -34,10 +35,6 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
                         metrics = metrics,
                         version = svversion)
 
-@pytest.fixture(scope='function')
-def metrics():
-    yield [Metrics['mean'], Metrics['median']]
-
 @pytest.fixture(scope="function")
 def storage(storage_config) -> Storage:
     yield Storage.create(storage_config)
@@ -50,14 +47,17 @@ def app_config(tdb_filepath, debug=True):
     yield app
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, copc_filepath, storage_config, app_config, storage):
+def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds, app_config, storage, date):
     log = Log(20) # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
-                      debug = True)
+                      bounds=bounds,
+                      debug = True,
+                      date=date)
+
     yield s
 
 @pytest.fixture(scope='function')
@@ -71,19 +71,21 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics):
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
+
 @pytest.fixture(scope='function')
 def uneven_storage(uneven_storage_config):
     yield Storage.create(uneven_storage_config)
 
 @pytest.fixture(scope='function')
-def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, storage):
+def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, storage, date):
     log = Log(20) # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,
                       attrs = uneven_storage_config.attrs,
                       metrics = uneven_storage_config.metrics,
-                      debug = True)
+                      debug = True,
+                      date=date)
     yield s
 
 @pytest.fixture(scope="function")
@@ -107,10 +109,14 @@ def s3_storage(s3_storage_config):
     subprocess.call(["aws", "s3", "rm", "--recursive", s3_storage_config.tdb_dir])
 
 @pytest.fixture(scope="function")
-def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics):
+def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics, date):
     config = s3_storage.config
     yield ShatterConfig(filename=copc_filepath, attrs=attrs, metrics=metrics,
-                        debug=True, tdb_dir=config.tdb_dir)
+                        debug=True, tdb_dir=config.tdb_dir, date=date)
+
+@pytest.fixture(scope='session')
+def metrics():
+    yield [Metrics['mean'], Metrics['median']]
 
 @pytest.fixture(scope='session')
 def copc_filepath() -> str:
@@ -169,3 +175,7 @@ def maxy() -> float:
 @pytest.fixture(scope="class")
 def crs():
     yield "EPSG:5070"
+
+@pytest.fixture(scope='class')
+def date():
+    yield datetime(2011, 1, 1)

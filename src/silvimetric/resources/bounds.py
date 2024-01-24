@@ -89,3 +89,10 @@ class Bounds(dict): #for JSON serializing
             Bounds(self.minx, centery, centerx, self.maxy), # top left
             Bounds(centerx, centery, self.maxx, self.maxy), # top right
         ]
+
+    def disjoint(self, other):
+        if other.minx > self.maxx or other.maxx < self.minx:
+            return True
+        if other.miny > self.maxy or other.maxy < self.miny:
+            return True
+        return False

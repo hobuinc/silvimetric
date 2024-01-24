@@ -1,6 +1,6 @@
 import json
 import numpy as np
-from typing import Callable, Optional, Any, Union, Self
+from typing import Callable, Optional, Any, Union
 from scipy import stats
 from inspect import getsource
 from tiledb import Attr
