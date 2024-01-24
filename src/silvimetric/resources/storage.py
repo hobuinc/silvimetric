@@ -1,12 +1,16 @@
 import tiledb
-from tiledb import object_type
 import numpy as np
-from math import floor
+from datetime import datetime
 import pathlib
 import contextlib
+import json
+from typing import Any
+
+from math import floor
 
 from .config import StorageConfig
-from .metric import Metrics, Metric, Attribute
+from .metric import Metric, Attribute
+from ..resources import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -152,7 +156,7 @@ class Storage:
 
         return val
 
-    def saveMetadata(self, key: str, data: any) -> None:
+    def saveMetadata(self, key: str, data: Any) -> None:
         """
         Save metadata to storage
 
@@ -164,7 +168,6 @@ class Storage:
             Metadata value. Must be translatable to and from string.
         """
         with self.open('w') as w:
-            w: tiledb.SparseArray
             w.meta[key] = data
 
     def getAttributes(self) -> list[Attribute]:
@@ -226,31 +229,53 @@ class Storage:
         finally:
             tdb.close()
 
-    def get_history(self):
-        af = tiledb.array_fragments(self.config.tdb_dir)
-        with self.open('r') as r:
-            meta = dict(r.meta)
+    def get_history(self, start_time: datetime, end_time: datetime,
+                    bounds: Bounds, name:str=None):
 
+        from ..resources import ShatterConfig
+
+        af = tiledb.array_fragments(self.config.tdb_dir, True)
+        m = [ ]
         for idx in range(len(af)):
 
-            begin = af[idx].timestamp_range[0]
-            if len(af) > idx + 1:
-                end = af[idx+1].timestamp_range[1]
+            # if processes are too short, begin and end times can be the same
+            # so it's necessary to adjust time bounds so we can grab information
+
+            if idx == 0:
+                begin = 0
             else:
-                end = af[idx].timestamp_range[1]
+                begin = af[idx-1].timestamp_range[1]
+
+            end = af[idx].timestamp_range[1]
 
             with self.open('r', (begin, end)) as r:
-                for key in r.meta.keys():
-                    if meta[key] is not None:
-                        if not isinstance(meta[key], list):
-                            meta[key] = [ meta[key] ]
-                        if not isinstance(r.meta[key], list):
-                            meta[key] = meta[key] + [ r.meta[key] ]
-                        else:
-                            meta[key] = meta[key] + r.meta[key]
+                try:
+                    if not bool(r.meta['shatter']):
+                        continue
+
+                    s = ShatterConfig.from_string(r.meta['shatter'])
+
+                    # filter bounds
+                    if s.bounds.disjoint(bounds):
+                        continue
+
+                    # filter name
+                    if name is not None and name != s.name:
+                        continue
+
+                    # filter dates
+                    if isinstance(s.date, tuple):
+                        if s.date[1] < start_time or s.date[0] > end_time:
+                            continue
                     else:
-                        meta[key] = r.meta[key]
-        return meta
+                        if s.date < start_time or s.date > end_time:
+                            continue
+
+                    m.append(json.loads(r.meta['shatter']))
+                except KeyError:
+                    continue
+
+        return m
 
     #TODO what are we reading? queries are probably going to be specific
     def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:

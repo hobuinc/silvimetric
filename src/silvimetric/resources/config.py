@@ -1,12 +1,13 @@
 import pyproj
-import pdal
 
 import json
-from json import JSONEncoder
 import uuid
+import numpy as np
 
 from pathlib import Path
 from abc import ABC, abstractmethod
+from typing import Union, Tuple
+from datetime import datetime
 
 from dataclasses import dataclass, field
 
@@ -17,7 +18,7 @@ from .entry import Attribute, Attributes
 from . import __version__
 
 
-class SilviMetricJSONEncoder(JSONEncoder):
+class SilviMetricJSONEncoder(json.JSONEncoder):
     def default(self, o):
         return o.__dict__
 
@@ -154,11 +155,12 @@ class ApplicationConfig(Config):
 @dataclass
 class ShatterConfig(Config):
     filename: str
+    date: Union[datetime, Tuple[datetime, datetime]]
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
-    bounds: Bounds = field(default=None)
+    bounds: Union[Bounds, None] = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
-    tile_size: int = field(default=None)
+    tile_size: Union[int, None] = field(default=None)
     point_count: int = 0
 
     def __post_init__(self) -> None:
@@ -180,14 +182,22 @@ class ShatterConfig(Config):
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
+        if isinstance(self.date, tuple):
+            d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
+        else:
+            d['date'] = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
 
-        ms = [ Metric.from_string(m) for m in x['metrics']]
-        attrs = [ Attribute.from_string(a) for a in x['attrs']]
+        ms = list([ Metric.from_string(m) for m in x['metrics']])
+        attrs = list([ Attribute.from_string(a) for a in x['attrs']])
+        if isinstance(x['date'], list):
+            date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
+        else:
+            date = datetime.strptime(x['date'], '%Y-%m-%dT%H:%M:%SZ')
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
@@ -196,7 +206,9 @@ class ShatterConfig(Config):
                 attrs = attrs,
                 metrics = ms,
                 debug = x['debug'],
-                name = uuid.UUID(x['name']))
+                name = uuid.UUID(x['name']),
+                bounds=Bounds(*x['bounds']),
+                date= date)
 
         return n
 

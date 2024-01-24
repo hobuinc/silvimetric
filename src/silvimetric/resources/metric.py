@@ -1,6 +1,6 @@
 import json
 import numpy as np
-from typing import Callable, Optional, Any, Union, Self
+from typing import Callable, Optional, Any, Union
 from scipy import stats
 from inspect import getsource
 from tiledb import Attr
@@ -88,7 +88,7 @@ def m_stddev(data):
 
 Metrics = {
     'mean' : Metric('mean', np.float64, m_mean),
-    # 'mode' : Metric('mode', np.float64, m_mode),
+    'mode' : Metric('mode', np.float64, m_mode),
     'median' : Metric('median', np.float64, m_median),
     'min' : Metric('min', np.float64, m_min),
     'max' : Metric('max', np.float64, m_max),
