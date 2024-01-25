@@ -43,7 +43,7 @@ class MetricParamType(click.ParamType):
     name="Metrics"
     def convert(self, value, param, ctx) -> list[Metric]:
         try:
-            return [Metrics[m] for m in value]
+            return Metrics[value]
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 

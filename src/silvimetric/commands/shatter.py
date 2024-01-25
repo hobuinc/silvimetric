@@ -81,9 +81,17 @@ def write(data_in, tdb):
     dx, dy, dd = data_in
     tdb[dx,dy] = dd
     pc = int(dd['count'].sum())
-    del data_in
 
     return pc
+
+def garbage(pc, points, leaf, att_data, arranged, metrics):
+    import gc
+    import copy
+
+    p = copy.copy(pc)
+    del pc, points, leaf, att_data, arranged, metrics
+    am = gc.collect()
+    return p
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage, tdb: SparseArray):
     attrs = [a.name for a in config.attrs]
@@ -95,7 +103,9 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage, tdb: SparseArra
     arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
     writes: db.Bag = metrics.map(write, tdb)
-    return sum(writes)
+    pc: db.Bag = writes.map(garbage, points, leaves, att_data, arranged, metrics)
+
+    return sum(pc)
 
 
 

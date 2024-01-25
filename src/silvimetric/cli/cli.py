@@ -117,7 +117,7 @@ def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     dask_handle(dasktype, workers, threads, watch)
     config = ShatterConfig(tdb_dir = app.tdb_dir,
-                            date=dates if dates else tuple(date),
+                            date=dates if dates else tuple([date]),
                             log = app.log,
                             filename = pointcloud,
                             bounds = bounds,
