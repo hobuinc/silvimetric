@@ -41,7 +41,8 @@ class Extents(object):
             dtype=[('x', np.int32), ('y', np.int32)]
         )
 
-    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000):
+    def chunk(self, data: Data, res_threshold=100, pc_threshold=600000,
+            depth_threshold=6, scan=False):
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -61,18 +62,20 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold))
-        depth = 0
+        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold, depth_threshold))
+        curr_depth = 0
 
         logger = logging.getLogger('silvimetric')
         while curr.npartitions > 0:
-            logger.info(f'Chunking {curr.npartitions} tiles at depth {depth}')
-            to_add = curr.filter(lambda x: isinstance(x, Extents)).compute()
+
+            logger.info(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')
+            n = curr.compute()
+            to_add = [ne for ne in n if isinstance(ne, Extents)]
             if to_add:
                 filtered = filtered + to_add
 
-            curr = db.from_delayed(curr.filter(lambda x: not isinstance(x, Extents)))
-            depth += 1
+            curr = db.from_delayed([ne for ne in n if not isinstance(ne, Extents)])
+            curr_depth += 1
 
         return filtered
 
@@ -97,7 +100,7 @@ class Extents(object):
     # chunk to determine if there are any points available in this
     # set a bottom resolution of ~1km
     @dask.delayed
-    def filter(self, data: Data, res_threshold=100, pc_threshold=600000) -> Self:
+    def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0) -> Self:
 
 
         pc = data.estimate_count(self.bounds)
@@ -120,13 +123,14 @@ class Extents(object):
                 return [ self ]
             elif pc < target_pc:
                 return [ self ]
-            elif area < res_threshold**2:
+            elif area < res_threshold**2 or depth >= depth_threshold:
                 pc_per_cell = pc / (area / self.resolution**2)
                 cell_estimate = ceil(target_pc / pc_per_cell)
 
                 return self.get_leaf_children(cell_estimate)
             else:
-                return [ ch.filter(data, res_threshold) for ch in self.split() ]
+                return [ ch.filter(data, res_threshold, depth_threshold, depth=depth+1) for ch in self.split() ]
+
 
     def _find_dims(self, tile_size):
         s = math.sqrt(tile_size)

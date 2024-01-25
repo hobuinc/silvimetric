@@ -6,6 +6,7 @@ import numpy as np
 import pdal
 
 import pathlib
+from urllib.parse import urlparse
 import json
 
 class Data:
@@ -30,7 +31,7 @@ class Data:
         """Does this instance represent a pdal.Pipeline or a simple filename"""
 
         p = pathlib.Path(self.filename)
-        if p.suffix == '.json':
+        if p.suffix == '.json' and p.name != 'ept.json':
             return True
         return False
 

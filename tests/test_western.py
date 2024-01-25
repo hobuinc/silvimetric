@@ -43,6 +43,28 @@ def western_config(western_filepath, WesternBounds, resolution, WebMercator, att
 def western_storage(western_config) -> Storage:
     yield Storage.create(western_config)
 
+@pytest.fixture(scope='function')
+def western_pipeline():
+    path = os.path.join(os.path.dirname(__file__), "data",
+            "western_us.json")
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
+
+@pytest.fixture(scope='function')
+def western_shatter_config(western_pipeline, western_storage):
+    log = Log(20) # INFO
+    st = western_storage.config
+
+    s = ShatterConfig(tdb_dir = st.tdb_dir,
+        log = log,
+        filename = western_pipeline,
+        attrs = st.attrs,
+        metrics = st.metrics,
+        bounds=bounds,
+        debug = True,
+        date=date)
+    yield s
+
 class Test_Western(object):
 
     def test_schema(self, western_storage: Storage):

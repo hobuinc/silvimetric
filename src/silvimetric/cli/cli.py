@@ -57,6 +57,7 @@ def info_cmd(app, bounds, date, dates, name):
 @click.argument("pointcloud", type=str)
 @click.option("--resolution", type=float, default=100)
 @click.option("--point_count", type=int, default=600000)
+@click.option("--depth", type=int, default=6)
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.option("--workers", type=int, default=12)
 @click.option("--threads", type=int, default=4)
@@ -65,15 +66,15 @@ def info_cmd(app, bounds, date, dates, name):
               'threads', 'processes', 'single-threaded']))
 @click.pass_obj
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
-         threads, watch):
+             depth, threads, watch):
     """Scan point cloud and determine the optimal tile size."""
     dask_handle(dasktype, workers, threads, watch)
-    return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution)
+    return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution, depth)
 
 
 @cli.command('initialize')
-@click.argument("bounds", type=BoundsParamType())
-@click.argument("crs", type=CRSParamType())
+@click.option("--bounds", type=BoundsParamType(), required=True)
+@click.option("--crs", type=CRSParamType(), required=True)
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
               help="List of attributes to include in Database")
 @click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
