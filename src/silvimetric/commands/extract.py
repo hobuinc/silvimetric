@@ -46,8 +46,9 @@ def create_metric_att_list(metrics: list[Metric], attrs: list[Attribute]):
 
 def extract(config: ExtractConfig):
 
-    ma_list = create_metric_att_list(config.metrics, config.attrs)
     storage = Storage.from_db(config.tdb_dir)
+    metadata = storage.getMetrics()
+    ma_list = create_metric_att_list(config.metrics, config.attrs)
     root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)

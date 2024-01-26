@@ -1,14 +1,12 @@
 import click
 import pyproj
 import webbrowser
-from datetime import datetime
-from typing import List
 
 import dask
 from dask.diagnostics import ProgressBar
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 
-from ..resources import Bounds, Attribute, Metric, Attributes, Metrics
+from ..resources import Bounds, Attribute, Metric, Attributes, Metrics, Log
 
 
 class BoundsParamType(click.ParamType):
@@ -47,24 +45,46 @@ class MetricParamType(click.ParamType):
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
-def dask_handle(dasktype, workers, threads, watch):
-    dask_config = {
-        'n_workers': workers,
-        'threads_per_worker': threads
-    }
-    if dasktype == 'cluster':
-        client = Client(n_workers=workers, threads_per_worker=threads)
-        client.get_versions(check=True)
-        dask_config['scheduler']='distributed'
-        dask_config['distributed.client']=client
+def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
+        watch: bool, log: Log):
+    dask_config = { }
 
-    else:
-        dask_config['scheduler']=dasktype
-    dask.config.set(dask_config)
+    if dasktype == 'threads':
+        dask_config['n_workers'] = threads
+        dask_config['threads_per_worker'] = 1
+    if dasktype == 'processes':
+        dask_config['n_workers'] = workers
+        dask_config['threads_per_worker'] = threads
 
-    if watch:
-        if dasktype == 'cluster':
-            webbrowser.open(client.cluster.dashboard_link)
-        else:
+    if scheduler == 'local':
+        if scheduler != 'distributed':
+            log.warning("""Selected scheduler type does not support continuously\
+                            updated config information.""")
+        # fall back to dask type to determine the scheduler type
+        dask_config['scheduler'] = dasktype
+        if watch:
             p = ProgressBar()
             p.register()
+
+    elif scheduler == 'distributed':
+        dask_config['scheduler'] = scheduler
+        if dasktype == 'processes':
+            cluster = LocalCluster(processes=True)
+        elif dasktype == 'threads':
+            cluster = LocalCluster(processes=False)
+        else:
+            raise ValueError(f"Invalid value for 'dasktype', {dasktype}")
+
+        client = Client(cluster)
+        client.get_versions(check=True)
+        dask_config['distributed.client'] = client
+        if watch:
+            webbrowser.open(client.cluster.dashboard_link)
+
+    elif scheduler == 'single-threaded':
+        if scheduler != 'distributed':
+            log.warning("""Selected scheduler type does not support continuously\
+                            updated config information.""")
+        dask_config['scheduler'] = scheduler
+
+    dask.config.set(dask_config)

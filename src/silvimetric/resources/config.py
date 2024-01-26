@@ -161,7 +161,9 @@ class ShatterConfig(Config):
     bounds: Union[Bounds, None] = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
     tile_size: Union[int, None] = field(default=None)
-    point_count: int = 0
+    point_count: int = field(default=0)
+    nonempty_domain: tuple[tuple[int, int], ...] = field(default=())
+    finished: bool = field(default=False)
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -171,7 +173,6 @@ class ShatterConfig(Config):
             self.attrs = s.getAttributes()
         if not self.metrics:
             self.metrics = s.getMetrics()
-        self.point_count: int = 0
 
         del s
 

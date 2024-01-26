@@ -1,5 +1,11 @@
 import numpy as np
+import gc
+import copy
+import signal
+import datetime
 
+import dask
+from dask.distributed import as_completed
 import dask.array as da
 import dask.bag as db
 
@@ -81,21 +87,15 @@ def write(data_in, tdb):
     dx, dy, dd = data_in
     tdb[dx,dy] = dd
     pc = int(dd['count'].sum())
+    p = copy.deepcopy(pc)
+    del pc, data_in
+    gc.collect()
 
-    return pc
-
-def garbage(pc, points, leaf, att_data, arranged, metrics):
-    import gc
-    import copy
-
-    p = copy.copy(pc)
-    del pc, points, leaf, att_data, arranged, metrics
-    am = gc.collect()
     return p
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage, tdb: SparseArray):
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
+        tdb: SparseArray, start_time: float):
     attrs = [a.name for a in config.attrs]
-
 
     leaf_bag: db.Bag = db.from_sequence(leaves)
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
@@ -103,25 +103,60 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage, tdb: SparseArra
     arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
     writes: db.Bag = metrics.map(write, tdb)
-    pc: db.Bag = writes.map(garbage, points, leaves, att_data, arranged, metrics)
 
-    return sum(pc)
+    def kill_gracefully(signum, frame):
+        end_time = datetime.datetime.now().timestamp() * 1000
+        with storage.open(timestamp=(start_time, end_time)) as a:
+            config.nonempty_domain = a.nonempty_domain()
+            config.finished=False
 
+            config.log.info('Saving config before quitting...')
+            tdb.meta['shatter'] = str(config)
+            config.log.info('Quitting.')
+
+    signal.signal(signal.SIGINT, kill_gracefully)
+
+    if dask.config.get('scheduler') == 'distributed':
+        client = dask.config.get('distributed.client')
+        client.compute(writes)
+        for batch in as_completed(writes, with_results=True).batches():
+            for future, pack in batch:
+                pc = pack
+                config.point_count += pc
+
+        end_time = datetime.datetime.now().timestamp() * 1000
+        a = storage.open(timestamp=(start_time, end_time))
+        return config.point_count
+
+    pc = sum(writes)
+    end_time = datetime.datetime.now().timestamp() * 1000
+    a = storage.open(timestamp=(start_time, end_time))
+
+    config.finished=True
+    config.point_count = pc
+    config.nonempty_domain = a.nonempty_domain()
+
+    return pc
 
 
 def shatter(config: ShatterConfig):
-
-    config.log.debug('Filtering out empty chunks...')
-
+    start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
-    with storage.open('w') as tdb:
-        if config.bounds is None:
-            config.bounds = data.bounds
 
+    with storage.open('w') as tdb:
+
+        ## shatter should still output a config if it's interrupted
+        # TODO add slices yet to be finished so we can pick up this process
+        # in the future
+
+        if config.bounds is None:
+            config.bounds = extents.bounds
+
+        config.log.debug('Grabbing leaf nodes...')
         if config.tile_size is not None:
             leaves = extents.get_leaf_children(config.tile_size)
         else:
@@ -129,7 +164,7 @@ def shatter(config: ShatterConfig):
 
         # Begin main operations
         config.log.debug('Fetching and arranging data...')
-        pc = run(leaves, config, storage, tdb)
+        pc = run(leaves, config, storage, tdb, start_time)
         config.point_count = int(pc)
 
         config.log.debug('Saving shatter metadata')

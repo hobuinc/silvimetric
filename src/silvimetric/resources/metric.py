@@ -5,7 +5,8 @@ from scipy import stats
 from inspect import getsource
 from tiledb import Attr
 import dask
-from line_profiler import profile
+import base64
+import pickle
 
 from .entry import Attribute, Entry
 
@@ -39,7 +40,8 @@ class Metric(Entry):
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
             'dependencies': self.dependencies,
-            'method': getsource(self._method)
+            'method_str': getsource(self._method),
+            'method': base64.b64encode(pickle.dumps(self._method)).decode()
         }
 
     def from_string(data: Union[str, dict]):
@@ -48,23 +50,23 @@ class Metric(Entry):
         elif isinstance(data, dict):
             j = data
         name = j['name']
+        dtype = np.dtype(j['dtype'])
+        dependencies = j['dependencies']
+        method = pickle.loads(base64.b64decode(j['method'].encode()))
 
-        # TODO should this be derived from config or from list of metrics?
-        # dtype = j['dtype']
-        # deps = j['dependencies']
-        # method = j['method']
-        # method = Metrics[name].method
-
-        return Metrics[name]
+        return Metric(name, dtype, method, dependencies)
 
     def __eq__(self, other):
-        return super().__eq__(other) and self._method == other._method
+        return (self.name == other.name and
+                self.dtype == other.dtype and
+                self.dependencies == other.dependencies and
+                self._method == other._method)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
     def __repr__(self) -> str:
-        return getsource(self._method)
+        return json.dumps(self.to_json())
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 

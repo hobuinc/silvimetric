@@ -3,6 +3,7 @@ from dask.distributed import performance_report
 import pyproj
 import logging
 
+
 from ..resources import Bounds, Log
 from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
@@ -62,13 +63,17 @@ def info_cmd(app, bounds, date, dates, name):
 @click.option("--workers", type=int, default=12)
 @click.option("--threads", type=int, default=4)
 @click.option("--watch", is_flag=True, default=False, type=bool)
-@click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
-              'threads', 'processes', 'single-threaded']))
+@click.option("--dasktype", default='processes', type=click.Choice(['threads',
+                'processes']))
+@click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
+                'local', 'single-threaded']), help="""Type of dask scheduler. Both are local, but \
+                    are run with different dask libraries. See more here \
+                    https://docs.dask.org/en/stable/scheduling.html.""")
 @click.pass_obj
-def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype, workers,
-             depth, threads, watch):
+def scan_cmd(app, resolution, point_count, pointcloud, bounds, dasktype,
+             scheduler, workers, depth, threads, watch):
     """Scan point cloud and determine the optimal tile size."""
-    dask_handle(dasktype, workers, threads, watch)
+    dask_handle(dasktype, scheduler, workers, threads, watch)
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution, depth)
 
 
@@ -107,15 +112,20 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
-@click.option("--dasktype", default='cluster', type=click.Choice(['cluster',
-              'threads', 'processes', 'single-threaded']))
+@click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--dasktype", default='processes', type=click.Choice(['threads',
+                'processes']))
+@click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
+                'local', 'single-threaded']), help="""Type of dask scheduler. Both are local, but \
+                    are run with different dask libraries. See more here \
+                    https://docs.dask.org/en/stable/scheduling.html.""")
 @click.pass_obj
 def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
-                dasktype, tilesize, date, dates):
+                dasktype, scheduler, tilesize, date, dates):
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
-    dask_handle(dasktype, workers, threads, watch)
+    dask_handle(dasktype, scheduler, workers, threads, watch, app.log)
     config = ShatterConfig(tdb_dir = app.tdb_dir,
                             date=dates if dates else tuple([date]),
                             log = app.log,
@@ -124,9 +134,9 @@ def shatter_cmd(app, pointcloud, workers, bounds, threads, watch, report,
                             tile_size=tilesize)
 
     if report:
-        if dasktype != 'cluster':
-            app.log.warning('Report option is incompatible with dask type'
-                            '{dasktype}, skipping.')
+        if scheduler != 'distributed':
+            app.log.warning('Report option is incompatible with scheduler'
+                            '{scheduler}, skipping.')
         report_path = f'reports/{config.name}.html'
         with performance_report(report_path) as pr:
             shatter.shatter(config)
