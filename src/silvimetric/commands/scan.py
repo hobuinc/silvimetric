@@ -6,7 +6,7 @@ import math
 
 from ..resources import Storage, Data, Extents, Bounds
 
-def scan(tdb_dir, pointcloud, bounds, point_count, resolution, depth):
+def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100, depth=6):
     logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
         data = Data(pointcloud, tdb.config, bounds)

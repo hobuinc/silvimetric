@@ -5,7 +5,7 @@ import signal
 import datetime
 
 import dask
-from dask.distributed import as_completed
+from dask.distributed import Client, as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
 
@@ -89,22 +89,17 @@ def write(data_in, tdb):
     pc = int(dd['count'].sum())
     p = copy.deepcopy(pc)
     del pc, data_in
-    gc.collect()
 
     return p
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         tdb: SparseArray, start_time: float):
-    attrs = [a.name for a in config.attrs]
 
-    leaf_bag: db.Bag = db.from_sequence(leaves)
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
-    arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
-    writes: db.Bag = metrics.map(write, tdb)
-
+    ## Handle a kill signal
     def kill_gracefully(signum, frame):
+        client = dask.config.get('distributed.client')
+        if client is not None:
+            client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
         with storage.open(timestamp=(start_time, end_time)) as a:
             config.nonempty_domain = a.nonempty_domain()
@@ -116,25 +111,39 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
+    ## Handle dask bag transitions through work states
+    attrs = [a.name for a in config.attrs]
+
+    leaf_bag: db.Bag = db.from_sequence(leaves)
+    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
+    arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
+    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
+    writes: db.Bag = metrics.map(write, tdb)
+
+    ## If dask is distributed, use the futures feature
     if dask.config.get('scheduler') == 'distributed':
-        client = dask.config.get('distributed.client')
-        client.compute(writes)
-        for batch in as_completed(writes, with_results=True).batches():
+        pc_futures = futures_of(writes.persist())
+        for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
-                pc = pack
-                config.point_count += pc
+                if isinstance(pack, CancelledError):
+                    continue
+                for pc in pack:
+                    config.point_count = config.point_count + pc
 
         end_time = datetime.datetime.now().timestamp() * 1000
         a = storage.open(timestamp=(start_time, end_time))
         return config.point_count
 
+    ## Handle non-distributed dask scenarios
     pc = sum(writes)
     end_time = datetime.datetime.now().timestamp() * 1000
-    a = storage.open(timestamp=(start_time, end_time))
+    with storage.open(timestamp=(start_time, end_time)) as a:
 
-    config.finished=True
-    config.point_count = pc
-    config.nonempty_domain = a.nonempty_domain()
+        config.finished=True
+        config.point_count = pc
+        config.nonempty_domain = a.nonempty_domain()
+        tdb.meta['shatter'] = str(config)
 
     return pc
 

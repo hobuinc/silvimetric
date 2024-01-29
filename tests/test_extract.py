@@ -28,6 +28,18 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
                        metrics = metrics)
     yield c
 
+@pytest.fixture(scope='function')
+def multivalue_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
+    shatter(shatter_config)
+    shatter(shatter_config)
+    log = Log(20)
+    c =  ExtractConfig(tdb_dir = tdb_filepath,
+                       log = log,
+                       out_dir = tif_filepath,
+                       attrs = extract_attrs,
+                       metrics = metrics)
+    yield c
+
 
 
 def tif_test(extract_config):
@@ -81,3 +93,5 @@ class Test_Extract(object):
                                bounds = b.bounds)
             extract(ec)
             tif_test(ec)
+
+    def test_multi_value(self, shatter_config, tdb_filepath)

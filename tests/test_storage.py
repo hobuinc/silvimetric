@@ -47,7 +47,5 @@ class Test_Storage(object):
                 def e_name(att):
                     return s.attr(m.entry_name(att.name))
                 def schema(att):
-                    return Metrics[m.name].schema(att.name)
+                    return Metrics[m.name].schema(att)
                 assert all([e_name(a) == schema(a) for a in a_list])
-
-

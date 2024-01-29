@@ -56,6 +56,8 @@ class Storage:
             Raises bounding box errors if not of lengths 4 or 6
         """
 
+        # TODO make any changes to tiledb setup here.
+
         if not ctx:
             ctx = tiledb.default_ctx()
 
@@ -70,7 +72,7 @@ class Storage:
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [m.schema(a.name) for m in config.metrics for a in config.attrs]
+        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process

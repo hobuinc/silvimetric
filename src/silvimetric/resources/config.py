@@ -161,9 +161,9 @@ class ShatterConfig(Config):
     bounds: Union[Bounds, None] = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
     tile_size: Union[int, None] = field(default=None)
-    point_count: int = field(default=0)
-    nonempty_domain: tuple[tuple[int, int], ...] = field(default=())
-    finished: bool = field(default=False)
+    point_count: int = 0
+    nonempty_domain: tuple[tuple[int, int], ...] = ()
+    finished: bool = False
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -183,6 +183,8 @@ class ShatterConfig(Config):
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
+        d['nonempty_domain'] = [ list(a) for a in self.nonempty_domain]
+
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
         else:
@@ -199,6 +201,7 @@ class ShatterConfig(Config):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
             date = datetime.strptime(x['date'], '%Y-%m-%dT%H:%M:%SZ')
+        nonempty_domains = tuple(tuple(ned) for ned in x['nonempty_domain'])
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
@@ -209,6 +212,7 @@ class ShatterConfig(Config):
                 debug = x['debug'],
                 name = uuid.UUID(x['name']),
                 bounds=Bounds(*x['bounds']),
+                nonempty_domain=nonempty_domains,
                 date= date)
 
         return n

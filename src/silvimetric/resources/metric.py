@@ -23,8 +23,8 @@ class Metric(Entry):
         self.dependencies = deps
         self._method = method
 
-    def schema(self, attr: str):
-        entry_name = self.entry_name(attr)
+    def schema(self, attr: Attribute):
+        entry_name = self.entry_name(attr.name)
         return Attr(name=entry_name, dtype=self.dtype)
 
     # common name, storage name
@@ -88,11 +88,12 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
+#TODO change to correct dtype
 Metrics = {
-    'mean' : Metric('mean', np.float64, m_mean),
-    'mode' : Metric('mode', np.float64, m_mode),
-    'median' : Metric('median', np.float64, m_median),
-    'min' : Metric('min', np.float64, m_min),
-    'max' : Metric('max', np.float64, m_max),
-    'stddev' : Metric('stddev', np.float64, m_stddev),
+    'mean' : Metric('mean', np.float32, m_mean),
+    'mode' : Metric('mode', np.float32, m_mode),
+    'median' : Metric('median', np.float32, m_median),
+    'min' : Metric('min', np.float32, m_min),
+    'max' : Metric('max', np.float32, m_max),
+    'stddev' : Metric('stddev', np.float32, m_stddev),
 }
