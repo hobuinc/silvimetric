@@ -1,9 +1,13 @@
 from osgeo import gdal, osr
 import numpy as np
+import numpy.lib.recfunctions as rfn
 from pathlib import Path
+import awkward as ak
+import pandas as pd
 
 from ..resources import Storage, ExtractConfig, Metric, Attribute
 from ..resources import Extents
+from ..commands.shatter import get_metrics
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -47,7 +51,6 @@ def create_metric_att_list(metrics: list[Metric], attrs: list[Attribute]):
 def extract(config: ExtractConfig):
 
     storage = Storage.from_db(config.tdb_dir)
-    metadata = storage.getMetrics()
     ma_list = create_metric_att_list(config.metrics, config.attrs)
     root_bounds=storage.config.root
 
@@ -61,14 +64,68 @@ def extract(config: ExtractConfig):
     y1 = maxy - miny + 1
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx, miny:maxy]
+        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
+                miny:maxy]
         data['X'] = data['X'] - minx
         data['Y'] = data['Y'] - miny
 
-        for ma in ma_list:
-            m_data = np.full(shape=(y1,x1), fill_value=np.nan, dtype=data[ma].dtype)
-            a = data[['X','Y',ma]].to_numpy()
-            for x,y,md in a[:]:
-                m_data[int(y)][int(x)] = md
+        # 1. should find values that are not unique, meaning they have multiple
+            # entries
+        recarray = data.to_records(index=False)
+        xys = recarray[['X', 'Y']]
+        unq, inv, counts = np.unique(xys, return_inverse=True,
+                return_counts=True)
+        redos = np.where(counts >= 2)
+        leave = np.where(counts == 1)
 
-            write_tif(x1, y1, m_data, ma, config)
+        # 2. then should combine the values of those attribute/cell combos
+        # TODO update extract config to use attributes and metrics, not strings
+        att_list = [a.name for a in config.attrs]
+        xs = np.unique(unq[redos]['X'])
+        ys = np.unique(unq[redos]['Y'])
+        redo_cells = pd.DataFrame(tdb.multi_index[[list(xs)], [list(ys)]]).to_records()
+        result = np.recarray(redos[0].shape, dtype=redo_cells.dtype)
+
+        for idx, val in enumerate(redos[0]):
+            vals = redo_cells[np.where(redo_cells[['X', 'Y']] == unq[val])]
+            result[idx] = rfn.merge_arrays(vals)
+
+        metrics = get_metrics([[],[],redo_cells], att_list, storage)
+
+
+        # 3. Should rerun the metrics over them
+            # - Add method to metric to get the attribute name from entry name
+
+        for ma in ma_list:
+
+            # m_data = ak.Array(shape=(y1,x1), fill_value=np.nan, dtype=data[ma].dtype)
+
+            # create numpy array of x and y, then get values from tiledb, then
+            # broadcast with awkward array?
+
+            # a = np.array(data[['X','Y', ma]].to_numpy().reshape(-1), dtype=[('X', np.int32), ('Y', np.int32), (ma, data[ma].dtype)])
+            # l = a.shape[0]
+            # a2 = a.reshape(-1)
+            # np.unique(a, return_counts=True)
+            axis = data[['X','Y']].to_numpy()
+            li = [np.array()]
+            awk = ak.from_iter([ak.from_iter(d[x,y][ma], ) for x,y in axis ])
+            ak.where(ak.count(awk,1) > 1)
+
+
+
+            # TODO figure out which cells have multiple values for metrics
+            # and recompute those metrics with combined cell data
+            a2 = data[ma].to_numpy().reshape(y1,x1,-1)
+            asdf = np.where(len(a2) > 1)
+
+
+            # np.unique(a, return_index=True)
+            # for x,y,md in a[:]:
+            #     if np.isnan(m_data[int(y)][int(x)]):
+            #         m_data[int(y)][int(x)] = md
+            #     else:
+            #         m_data[int(y)][int(x)] = np.append((m_data[int(y)][int(x)], md))
+
+
+            write_tif(x1, y1, a2, ma, config)

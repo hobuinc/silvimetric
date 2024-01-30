@@ -14,6 +14,7 @@ from tiledb import SparseArray
 from ..resources import Extents, Storage, ShatterConfig, Data
 
 def get_data(extents: Extents, filename: str, storage: Storage):
+    #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
     data.execute()
     return data.array
