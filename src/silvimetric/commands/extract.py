@@ -1,9 +1,8 @@
 from osgeo import gdal, osr
 import numpy as np
-import numpy.lib.recfunctions as rfn
 from pathlib import Path
-import awkward as ak
 import pandas as pd
+import itertools
 
 from ..resources import Storage, ExtractConfig, Metric, Attribute
 from ..resources import Extents
@@ -64,68 +63,44 @@ def extract(config: ExtractConfig):
     y1 = maxy - miny + 1
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
-                miny:maxy]
+        att_list = [a.name for a in config.attrs] + ['count']
+        #TODO adjust the other data references to account for new query
+        data = tdb.query(attrs=[*ma_list, *att_list], use_arrow=False, order='F',
+                coords=True).df[minx:maxx, miny:maxy]
         data['X'] = data['X'] - minx
         data['Y'] = data['Y'] - miny
 
         # 1. should find values that are not unique, meaning they have multiple
-            # entries
-        recarray = data.to_records(index=False)
+        # entries
+        recarray = data.to_records()
         xys = recarray[['X', 'Y']]
-        unq, inv, counts = np.unique(xys, return_inverse=True,
-                return_counts=True)
-        redos = np.where(counts >= 2)
-        leave = np.where(counts == 1)
+        unq, idx, counts = np.unique(xys, return_index=True, return_counts=True)
+        redos = data.loc[idx[np.where(counts >= 2)]]
+        leaves = data.loc[idx[np.where(counts == 1)]]
 
         # 2. then should combine the values of those attribute/cell combos
-        # TODO update extract config to use attributes and metrics, not strings
-        att_list = [a.name for a in config.attrs]
-        xs = np.unique(unq[redos]['X'])
-        ys = np.unique(unq[redos]['Y'])
-        redo_cells = pd.DataFrame(tdb.multi_index[[list(xs)], [list(ys)]]).to_records()
-        result = np.recarray(redos[0].shape, dtype=redo_cells.dtype)
+        # ridx = np.unique(unq[redos])
+        # rxs = list(ridx['X'])
+        # rys = list(ridx['Y'])
+        # redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
+        recs = redos.groupby(['X','Y'], as_index=False).agg(
+            lambda x: np.fromiter(itertools.chain(*x), x.dtype)
+            if x.dtype == object else sum(x))
+        recs = recs.to_dict(orient='list')
 
-        for idx, val in enumerate(redos[0]):
-            vals = redo_cells[np.where(redo_cells[['X', 'Y']] == unq[val])]
-            result[idx] = rfn.merge_arrays(vals)
+        # lidx = idx[leaves]
+        # lidx = np.unique(unq[leaves])
+        # lxs = list(lidx['X'])
+        # lys = list(lidx['Y'])
 
-        metrics = get_metrics([[],[],redo_cells], att_list, storage)
-
+        # leave = pd.DataFrame(tdb.query(attrs=ma_list).multi_index[[lxs], [lys]])
+        # leave = pd.DataFrame(tdb.query(attrs=ma_list).multi_index[[lxs], [lys]])
 
         # 3. Should rerun the metrics over them
-            # - Add method to metric to get the attribute name from entry name
+        dx, dy, metrics = get_metrics([[],[],recs[att_list]], att_list, storage)
+        ms = pd.DataFrame.from_dict(metrics)[[*ma_list, 'X', 'Y']]
+        final = pd.concat((ms, leaves))
 
+        # 4. output them to tifs
         for ma in ma_list:
-
-            # m_data = ak.Array(shape=(y1,x1), fill_value=np.nan, dtype=data[ma].dtype)
-
-            # create numpy array of x and y, then get values from tiledb, then
-            # broadcast with awkward array?
-
-            # a = np.array(data[['X','Y', ma]].to_numpy().reshape(-1), dtype=[('X', np.int32), ('Y', np.int32), (ma, data[ma].dtype)])
-            # l = a.shape[0]
-            # a2 = a.reshape(-1)
-            # np.unique(a, return_counts=True)
-            axis = data[['X','Y']].to_numpy()
-            li = [np.array()]
-            awk = ak.from_iter([ak.from_iter(d[x,y][ma], ) for x,y in axis ])
-            ak.where(ak.count(awk,1) > 1)
-
-
-
-            # TODO figure out which cells have multiple values for metrics
-            # and recompute those metrics with combined cell data
-            a2 = data[ma].to_numpy().reshape(y1,x1,-1)
-            asdf = np.where(len(a2) > 1)
-
-
-            # np.unique(a, return_index=True)
-            # for x,y,md in a[:]:
-            #     if np.isnan(m_data[int(y)][int(x)]):
-            #         m_data[int(y)][int(x)] = md
-            #     else:
-            #         m_data[int(y)][int(x)] = np.append((m_data[int(y)][int(x)], md))
-
-
-            write_tif(x1, y1, a2, ma, config)
+            write_tif(x1, y1, final[ma].to_dict(orient='list'), ma, config)
