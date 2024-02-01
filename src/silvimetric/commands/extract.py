@@ -21,7 +21,7 @@ np_to_gdal_types = {
     np.dtype(np.float64).str: gdal.GDT_Float64
 }
 
-def write_tif(xsize: int, ysize: int, data: np.ndarray, name: str,
+def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
               config: ExtractConfig):
     osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
@@ -48,10 +48,10 @@ def extract(config: ExtractConfig):
 
     storage = Storage.from_db(config.tdb_dir)
     ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
-            config.attrs ]
+        config.attrs ]
     att_list = [ a.name for a in config.attrs ] + [ 'count' ]
     out_list = [ *ma_list, 'X', 'Y' ]
-    root_bounds = storage.config.root
+    root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
     i = e.get_indices()
@@ -63,8 +63,8 @@ def extract(config: ExtractConfig):
     y1 = maxy - miny + 1
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=[*ma_list, *att_list], use_arrow=False,
-                order='F', coords=True).df[minx:maxx, miny:maxy]
+        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
+                miny:maxy]
         data['X'] = data['X'] - minx
         data['Y'] = data['Y'] - miny
 
@@ -72,12 +72,16 @@ def extract(config: ExtractConfig):
         # entries
         recarray = data.to_records()
         xys = recarray[['X', 'Y']]
-        unq, idx, counts = np.unique(xys, return_index=True, return_counts=True)
-        redos = data.loc[idx[np.where(counts >= 2)]]
+        unq, idx, inv, counts = np.unique(xys, return_index=True, return_inverse=True, return_counts=True)
+        redos = np.where(counts >= 2)
         leaves = data.loc[idx[np.where(counts == 1)]]
 
         # 2. then should combine the values of those attribute/cell combos
-        recs = redos.groupby(['X','Y'], as_index=False).agg(
+        ridx = np.unique(unq[redos])
+        rxs = list(ridx['X'])
+        rys = list(ridx['Y'])
+        redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
+        recs = redo.groupby(['X','Y'], as_index=False).agg(
             lambda x: np.fromiter(itertools.chain(*x), x.dtype)
             if x.dtype == object else sum(x))[[*att_list, 'X', 'Y']]
         recs = recs.to_dict(orient='list')
@@ -87,10 +91,7 @@ def extract(config: ExtractConfig):
         ms = pd.DataFrame.from_dict(metrics)[out_list]
         final = pd.concat((ms, leaves[out_list]))
 
-
         # 4. output them to tifs
-        # TODO create empty df with nan values where there is no data
-        # TODO hook up dask into the cli so we can use it here
         xs = final['X'].max() + 1
         ys = final['Y'].max() + 1
         for ma in ma_list:
