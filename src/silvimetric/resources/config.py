@@ -162,6 +162,8 @@ class ShatterConfig(Config):
     bounds: Union[Bounds, None] = field(default=None)
     name: uuid.UUID = field(default=uuid.uuid4())
     tile_size: Union[int, None] = field(default=None)
+    start_time:float = 0
+    end_time:float = 0
     point_count: int = 0
     nonempty_domain: tuple[tuple[int, int], ...] = ()
     finished: bool = False

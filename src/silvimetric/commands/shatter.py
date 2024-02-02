@@ -94,14 +94,16 @@ def write(data_in, tdb):
     return p
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
-        tdb: SparseArray, start_time: float):
+        tdb: SparseArray):
 
+    start_time = config.start_time
     ## Handle a kill signal
     def kill_gracefully(signum, frame):
         client = dask.config.get('distributed.client')
         if client is not None:
             client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
+        config.end_time = end_time
         with storage.open(timestamp=(start_time, end_time)) as a:
             config.nonempty_domain = a.nonempty_domain()
             config.finished=False
@@ -150,7 +152,8 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
 
 
 def shatter(config: ShatterConfig):
-    start_time = datetime.datetime.now().timestamp() * 1000
+    # get start time in milliseconds
+    config.start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     data = Data(config.filename, storage.config, config.bounds)
@@ -174,7 +177,7 @@ def shatter(config: ShatterConfig):
 
         # Begin main operations
         config.log.debug('Fetching and arranging data...')
-        pc = run(leaves, config, storage, tdb, start_time)
+        pc = run(leaves, config, storage, tdb)
         config.point_count = int(pc)
 
         config.log.debug('Saving shatter metadata')

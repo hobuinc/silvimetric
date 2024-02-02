@@ -121,9 +121,9 @@ class TestExtents(object):
     def test_pointcount(self, filtered, unfiltered, test_point_count, shatter_config, storage):
 
         with storage.open('w') as tdb:
-            start_time = datetime.datetime.now().timestamp() * 1000
-            fc = run(filtered, shatter_config, storage, tdb, start_time)
-            ufc = run(unfiltered, shatter_config, storage, tdb, start_time)
+            shatter_config.start_time = datetime.datetime.now().timestamp() * 1000
+            fc = run(filtered, shatter_config, storage, tdb)
+            ufc = run(unfiltered, shatter_config, storage, tdb)
 
             assert fc == ufc, f"""
                 Filtered and unfiltered point counts don't match.

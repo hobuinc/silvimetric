@@ -1,4 +1,3 @@
-
 from . import Bounds
 from .config import StorageConfig
 import numpy as np
@@ -6,7 +5,6 @@ import numpy as np
 import pdal
 
 import pathlib
-from urllib.parse import urlparse
 import json
 
 class Data:
