@@ -6,12 +6,14 @@ import math
 
 from ..resources import Storage, Data, Extents, Bounds
 
-def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100, depth=6):
+def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
+        depth=6):
     logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
         data = Data(pointcloud, tdb.config, bounds)
         extents = Extents.from_sub(tdb_dir, data.bounds)
-        cell_counts = extent_handle(extents, data, resolution, point_count, depth)
+        cell_counts = extent_handle(extents, data, resolution, point_count,
+            depth)
 
         # total = np.array([l.cell_count for l in leaves])
         std = np.std(cell_counts)
@@ -26,8 +28,8 @@ def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100, depth=
         return rec
 
 
-def extent_handle(extent: Extents, data: Data, res_threshold=100, pc_threshold=600000,
-        depth_threshold=6):
+def extent_handle(extent: Extents, data: Data, res_threshold=100,
+        pc_threshold=600000, depth_threshold=6):
 
     if extent.root is not None:
         bminx, bminy, bmaxx, bmaxy = extent.root.get()
@@ -47,7 +49,8 @@ def extent_handle(extent: Extents, data: Data, res_threshold=100, pc_threshold=6
     if extent.bounds == extent.root:
         extent.root = chunk.bounds
 
-    curr = db.from_delayed(tile_info(chunk, data, res_threshold, pc_threshold, depth_threshold))
+    curr = db.from_delayed(tile_info(chunk, data, res_threshold, pc_threshold,
+            depth_threshold))
     logger = logging.getLogger('silvimetric')
     a = [ ]
 
@@ -100,4 +103,5 @@ def tile_info(extent: Extents, data: Data, res_threshold=100,
             return [ cell_estimate for x in range(tile_count) ] + [ remainder ]
 
         else:
-            return [ tile_info(ch, data, res_threshold, pc_threshold, depth_threshold, depth+1) for ch in extent.split() ]
+            return [ tile_info(ch, data, res_threshold, pc_threshold,
+                    depth_threshold, depth+1) for ch in extent.split() ]

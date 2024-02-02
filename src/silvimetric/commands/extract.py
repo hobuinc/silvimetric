@@ -2,11 +2,12 @@ from osgeo import gdal, osr
 import numpy as np
 from pathlib import Path
 import pandas as pd
-import itertools
+import dask
+import dask.dataframe as dd
+import dask.bag as db
 
 from ..resources import Storage, ExtractConfig, Metric, Attribute
 from ..resources import Extents
-from ..commands.shatter import get_metrics
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -44,23 +45,43 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.FlushCache()
     tif = None
 
-def extract(config: ExtractConfig):
+def get_metrics(data_in, config: ExtractConfig):
+    if data_in is None:
+        return None
 
-    storage = Storage.from_db(config.tdb_dir)
+    # make sure it's not empty. No empty writes
+    if not np.any(data_in['count']):
+        return None
+
+    # doing dask compute inside the dict array because it was too fine-grained
+    # when it was outside
+    #TODO move this operation to a dask bag and convert to dataframe and then
+    # to a dict for better efficiency?
+    metric_data = {
+        f'{m.entry_name(attr.name)}': [m(cell_data) for cell_data in data_in[attr.name]]
+        for attr in config.attrs for m in config.metrics
+    }
+    # md = dask.compute(metric_data)[0]
+    data_out = data_in | metric_data
+    return data_out
+
+def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray):
     ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
         config.attrs ]
     att_list = [ a.name for a in config.attrs ] + [ 'count' ]
     out_list = [ *ma_list, 'X', 'Y' ]
-    root_bounds=storage.config.root
 
-    e = Extents(config.bounds, config.resolution, root=root_bounds)
-    i = e.get_indices()
-    minx = i['x'].min()
-    maxx = i['x'].max()
-    miny = i['y'].min()
-    maxy = i['y'].max()
-    x1 = maxx - minx + 1
-    y1 = maxy - miny + 1
+    minx = indices['x'].min()
+    maxx = indices['x'].max()
+    miny = indices['y'].min()
+    maxy = indices['y'].max()
+
+    att_meta = {}
+    att_meta['X'] = np.int32
+    att_meta['Y'] = np.int32
+    att_meta['count'] = np.int32
+    for a in config.attrs:
+        att_meta[a.name] =  a.dtype
 
     with storage.open("r") as tdb:
         data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
@@ -72,30 +93,70 @@ def extract(config: ExtractConfig):
         # entries
         recarray = data.to_records()
         xys = recarray[['X', 'Y']]
-        unq, idx, inv, counts = np.unique(xys, return_index=True, return_inverse=True, return_counts=True)
+        unq, idx, counts = np.unique(xys, return_index=True, return_counts=True)
         redos = np.where(counts >= 2)
+
+        if not np.any(redos):
+            return data
+
         leaves = data.loc[idx[np.where(counts == 1)]]
 
         # 2. then should combine the values of those attribute/cell combos
         ridx = np.unique(unq[redos])
         rxs = list(ridx['X'])
         rys = list(ridx['Y'])
-        redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
-        recs = redo.groupby(['X','Y'], as_index=False).agg(
-            lambda x: np.fromiter(itertools.chain(*x), x.dtype)
-            if x.dtype == object else sum(x))[[*att_list, 'X', 'Y']]
-        recs = recs.to_dict(orient='list')
+        if np.any(rxs):
+            redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
+
+        parts = min(int(redo['X'].max() * redo['Y'].max()), 1000)
+        r = dd.from_pandas(redo, npartitions=parts, name='MetricDataFrame')
+        def squash(x):
+            def s2(vals):
+                if vals.dtype == object:
+                    return np.array([*vals], vals.dtype).reshape(-1)
+                elif vals.name == 'X' or vals.name == 'Y':
+                    return vals.values[0]
+                else:
+                    return sum(vals)
+            val = x.aggregate(s2)
+            p = pd.DataFrame(val).T
+            return p
+
+        recs = r.groupby(['X','Y']).apply(squash, meta=att_meta)
+        rs = recs.compute().to_dict(orient='list')
 
         # 3. Should rerun the metrics over them
-        dx, dy, metrics = get_metrics([[],[],recs], att_list, storage)
+        metrics = get_metrics(rs, config)
         ms = pd.DataFrame.from_dict(metrics)[out_list]
-        final = pd.concat((ms, leaves[out_list]))
+        return pd.concat((ms, leaves[out_list]))
 
-        # 4. output them to tifs
-        xs = final['X'].max() + 1
-        ys = final['Y'].max() + 1
-        for ma in ma_list:
-            raster_data = np.full((ys, xs), np.nan)
-            raster_idx = final['Y']*ys + final['X']
-            np.put(raster_data, raster_idx, final[ma])
-            write_tif(x1, y1, raster_data, ma, config)
+def extract(config: ExtractConfig):
+
+    dask.config.set({"dataframe.convert-string": False})
+
+    ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
+        config.attrs ]
+
+
+    storage = Storage.from_db(config.tdb_dir)
+    root_bounds=storage.config.root
+
+    e = Extents(config.bounds, config.resolution, root=root_bounds)
+    i = e.get_indices()
+    minx = i['x'].min()
+    maxx = i['x'].max()
+    miny = i['y'].min()
+    maxy = i['y'].max()
+    x1 = maxx - minx + 1
+    y1 = maxy - miny + 1
+
+    final = handle_overlaps(config, storage, i)
+
+    # output metric data to tifs
+    xs = final['X'].max() + 1
+    ys = final['Y'].max() + 1
+    for ma in ma_list:
+        raster_data = np.full((ys, xs), np.nan)
+        raster_idx = final['Y']*ys + final['X']
+        np.put(raster_data, raster_idx, final[ma])
+        write_tif(x1, y1, raster_data, ma, config)

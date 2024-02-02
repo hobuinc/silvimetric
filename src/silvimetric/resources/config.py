@@ -136,6 +136,7 @@ class StorageConfig(Config):
 class ApplicationConfig(Config):
     debug: bool = False,
     progress: bool = False,
+    scheduler: str = 'distributed'
 
     def to_json(self):
         d = super().to_json()
@@ -224,8 +225,8 @@ class ShatterConfig(Config):
 @dataclass
 class ExtractConfig(Config):
     out_dir: str
-    attrs: list[str] = field(default_factory=list)
-    metrics: list[str] = field(default_factory=list)
+    attrs: list[Attribute] = field(default_factory=list)
+    metrics: list[Metric] = field(default_factory=list)
     bounds: Bounds = field(default=None)
 
     def __post_init__(self) -> None:

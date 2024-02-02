@@ -58,8 +58,8 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
 
     if scheduler == 'local':
         if scheduler != 'distributed':
-            log.warning("""Selected scheduler type does not support continuously\
-                            updated config information.""")
+            log.warning("Selected scheduler type does not support continuously"
+                            "updated config information.")
         # fall back to dask type to determine the scheduler type
         dask_config['scheduler'] = dasktype
         if watch:
@@ -69,9 +69,9 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
     elif scheduler == 'distributed':
         dask_config['scheduler'] = scheduler
         if dasktype == 'processes':
-            cluster = LocalCluster(processes=True)
+            cluster = LocalCluster(processes=True, n_workers=workers, threads_per_worker=threads)
         elif dasktype == 'threads':
-            cluster = LocalCluster(processes=False)
+            cluster = LocalCluster(processes=False, n_workers=workers, threads_per_worker=threads)
         else:
             raise ValueError(f"Invalid value for 'dasktype', {dasktype}")
 
