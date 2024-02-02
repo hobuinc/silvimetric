@@ -2,6 +2,7 @@ import numpy as np
 import dask
 import pdal
 import pytest
+import datetime
 
 from silvimetric.resources import Extents
 from silvimetric.commands.shatter import run
@@ -120,6 +121,7 @@ class TestExtents(object):
     def test_pointcount(self, filtered, unfiltered, test_point_count, shatter_config, storage):
 
         with storage.open('w') as tdb:
+            shatter_config.start_time = datetime.datetime.now().timestamp() * 1000
             fc = run(filtered, shatter_config, storage, tdb)
             ufc = run(unfiltered, shatter_config, storage, tdb)
 

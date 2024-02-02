@@ -3,6 +3,8 @@ import os
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
+import copy
+import uuid
 
 from silvimetric.commands.shatter import shatter
 from silvimetric.commands.extract import extract
@@ -28,7 +30,26 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
                        metrics = metrics)
     yield c
 
+@pytest.fixture(scope='function')
+def multivalue_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
 
+    shatter(shatter_config)
+    e = Extents.from_storage(shatter_config.tdb_dir)
+    b: Extents = e.split()[0]
+
+    second_config = copy.deepcopy(shatter_config)
+    second_config.bounds = b.bounds
+    second_config.name = uuid.uuid4()
+    second_config.point_count = 0
+
+    shatter(second_config)
+    log = Log(20)
+    c =  ExtractConfig(tdb_dir = tdb_filepath,
+                       log = log,
+                       out_dir = tif_filepath,
+                       attrs = extract_attrs,
+                       metrics = metrics)
+    yield c
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
@@ -81,3 +102,7 @@ class Test_Extract(object):
                                bounds = b.bounds)
             extract(ec)
             tif_test(ec)
+
+    def test_multi_value(self, multivalue_config):
+        extract(multivalue_config)
+        tif_test(multivalue_config)

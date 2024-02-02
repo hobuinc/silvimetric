@@ -1,4 +1,3 @@
-
 from . import Bounds
 from .config import StorageConfig
 import numpy as np
@@ -30,7 +29,7 @@ class Data:
         """Does this instance represent a pdal.Pipeline or a simple filename"""
 
         p = pathlib.Path(self.filename)
-        if p.suffix == '.json':
+        if p.suffix == '.json' and p.name != 'ept.json':
             return True
         return False
 

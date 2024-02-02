@@ -41,8 +41,10 @@ class TestCommands(object):
 
     def test_scan(self, shatter_config):
         s = shatter_config
-        res = scan.scan(s.tdb_dir, s.filename, s.bounds, 10, 10)
-        assert res == 25
+        res = scan.scan(s.tdb_dir, s.filename, s.bounds, 10, 10, 5)
+        assert res == 1
+        res = scan.scan(s.tdb_dir, s.filename, s.bounds, depth=5)
+        assert res == 100
 
     def test_info(self, tdb_filepath, config_split):
         i = info.info(tdb_filepath)

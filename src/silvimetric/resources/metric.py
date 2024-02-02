@@ -5,7 +5,8 @@ from scipy import stats
 from inspect import getsource
 from tiledb import Attr
 import dask
-from line_profiler import profile
+import base64
+import pickle
 
 from .entry import Attribute, Entry
 
@@ -22,8 +23,8 @@ class Metric(Entry):
         self.dependencies = deps
         self._method = method
 
-    def schema(self, attr: str):
-        entry_name = self.entry_name(attr)
+    def schema(self, attr: Attribute):
+        entry_name = self.entry_name(attr.name)
         return Attr(name=entry_name, dtype=self.dtype)
 
     # common name, storage name
@@ -39,7 +40,8 @@ class Metric(Entry):
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
             'dependencies': self.dependencies,
-            'method': getsource(self._method)
+            'method_str': getsource(self._method),
+            'method': base64.b64encode(pickle.dumps(self._method)).decode()
         }
 
     def from_string(data: Union[str, dict]):
@@ -48,23 +50,23 @@ class Metric(Entry):
         elif isinstance(data, dict):
             j = data
         name = j['name']
+        dtype = np.dtype(j['dtype'])
+        dependencies = j['dependencies']
+        method = pickle.loads(base64.b64decode(j['method'].encode()))
 
-        # TODO should this be derived from config or from list of metrics?
-        # dtype = j['dtype']
-        # deps = j['dependencies']
-        # method = j['method']
-        # method = Metrics[name].method
-
-        return Metrics[name]
+        return Metric(name, dtype, method, dependencies)
 
     def __eq__(self, other):
-        return super().__eq__(other) and self._method == other._method
+        return (self.name == other.name and
+                self.dtype == other.dtype and
+                self.dependencies == other.dependencies and
+                self._method == other._method)
 
     def __call__(self, data: np.ndarray) -> np.ndarray:
         return self._method(data)
 
     def __repr__(self) -> str:
-        return getsource(self._method)
+        return json.dumps(self.to_json())
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
@@ -86,11 +88,12 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
+#TODO change to correct dtype
 Metrics = {
-    'mean' : Metric('mean', np.float64, m_mean),
-    'mode' : Metric('mode', np.float64, m_mode),
-    'median' : Metric('median', np.float64, m_median),
-    'min' : Metric('min', np.float64, m_min),
-    'max' : Metric('max', np.float64, m_max),
-    'stddev' : Metric('stddev', np.float64, m_stddev),
+    'mean' : Metric('mean', np.float32, m_mean),
+    'mode' : Metric('mode', np.float32, m_mode),
+    'median' : Metric('median', np.float32, m_median),
+    'min' : Metric('min', np.float32, m_min),
+    'max' : Metric('max', np.float32, m_max),
+    'stddev' : Metric('stddev', np.float32, m_stddev),
 }

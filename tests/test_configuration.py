@@ -4,7 +4,7 @@ import os
 import dataclasses
 
 
-from silvimetric.resources import StorageConfig, Bounds, Log
+from silvimetric.resources import StorageConfig, Bounds, Log, Metric
 
 @pytest.fixture(scope='function')
 def tdb_filepath(tmp_path_factory) -> str:
@@ -32,5 +32,9 @@ class Test_Configuration(object):
 
         j = str(config)
         c = StorageConfig.from_string(j)
+        mean = [ m for m in c.metrics if m.name == 'mean']
+        assert len(mean) == 1
+
+        assert int(mean[0]([2,2,2,2])) == 2
         assert config == c
 
