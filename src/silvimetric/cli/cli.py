@@ -12,20 +12,22 @@ from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamTyp
 from .common import dask_handle
 
 @click.group()
-@click.option("--database", '-d', type=click.Path(exists=False))
+@click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
 @click.option("--debug", is_flag=True, default=False, help="Print debug messages?")
 @click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=12)
-@click.option("--threads", type=int, default=4)
-@click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--workers", type=int, default=12, help="Number of workers for Dask")
+@click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
+@click.option("--watch", is_flag=True, default=False, type=bool,
+        help="Open dask diagnostic page in default web browser.")
 @click.option("--dasktype", default='processes', type=click.Choice(['threads',
-        'processes']))
+        'processes']), help="What Dask uses for parallelization. For more"
+        "information see here https://docs.dask.org/en/stable/scheduling.html#local-threads")
 @click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
-        'local', 'single-threaded']), help="""Type of dask scheduler. Both are local, but \
-        are run with different dask libraries. See more here \
-        https://docs.dask.org/en/stable/scheduling.html.""")
+        'local', 'single-threaded']), help="Type of dask scheduler. Both are "
+        "local, but are run with different dask libraries. See more here "
+        "https://docs.dask.org/en/stable/scheduling.html.")
 @click.pass_context
 def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
         workers, threads, watch):
@@ -76,7 +78,7 @@ def info_cmd(app, bounds, date, dates, name):
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth):
     """Scan point cloud and determine the optimal tile size."""
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth, app.log)
+            depth)
 
 
 @cli.command('initialize')
