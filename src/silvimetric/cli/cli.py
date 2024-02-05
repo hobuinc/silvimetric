@@ -76,7 +76,7 @@ def info_cmd(app, bounds, date, dates, name):
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth):
     """Scan point cloud and determine the optimal tile size."""
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth)
+            depth, app.log)
 
 
 @cli.command('initialize')
@@ -90,6 +90,7 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth):
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
+    import itertools
     """Initialize silvimetrics DATABASE
     """
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
@@ -97,7 +98,7 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
             root = bounds,
             crs = crs,
             attrs = attributes,
-            metrics = metrics,
+            metrics = list(itertools.chain(*metrics)),
             resolution = resolution)
     return initialize.initialize(storageconfig)
 
@@ -113,8 +114,13 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
 @click.pass_obj
 def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
+
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
+
+    if date is None and dates is None:
+        raise ValueError("One of '--date' or '--dates' must be provided.")
+
     """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     config = ShatterConfig(tdb_dir = app.tdb_dir,
             date=dates if dates else tuple([date]),

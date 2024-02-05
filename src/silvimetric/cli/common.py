@@ -40,8 +40,28 @@ class AttrParamType(click.ParamType):
 class MetricParamType(click.ParamType):
     name="Metrics"
     def convert(self, value, param, ctx) -> list[Metric]:
+        if '.py' in value:
+            import importlib.util
+            import os
+            from pathlib import Path
+
+            cwd = os.getcwd()
+            p = Path(cwd, value)
+            if not p.exists():
+                self.fail("Failed to find import file for metrics at"
+                        f" {str(p)}", param, ctx)
+
+            spec = importlib.util.spec_from_file_location('user_metrics', str(p))
+            user_metrics = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(user_metrics)
+            ms = user_metrics.metrics()
+            for m in ms:
+                if not isinstance(m, Metric):
+                    self.fail(f"Invalid Metric supplied: {m}")
+            return user_metrics.metrics()
+
         try:
-            return Metrics[value]
+            return [ Metrics[value] ]
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
