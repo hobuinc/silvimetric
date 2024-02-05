@@ -26,8 +26,6 @@ def write(x,y,val, s:Storage, attrs, dims, metrics):
 
 class Test_Shatter(object):
 
-    # @pytest.mark.skipif('linux' in platform.platform().lower(),
-    #                     reason='Tiledb array_fragments bug in linux.')
     def test_shatter(self, shatter_config, storage: Storage, maxy):
         shatter(shatter_config)
         with storage.open('r') as a:
