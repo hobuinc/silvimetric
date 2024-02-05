@@ -4,11 +4,12 @@ import dask.bag as db
 import dask
 import math
 
-from ..resources import Storage, Data, Extents, Bounds
+from ..resources import Storage, Data, Extents, Bounds, Log
 
 def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
-        depth=6):
-    logger = logging.getLogger('silvimetric')
+        depth=6, log: Log=None):
+    if log is None:
+        logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
         data = Data(pointcloud, tdb.config, bounds)
         extents = Extents.from_sub(tdb_dir, data.bounds)
