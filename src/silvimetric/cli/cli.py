@@ -152,6 +152,9 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE """
 
+    #TODO only allow metrics and attributes to be added if they're present
+    # in the storage config.
+
     config = ExtractConfig(tdb_dir = app.tdb_dir,
             log = app.log,
             out_dir= outdir,

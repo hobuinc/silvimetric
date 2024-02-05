@@ -31,6 +31,7 @@ class CRSParamType(click.ParamType):
 
 class AttrParamType(click.ParamType):
     name="Attrs"
+    #TODO add import similar to metrics
     def convert(self, value, param, ctx) -> list[Attribute]:
         try:
             return [Attributes[a] for a in value]
@@ -41,20 +42,25 @@ class MetricParamType(click.ParamType):
     name="Metrics"
     def convert(self, value, param, ctx) -> list[Metric]:
         if '.py' in value:
-            import importlib.util
-            import os
-            from pathlib import Path
+            try:
+                import importlib.util
+                import os
+                from pathlib import Path
 
-            cwd = os.getcwd()
-            p = Path(cwd, value)
-            if not p.exists():
-                self.fail("Failed to find import file for metrics at"
-                        f" {str(p)}", param, ctx)
+                cwd = os.getcwd()
+                p = Path(cwd, value)
+                if not p.exists():
+                    self.fail("Failed to find import file for metrics at"
+                            f" {str(p)}", param, ctx)
 
-            spec = importlib.util.spec_from_file_location('user_metrics', str(p))
-            user_metrics = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(user_metrics)
-            ms = user_metrics.metrics()
+                spec = importlib.util.spec_from_file_location('user_metrics', str(p))
+                user_metrics = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(user_metrics)
+                ms = user_metrics.metrics()
+            except Exception as e:
+                self.fail(f"Failed to import metrics from {str(p)} with error {e}",
+                        param, ctx)
+
             for m in ms:
                 if not isinstance(m, Metric):
                     self.fail(f"Invalid Metric supplied: {m}")
