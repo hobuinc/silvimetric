@@ -111,6 +111,7 @@ than just one dataset, as well as the coordinate system it will live in. You
 will also need to define any `Attributes` and `Metrics`, as these will be
 propagated to future processes.
 
+Example:
 .. code-block:: console
 
     $ DB_NAME="western-us.tdb"
@@ -119,9 +120,31 @@ propagated to future processes.
 
     $ silvimetric --database $DB_NAME initialize --bounds "$BOUNDS" --crs "EPSG:$EPSG"
 
+Usage:
+.. code-block:: console
+
+    Usage: silvimetric initialize [OPTIONS]
+
+    Options:
+    --bounds BOUNDS         Root bounds that encapsulates all data  [required]
+    --crs CRS               Coordinate system of data  [required]
+    -a, --attributes ATTRS  List of attributes to include in Database
+    -m, --metrics METRICS   List of metrics to include in Database
+    --resolution FLOAT      Summary pixel resolution
+    --help                  Show this message and exit.
+
+
 User-Defined Metrics
 ................................................................................
 
+:ref:`user-defined metric` is a `Metric` that is not given to the user by
+SilviMetric. This `Metric` looks and acts exactly the same, but is defined by
+whoever is creating the database. You can create a metrics module using the
+sample below, and substituting any number of extra metrics in place of `p75`
+and `p90`. When looking for a metrics module, we look for a method named
+`metrics`, and that it returns a list of `Metric` objects. The methods that
+are included in these objects need to be able to be serialized by `dill` in
+order to be pushed and fetched to and from the database.
 
 .. code-block:: python
    :linenos:
@@ -142,6 +165,9 @@ User-Defined Metrics
 
         return [m_p75, m_p90]
 
+When including the metrics in the `initialize` step, be sure to include them by
+doing `-m './path/to/metrics.py'`. At this point, you will need to have all
+other metrics you would like to include as well.
 
 .. code-block:: console
 
@@ -152,12 +178,49 @@ User-Defined Metrics
 Scan
 ................................................................................
 
+:ref:`scan` will allow us to look through the nodes of the point cloud file
+that you'd like to run in order to determine a good number of cells you should
+include per tile. The `Shatter` process will take steps to try to inform itself
+of the best splits possible before doing it's work. The filter process will remove
+any sections of the bounds that are empty before we get to the shatter process,
+removing some wasted compute time. By performing a scan ahead of time though,
+you only need to do it once.
+
+When scan looks through each section of the data, it looks to see how many points
+are here, how much area this section is taking up, and what depth we're at in
+the octree. If any of these pass the defined thresholds, then we stop splitting
+and return that tile. The number of cells in that tile further tells us how best
+to split the data.
+
+Usually 1 standard deviation from the mean is a good starting point for a shatter
+process, but this won't always be perfect for your use case.
+
+Usage:
+
+.. code-block:: console
+
+    Usage: silvimetric scan [OPTIONS] POINTCLOUD
+
+    Scan point cloud and determine the optimal tile size.
+
+    Options:
+    --resolution FLOAT     Summary pixel resolution
+    --filter               Remove empty space in computation. Will take extra
+                            time.
+    --point_count INTEGER  Point count threshold.
+    --depth INTEGER        Quadtree depth threshold.
+    --bounds BOUNDS        Bounds to scan.
+    --help                 Show this message and exit.
+
+
+Exmaple:
+
 .. code-block:: console
 
     $ FILEPATH="https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
     $ silvimetric -d $DB_NAME --watch scan $FILEPATH
 
-Output
+Output:
 
 .. code-block:: console
 
@@ -170,8 +233,30 @@ Output
 Shatter
 ................................................................................
 
-:ref:`shatter` ingests data into the SilviMetric database.
+:ref:`shatter` is where the vast majority of the processing happens. Here
+SilviMetric will take all the previously defined variables like the bounds,
+resolution, and our tile size, and it will split all data values up into their
+respective bins. From here, SilviMetric will perform each `Metric` previously
+defined in `Initialize` over the data in each cell. At the end of all that,
+this data will be written to a `SparseArray` in `TileDB`, where it will be much
+easier to access.
 
+Usage:
+.. code-block:: console
+
+    Usage: silvimetric shatter [OPTIONS] POINTCLOUD
+
+    Options:
+    --bounds BOUNDS                 Bounds for data to include in processing
+    --tilesize INTEGER              Number of cells to include per tile
+    --report                        Whether or not to write a report of the
+                                    process, useful for debugging
+    --date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
+                                    Date the data was produced.
+    --dates <DATETIME DATETIME>...  Date range the data was produced during
+    --help                          Show this message and exit.
+
+Example:
 .. code-block:: console
 
     $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
@@ -180,60 +265,72 @@ Shatter
 Info
 ................................................................................
 
-:ref:`info` provides the ability to scan and inspect the SilviMetric database.
+:ref:`info` provides the ability to inspect the SilviMetric database. Here you
+can see past `Shatter` processes that have been run, including point counts,
+attributes, metrics, and other process metadata.
 
+Usage:
+.. code-block:: console
+    Usage: silvimetric info [OPTIONS]
+
+    Options:
+    --bounds BOUNDS                 Bounds to filter by
+    --date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
+                                    Select processes with this date
+    --dates <DATETIME DATETIME>...  Select processes within this date range
+    --name TEXT                     Select processes with this name
+    --help                          Show this message and exit.
+
+
+Example:
 .. code-block:: console
 
     $ silvimetric -d $DB_NAME info
 
-The output will be formatted like below.
-
+Output:
 .. code-block:: json
     :linenos:
 
     {
         "attributes": [
             {
-            "name": "Z",
-            "dtype": "<f8",
-            "dependencies": null
-            },
-            ...
+                "name": "Z",
+                "dtype": "<f8",
+                "dependencies": null
+            }
         ],
         "metadata": {
             "tdb_dir": "western-us.tdb",
             "log": {
-            "logdir": null,
-            "log_level": "INFO",
-            "logtype": "stream",
-            "logfilename": "silvimetric-log.txt"
+                "logdir": null,
+                "log_level": "INFO",
+                "logtype": "stream",
+                "logfilename": "silvimetric-log.txt"
             },
             "debug": false,
             "root": [
-            -14100053.268191,
-            3058230.975702,
-            -11138180.816218,
-            6368599.176434
+                -14100053.268191,
+                3058230.975702,
+                -11138180.816218,
+                6368599.176434
             ],
-            "crs": {...PROJJSON}
+            "crs": {"PROJJSON"}
             "resolution": 30.0,
             "attrs": [
-            {
-                "name": "Z",
-                "dtype": "<f8",
-                "dependencies": null
-            },
-            ...
+                {
+                    "name": "Z",
+                    "dtype": "<f8",
+                    "dependencies": null
+                }
             ],
             "metrics": [
-            {
-                "name": "mean",
-                "dtype": "<f4",
-                "dependencies": null,
-                "method_str": "def m_mean(data):\n    return np.mean(data)\n",
-                "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
-            },
-            ...
+                {
+                    "name": "mean",
+                    "dtype": "<f4",
+                    "dependencies": null,
+                    "method_str": "def m_mean(data):\n    return np.mean(data)\n",
+                    "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+                }
             ],
             "version": "0.0.1",
             "capacity": 1000000
@@ -244,30 +341,138 @@ The output will be formatted like below.
 Extract
 ................................................................................
 
+:ref:`extract` is the final stop, where SilviMetric outputs the metrics that
+been binned up nicely, and will output them as rasters to where you select.
+
+Usage:
+.. code-block:: console
+    Usage: silvimetric extract [OPTIONS]
+
+    Extract silvimetric metrics from DATABASE
+
+    Options:
+    -a, --attributes ATTRS  List of attributes to include output
+    -m, --metrics METRICS   List of metrics to include in output
+    --bounds BOUNDS         Bounds for data to include in output
+    -o, --outdir PATH       Output directory.  [required]
+    --help                  Show this message and exit.
+
+Example:
+.. code-block:: console
+
+    $ OUT_DIR="western-us-tifs"
+    $ silvimetric -d $DB_NAME extract --outdir $OUT_DIR
+
 
 Python API Usage
 --------------------------------------------------------------------------------
 
-Setup
-................................................................................
+Everything that can be done from the command line can also be performed from
+withing Python. The CLi provides some nice wrapping around some of the setup
+pieces, including config, log, and dask handling, but all of these are pieces
+that you can set up on your own as well.
 
-Initialize
-................................................................................
+.. code-block:: python
 
-Scan
-................................................................................
+    import os
+    from pathlib import Path
+    import numpy as np
+    import pdal
+    import json
+    from dask.distributed import Client
+    import webbrowser
 
-Info
-................................................................................
+    from silvimetric.resources import Storage, Metric, Metrics, Bounds, Pdal_Attributes
+    from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig
+    from silvimetric.commands import scan, shatter, extract
 
-Shatter
-................................................................................
+    ########## Setup #############
 
-Extract
-................................................................................
+    # Here we create a path for our current working directory, as well as the path
+    # to our forest data, the path to the database directory, and the path to the
+    # directory that will house the raster data.
+    curpath = Path(os.path.dirname(os.path.realpath(__file__)))
+    filename = "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
+    db_dir_path = Path(curpath  / "western_us.tdb")
+
+    db_dir = str(db_dir_path)
+    out_dir = str(curpath / "westsern_us_tifs")
+    resolution = 10 # 10 meter resolution
+
+    # we'll use PDAL python bindings to find the srs of our data, and the bounds
+    reader = pdal.Reader(filename)
+    p = reader.pipeline()
+    qi = p.quickinfo[reader.type]
+    bounds = Bounds.from_string((json.dumps(qi['bounds'])))
+    srs = json.dumps(qi['srs']['json'])
+
+    ######## Create Metric ########
+    # Metrics give you the ability to define methods you'd like applied to the data
+    # Here we define, the name, the data type, and what values we derive from it.
+
+    def make_metric():
+        def p75(arr: np.ndarray):
+            return np.percentile(arr, 75)
+
+        return Metric(name='p75', dtype=np.float32, method = p75)
+
+    ###### Create Storage #####
+    # This will create a tiledb database, same as the `initialize` command would
+    # from the command line. Here we'll define the overarching bounds, which may
+    # extend beyond the current dataset, as well as the CRS of the data, the list
+    # of attributes that will be used, as well as metrics. The config will be stored
+    # in the database for future processes to use.
+
+    def db():
+        perc_75 = make_metric()
+        attrs = [
+            Pdal_Attributes[a]
+            for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
+        ]
+        metrics = [
+            Metrics[m]
+            for m in ['mean', 'min', 'max']
+        ]
+        metrics.append(perc_75)
+        st_config = StorageConfig(db_dir, bounds, resolution, srs, attrs, metrics)
+        storage = Storage.create(st_config)
+
+    ###### Perform Shatter #####
+    # The shatter process will pull the config from the database that was previously
+    # made and will populate information like CRS, Resolution, Attributes, and what
+    # Metrics to perform from there. This will split the data into cells, perform
+    # the metric method over each cell, and then output that information to TileDB
+
+    def sh():
+        sh_config = ShatterConfig(db_dir, filename, tile_size=200)
+        with Client(n_workers=10, threads_per_worker=3, timeout=100000) as client:
+            webbrowser.open(client.cluster.dashboard_link)
+            shatter(sh_config, client)
 
 
-Examples
---------------------------------------------------------------------------------
+    ###### Perform Extract #####
+    # The Extract step will pull data from the database for each metric/attribute combo
+    # and store it in an array, where it will be output to a raster with the name
+    # `m_{Attr}_{Metric}.tif`. By default, each computed metric will be written
+    # to the output directory, but you can limit this by defining which Metric names
+    # you would like
+    def ex():
+        ex_config = ExtractConfig(db_dir, out_dir)
+        extract(ex_config)
+
+    ####### Perform Scan #######
+    # The Scan step will perform a search down the resolution tree of the COPC or
+    # EPT file you've supplied and will provide a best guess of how many cells per
+    # tile you should use for this dataset.
+
+    def sc():
+        scan.scan()
+
+
+    if __name__ == "__main__":
+        make_metric()
+        db()
+        sh()
+        ex()
 
 .. include:: ./substitutions.txt

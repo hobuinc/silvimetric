@@ -86,8 +86,8 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     with storage.open("r") as tdb:
         data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
                 miny:maxy]
-        data['X'] = data['X'] - minx
-        data['Y'] = data['Y'] - miny
+        data['X'] = data['X'] - data['X'].min()
+        data['Y'] = data['Y'] - data['Y'].min()
 
         # 1. should find values that are not unique, meaning they have multiple
         # entries
@@ -107,6 +107,8 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         rys = list(ridx['Y'])
         if np.any(rxs):
             redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
+            redo['X'] = redo['X'] - minx
+            redo['Y'] = redo['Y'] - miny
 
         parts = min(int(redo['X'].max() * redo['Y'].max()), 1000)
         r = dd.from_pandas(redo, npartitions=parts, name='MetricDataFrame')
@@ -150,13 +152,13 @@ def extract(config: ExtractConfig):
     x1 = maxx - minx + 1
     y1 = maxy - miny + 1
 
-    final = handle_overlaps(config, storage, i)
+    final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
 
     # output metric data to tifs
-    xs = final['X'].max() + 1
-    ys = final['Y'].max() + 1
     for ma in ma_list:
-        raster_data = np.full((ys, xs), np.nan)
-        raster_idx = final['Y']*ys + final['X']
-        np.put(raster_data, raster_idx, final[ma])
-        write_tif(x1, y1, raster_data, ma, config)
+        m_data = np.full(shape=(y1,x1), fill_value=np.nan, dtype=final[ma].dtype)
+        a = final[['X','Y',ma]].to_numpy()
+        for x,y,md in a[:]:
+            m_data[int(y)][int(x)] = md
+
+        write_tif(x1, y1, m_data, ma, config)
