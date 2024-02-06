@@ -10,38 +10,59 @@ SilviMetric Tutorial
 
 
 This tutorial will cover how to interact with SilviMetric, including the key
-commands `initialize`, `info`, `scan`, `shatter`, and `extract`. These commands
-make up the core functionality of SilviMetric and will allow you convert point
-cloud files into a storage system with TileDB and extract the
-metrics that are produced into rasters or read with the library/language of your
-choice.
+commands :ref:`initialize`, :ref:`info`, :ref:`scan`, :ref:`shatter`, and
+:ref:`extract`. These commands make up the core functionality of SilviMetric
+and will allow you convert point cloud files into a storage system with TileDB
+and extract the metrics that are produced into rasters or read with the
+library/language of your choice.
 
 Introduction
 -------------------------------------------------------------------------------
 
-SilviMetric was created as the spiritual successor to `Fusion`, a C++ library written
-by Robert McGaughey with the goal of making point clouds easier to handle and
-process. SilviMetric aims to handle this same problem with the use of modern
-libraries, a more widely used language in `Python`. The goal is to create a
-library that can be developed by a wider audience of researchers and developers,
-and used on a wider variety of systems, including easier access to distributed
-systems in cloud based scenarios.
+SilviMetric was created as the spiritual successor to |FUSION|, a C++ library
+written by Robert McGaughey with the goal of making point clouds easier to
+handle and process for forestry. SilviMetric aims to handle the challenge of
+computing statistics and metrics from LiDAR data by using |Python|. The goal is
+to create a software library and set of command line utilities that a wider
+audience of researchers and developers can contribute to, support distributed
+computing and storage systems in the cloud, and provide a convenient solution
+to the challenge of distributing and managing LiDAR metrics that are typically
+used for forestry modeling.
 
 
 Technologies
 -------------------------------------------------------------------------------
 
-Dask
-................................................................................
-
 TileDB
 ................................................................................
 
-Numpy
+|TileDB| is an open source database engine for array data. Some features that it
+provides that make it especially attractive for the challenge that SilviMetric has
+include:
+
+* Sophisticated "infinite" sparse array support
+* Time travel
+* Multiple APIs (Python, C++, R, Go, Java)
+* Cloud object store (S3, AzB, GCS)
+
+
+PDAL
 ................................................................................
 
-Pandas
+|PDAL| provides point cloud processing, translation, and data conditioning utilities
+that SilviMetric depends upon to read, ingest, and process point cloud data.
+
+Dask
 ................................................................................
+
+|Dask| provides the parallel execution engine for SilviMetric.
+
+NumPy
+................................................................................
+
+|NumPy| is the array processing library of Python that other libraries in the
+ecosystem build upon including |PDAL|, |SciPy|, |scikit-learn| and
+|PyTorch|/|TensorFlow|.
 
 Command Line Interface Usage
 --------------------------------------------------------------------------------
@@ -79,7 +100,8 @@ in certain orders, so our base options will always be first.
 
 Initialize
 ................................................................................
-`Initialize` will create a `TileDB` database that will house all future information
+
+:ref:`initialize` will create a |TileDB| database that will house all future information
 that is collected about processed point clouds, including attribute data collected
 about point in a cell, as well as the computed metrics for each individual
 combination of `Attribute` and `Metric` for each cell.
@@ -102,6 +124,7 @@ User-Defined Metrics
 
 
 .. code-block:: python
+   :linenos:
 
     import numpy as np
 
@@ -135,33 +158,39 @@ Scan
     $ silvimetric -d $DB_NAME --watch scan $FILEPATH
 
 Output
+
 .. code-block:: console
 
     2024-02-05 17:29:21,464 - silvimetric - INFO - scan:24 - Tiling information:
-
     2024-02-05 17:29:21,465 - silvimetric - INFO - scan:25 -   Mean tile size: 447.98609121670717
-
     2024-02-05 17:29:21,465 - silvimetric - INFO - scan:26 -   Std deviation: 38695.06897023395
-
     2024-02-05 17:29:21,465 - silvimetric - INFO - scan:27 -   Recommended split size: 39143
 
 
 Shatter
 ................................................................................
 
+:ref:`shatter` ingests data into the SilviMetric database.
+
 .. code-block:: console
+
     $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
     $ silvimetric -d $DB_NAME --watch shatter $FILEPATH --tilesize 100 --date 2024-02-05 --report --bounds $BOUNDS
 
 Info
 ................................................................................
 
+:ref:`info` provides the ability to scan and inspect the SilviMetric database.
+
 .. code-block:: console
+
     $ silvimetric -d $DB_NAME info
 
 The output will be formatted like below.
+
 .. code-block:: json
     :linenos:
+
     {
         "attributes": [
             {
@@ -240,3 +269,5 @@ Extract
 
 Examples
 --------------------------------------------------------------------------------
+
+.. include:: ./substitutions.txt

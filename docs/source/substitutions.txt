@@ -2,7 +2,11 @@
 .. |PDAL| replace:: `PDAL <https://pdal.io/>`__
 .. |Python| replace:: `Python <https://python.org/>`__
 .. |SciPy| replace:: `SciPy <https://scipy.org/>`__
+.. |scikit-learn| replace:: `scikit-learn <https://scikit-learn.org/stable/>`__
+.. |Tensorflow| replace:: `Tensorflow <https://www.tensorflow.org/>`__
+.. |PyTorch| replace:: `PyTorch <https://pytorch.org/>`__
 .. |Dask| replace:: `Dask <https://www.dask.org/>`__
+.. |NumPy| replace:: `NumPy <https://numpy.org/>`__
 .. |TileDB| replace:: `TileDB <https://tiledb.com/>`__
 .. |PROJ| replace:: `PROJ <http://proj.org/>`__
 .. |Conda| replace:: `Conda <https://docs.conda.io/en/latest/>`__
