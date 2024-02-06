@@ -1,4 +1,6 @@
-SilviMetric Tutorial
+.. _tutorial:
+
+Tutorial
 ================================================================================
 
 :Author: Kyle Mann
@@ -19,15 +21,18 @@ library/language of your choice.
 Introduction
 -------------------------------------------------------------------------------
 
-SilviMetric was created as the spiritual successor to |FUSION|, a C++ library
-written by Robert McGaughey with the goal of making point clouds easier to
-handle and process for forestry. SilviMetric aims to handle the challenge of
-computing statistics and metrics from LiDAR data by using |Python|. The goal is
-to create a software library and set of command line utilities that a wider
-audience of researchers and developers can contribute to, support distributed
-computing and storage systems in the cloud, and provide a convenient solution
-to the challenge of distributing and managing LiDAR metrics that are typically
-used for forestry modeling.
+SilviMetric was created as a spiritual successor to |FUSION|, a C++ library
+written by Robert McGaughey, with a focus on the point cloud metric extraction
+and management capability that FUSION provides in the form of GridMetrics.
+SilviMetric aims to handle the challenge of computing statistics and metrics
+from LiDAR data by using |Python| instead of C++, delegate data management to
+|TileDB|, and leverage the wealth of capabilities provided in the machine
+learning and scientific computing ecosystem of Python. The goal is to create a
+library and command line utilities that a wider audience of researchers and
+developers can contribute to, support distributed computing and storage systems
+in the cloud, and provide a convenient solution to the challenge of
+distributing and managing LiDAR metrics that are typically used for forestry
+modeling.
 
 
 Technologies
@@ -69,10 +74,12 @@ Command Line Interface Usage
 
 Base
 ................................................................................
+
 The base options for SilviMetric include setup options that include dask setup
-options, log setup optoins, and progress reporting options. The `click` python
-library requires that commands and options associated with specific groups appear
-in certain orders, so our base options will always be first.
+options, log setup options, and progress reporting options. The `click
+<https://pypi.org/project/click/>`__ python library requires that commands and
+options associated with specific groups appear in certain orders, so our base
+options will always be first.
 
 .. code-block:: console
 
@@ -136,17 +143,21 @@ Usage:
     --help                  Show this message and exit.
 
 
+.. _udm:
+
 User-Defined Metrics
 ................................................................................
 
-:ref:`user-defined metric` is a `Metric` that is not given to the user by
-SilviMetric. This `Metric` looks and acts exactly the same, but is defined by
-whoever is creating the database. You can create a metrics module using the
-sample below, and substituting any number of extra metrics in place of `p75`
-and `p90`. When looking for a metrics module, we look for a method named
-`metrics`, and that it returns a list of `Metric` objects. The methods that
-are included in these objects need to be able to be serialized by `dill` in
-order to be pushed and fetched to and from the database.
+SilviMetric supports creating custom user defined Metrics not provided by the
+base software. These behave the same as provided Metrics, but can be defined
+per-database.
+
+You can create a metrics module by following the sample below, and substituting
+any number of extra metrics in place of ``p75`` and ``p90``. When looking for a
+metrics module, we look for a method named ``metrics``, and that it returns a
+list of Metric objects. The methods that are included in these objects need to
+be able to be serialized by `dill <https://pypi.org/project/dill/>`__ in order
+to be pushed and fetched to and from the database.
 
 .. code-block:: python
    :linenos:
@@ -176,8 +187,14 @@ Example:
 .. code-block:: console
 
     $ METRIC_PATH="./path/to/python_metrics.py"
-    $ silvimetric --database $DB_NAME initialize --bounds "$BOUNDS" --crs "EPSG:$EPSG" -m $METRIC_PATH -m min -m max -m mean
+    $ silvimetric --database $DB_NAME initialize --bounds "$BOUNDS" \
+          --crs "EPSG:$EPSG" \
+          -m $METRIC_PATH -m min -m max -m mean
 
+.. warning::
+
+    Additional Metrics cannot be added to a SilviMetric after it has been
+    initialized at this time.
 
 Scan
 ................................................................................
@@ -196,7 +213,7 @@ the octree. If any of these pass the defined thresholds, then we stop splitting
 and return that tile. The number of cells in that tile further tells us how best
 to split the data.
 
-Usually 1 standard deviation from the mean is a good starting point for a shatter
+One standard deviation from the mean is a good starting point for a shatter
 process, but this won't always be perfect for your use case.
 
 Usage:
@@ -217,7 +234,7 @@ Usage:
     --help                 Show this message and exit.
 
 
-Exmaple:
+Example:
 
 .. code-block:: console
 
@@ -241,7 +258,7 @@ Shatter
 SilviMetric will take all the previously defined variables like the bounds,
 resolution, and our tile size, and it will split all data values up into their
 respective bins. From here, SilviMetric will perform each `Metric` previously
-defined in `Initialize` over the data in each cell. At the end of all that,
+defined in :ref:`initialize` over the data in each cell. At the end of all that,
 this data will be written to a `SparseArray` in `TileDB`, where it will be much
 easier to access.
 
@@ -266,7 +283,12 @@ Example:
 .. code-block:: console
 
     $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
-    $ silvimetric -d $DB_NAME --watch shatter $FILEPATH --tilesize 100 --date 2024-02-05 --report --bounds $BOUNDS
+    $ silvimetric -d $DB_NAME \
+          --watch shatter $FILEPATH \
+          --tilesize 100 \
+          --date 2024-02-05 \
+          --report \
+          --bounds $BOUNDS
 
 Info
 ................................................................................
@@ -278,6 +300,7 @@ attributes, metrics, and other process metadata.
 Usage:
 
 .. code-block:: console
+
     Usage: silvimetric info [OPTIONS]
 
     Options:
@@ -356,6 +379,7 @@ been binned up nicely, and will output them as rasters to where you select.
 Usage:
 
 .. code-block:: console
+
     Usage: silvimetric extract [OPTIONS]
 
     Extract silvimetric metrics from DATABASE
@@ -379,8 +403,8 @@ Python API Usage
 --------------------------------------------------------------------------------
 
 Everything that can be done from the command line can also be performed from
-withing Python. The CLi provides some nice wrapping around some of the setup
-pieces, including config, log, and dask handling, but all of these are pieces
+within Python. The CLI provides some nice wrapping around some of the setup
+pieces, including config, log, and Dask handling, but all of these are pieces
 that you can set up on your own as well.
 
 .. code-block:: python
