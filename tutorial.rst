@@ -53,29 +53,29 @@ options, log setup optoins, and progress reporting options. The `click` python
 library requires that commands and options associated with specific groups appear
 in certain orders, so our base options will always be first.
 
-```
-Usage: silvimetric [OPTIONS] COMMAND [ARGS]...
+.. code-block:: console
 
-Options:
-  -d, --database PATH             Database path
-  --debug                         Print debug messages?
-  --log-level TEXT                Log level (INFO/DEBUG)
-  --log-dir TEXT                  Directory for log output
-  --progress BOOLEAN              Report progress
-  --workers INTEGER               Number of workers for Dask
-  --threads INTEGER               Number of threads per worker for Dask
-  --watch                         Open dask diagnostic page in default web
-                                  browser.
-  --dasktype [threads|processes]  What Dask uses for parallelization. For
-                                  moreinformation see here https://docs.dask.o
-                                  rg/en/stable/scheduling.html#local-threads
-  --scheduler [distributed|local|single-threaded]
-                                  Type of dask scheduler. Both are local, but
-                                  are run with different dask libraries. See
-                                  more here https://docs.dask.org/en/stable/sc
-                                  heduling.html.
-  --help                          Show this message and exit.
-```
+    Usage: silvimetric [OPTIONS] COMMAND [ARGS]...
+
+    Options:
+    -d, --database PATH             Database path
+    --debug                         Print debug messages?
+    --log-level TEXT                Log level (INFO/DEBUG)
+    --log-dir TEXT                  Directory for log output
+    --progress BOOLEAN              Report progress
+    --workers INTEGER               Number of workers for Dask
+    --threads INTEGER               Number of threads per worker for Dask
+    --watch                         Open dask diagnostic page in default web
+                                    browser.
+    --dasktype [threads|processes]  What Dask uses for parallelization. For
+                                    moreinformation see here https://docs.dask.o
+                                    rg/en/stable/scheduling.html#local-threads
+    --scheduler [distributed|local|single-threaded]
+                                    Type of dask scheduler. Both are local, but
+                                    are run with different dask libraries. See
+                                    more here https://docs.dask.org/en/stable/sc
+                                    heduling.html.
+    --help                          Show this message and exit.
 
 Initialize
 ................................................................................
@@ -90,6 +90,7 @@ will also need to define any `Attributes` and `Metrics`, as these will be
 propagated to future processes.
 
 .. code-block:: console
+
     $ DB_NAME="western-us.tdb"
     $ BOUNDS="[-14100053.268191, 3058230.975702, -11138180.816218, 6368599.176434]"
     $ EPSG=3857
@@ -99,23 +100,58 @@ propagated to future processes.
 User-Defined Metrics
 ................................................................................
 
+
+.. code-block:: python
+
+    import numpy as np
+
+    from silvimetric.resources import Metric
+
+    def metrics() -> list[Metric]:
+
+        def p75(arr: np.ndarray):
+            return np.percentile(arr, 75)
+        m_p75 = Metric(name='p75', dtype=np.float32, method = p75)
+
+        def p90(arr: np.ndarray):
+            return np.percentile(arr, 90)
+        m_p90 = Metric(name='p90', dtype=np.float32, method = p90)
+
+        return [m_p75, m_p90]
+
+
 .. code-block:: console
-    $
+
+    $ METRIC_PATH="./path/to/python_metrics.py"
+    $ silvimetric --database $DB_NAME initialize --bounds "$BOUNDS" --crs "EPSG:$EPSG" -m $METRIC_PATH -m min -m max -m mean
+
 
 Scan
 ................................................................................
 
 .. code-block:: console
+
     $ FILEPATH="https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
     $ silvimetric -d $DB_NAME --watch scan $FILEPATH
 
 Output
-```
-2024-02-05 17:29:21,464 - silvimetric - INFO - scan:24 - Tiling information:
-2024-02-05 17:29:21,465 - silvimetric - INFO - scan:25 -   Mean tile size: 447.98609121670717
-2024-02-05 17:29:21,465 - silvimetric - INFO - scan:26 -   Std deviation: 38695.06897023395
-2024-02-05 17:29:21,465 - silvimetric - INFO - scan:27 -   Recommended split size: 39143
-```
+.. code-block:: console
+
+    2024-02-05 17:29:21,464 - silvimetric - INFO - scan:24 - Tiling information:
+
+    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:25 -   Mean tile size: 447.98609121670717
+
+    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:26 -   Std deviation: 38695.06897023395
+
+    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:27 -   Recommended split size: 39143
+
+
+Shatter
+................................................................................
+
+.. code-block:: console
+    $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
+    $ silvimetric -d $DB_NAME --watch shatter $FILEPATH --tilesize 100 --date 2024-02-05 --report --bounds $BOUNDS
 
 Info
 ................................................................................
@@ -124,65 +160,57 @@ Info
     $ silvimetric -d $DB_NAME info
 
 The output will be formatted like below.
-```
-2024-02-05 17:18:24,915 - silvimetric - INFO - info:153 - {
-  "attributes": [
+.. code-block:: json
+    :linenos:
     {
-      "name": "Z",
-      "dtype": "<f8",
-      "dependencies": null
-    },
-    ...
-  ],
-  "metadata": {
-    "tdb_dir": "western-us.tdb",
-    "log": {
-      "logdir": null,
-      "log_level": "INFO",
-      "logtype": "stream",
-      "logfilename": "silvimetric-log.txt"
-    },
-    "debug": false,
-    "root": [
-      -14100053.268191,
-      3058230.975702,
-      -11138180.816218,
-      6368599.176434
-    ],
-    "crs": {...PROJJSON}
-    "resolution": 30.0,
-    "attrs": [
-      {
-        "name": "Z",
-        "dtype": "<f8",
-        "dependencies": null
-      },
-      ...
-    ],
-    "metrics": [
-      {
-        "name": "mean",
-        "dtype": "<f4",
-        "dependencies": null,
-        "method_str": "def m_mean(data):\n    return np.mean(data)\n",
-        "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
-      },
-      ...
-    ],
-    "version": "0.0.1",
-    "capacity": 1000000
-  },
-  "history": []
-}
-```
-
-Shatter
-................................................................................
-
-.. code-block:: console
-    $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
-    $ silvimetric --watch shatter $FILEPATH --tilesize 100 --date 2024-02-05 --report --bounds $BOUNDS
-
+        "attributes": [
+            {
+            "name": "Z",
+            "dtype": "<f8",
+            "dependencies": null
+            },
+            ...
+        ],
+        "metadata": {
+            "tdb_dir": "western-us.tdb",
+            "log": {
+            "logdir": null,
+            "log_level": "INFO",
+            "logtype": "stream",
+            "logfilename": "silvimetric-log.txt"
+            },
+            "debug": false,
+            "root": [
+            -14100053.268191,
+            3058230.975702,
+            -11138180.816218,
+            6368599.176434
+            ],
+            "crs": {...PROJJSON}
+            "resolution": 30.0,
+            "attrs": [
+            {
+                "name": "Z",
+                "dtype": "<f8",
+                "dependencies": null
+            },
+            ...
+            ],
+            "metrics": [
+            {
+                "name": "mean",
+                "dtype": "<f4",
+                "dependencies": null,
+                "method_str": "def m_mean(data):\n    return np.mean(data)\n",
+                "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+            },
+            ...
+            ],
+            "version": "0.0.1",
+            "capacity": 1000000
+        },
+        "history": []
+    }
 
 Extract
 ................................................................................
