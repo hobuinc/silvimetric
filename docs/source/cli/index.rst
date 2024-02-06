@@ -12,3 +12,4 @@ Command Line Interface
    shatter
    info
    initialize
+   scan
