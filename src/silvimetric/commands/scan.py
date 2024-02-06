@@ -17,7 +17,6 @@ def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
-            breakpoint()
             cell_counts = [ch.cell_count for ch in chunks]
 
         else:

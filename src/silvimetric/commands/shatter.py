@@ -3,6 +3,7 @@ import gc
 import copy
 import signal
 import datetime
+import pandas as pd
 
 import dask
 from dask.distributed import Client, as_completed, futures_of, CancelledError
@@ -16,7 +17,9 @@ from ..resources import Extents, Storage, ShatterConfig, Data
 def get_data(extents: Extents, filename: str, storage: Storage):
     #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
+    p = data.pipeline
     data.execute()
+    return p.get_dataframe(0)
     return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
@@ -26,41 +29,56 @@ def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
     if points.size == 0:
         return None
 
-    xis = da.floor(points[['xi']]['xi'])
-    yis = da.floor(points[['yi']]['yi'])
+    # xis = da.floor(points[['xi']]['xi'])
+    # yis = da.floor(points[['yi']]['yi'])
+    # att_view = points[:][attrs]
 
-    att_view = points[:][attrs]
-    idx = leaf.get_indices()
-    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
-    return l
+    points.xi = da.floor(points.xi)
+    points.yi = da.floor(points.yi)
+    points = points[[*attrs, 'xi', 'yi']]
+    # att_view = points[attrs]
+
+    # idx = leaf.get_indices()
+    # l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
+    return points
 
 def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs):
     if data is None:
         return None
 
-    di = data
-    dd = {}
-    for att in attrs:
-        try:
-            dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in di], None], dtype=object)[:-1]
-        except Exception as e:
-            raise Exception(f"Missing attribute {att}: {e}")
-    counts = np.array([z.size for z in dd['Z']], np.int32)
+    empty = pd.DataFrame(columns=data.columns)
+    data['count'] = data.groupby(['xi','yi'])['Z'].transform(len)
+    zeros = data.where(data['count'] == 0)
+    if np.any(zeros):
+        data.drop(zeros)
 
+    grouped = data.groupby(['xi','yi'], as_index=False).agg(list)
+    return grouped
+
+    # di = data
+    # dd = {}
+    # for att in attrs:
+    #     try:
+    #         dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in di], None], dtype=object)[:-1]
+    #     except Exception as e:
+    #         raise Exception(f"Missing attribute {att}: {e}")
+
+    # counts = np.array([z.size for z in data.Z], np.int32)
     ## remove empty indices
-    empties = np.where(counts == 0)[0]
-    dd['count'] = counts
-    idx = leaf.get_indices()
-    if bool(empties.size):
-        for att in dd:
-            dd[att] = np.delete(dd[att], empties)
-        idx = np.delete(idx, empties)
+    # empties = np.where(data['count'] == 0)[0]
+    # idx = leaf.get_indices()
+    # if bool(empties.size):
+    #     for att in dd:
+    #         dd[att] = np.delete(dd[att], empties)
+    #     idx = np.delete(idx, empties)
 
-    dx = idx['x']
-    dy = idx['y']
-    return (dx, dy, dd)
+    # dx = idx['x']
+    # dy = idx['y']
+    # return (dx, dy, dd)
 
 def get_metrics(data_in, attrs: list[str], storage: Storage):
+    #TODO take dataframe from arrange method above and do grouped[attrs].map(metric_method) for each metric
+    # could probably merge them together at the end
     if data_in is None:
         return None
 
