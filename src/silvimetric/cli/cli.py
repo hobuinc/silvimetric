@@ -71,14 +71,15 @@ def info_cmd(app, bounds, date, dates, name):
 @cli.command("scan")
 @click.argument("pointcloud", type=str)
 @click.option("--resolution", type=float, default=100)
+@click.option("--filter", is_flag=True, type=bool, default=False)
 @click.option("--point_count", type=int, default=600000)
 @click.option("--depth", type=int, default=6)
 @click.option("--bounds", type=BoundsParamType(), default=None)
 @click.pass_obj
-def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth):
+def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
     """Scan point cloud and determine the optimal tile size."""
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth)
+            depth, filter)
 
 
 @cli.command('initialize')

@@ -99,6 +99,9 @@ propagated to future processes.
 User-Defined Metrics
 ................................................................................
 
+.. code-block:: console
+    $
+
 Scan
 ................................................................................
 
@@ -177,8 +180,8 @@ Shatter
 ................................................................................
 
 .. code-block:: console
-    $ bounds=(-111.44438158718762, 44.97614593664473, -111.26471853040864, 45.162953709129766)
-    $ silvimetric --watch shatter $FILEPATH --tilesize 447 --date 2024-02-05 --report --bounds
+    $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
+    $ silvimetric --watch shatter $FILEPATH --tilesize 100 --date 2024-02-05 --report --bounds $BOUNDS
 
 
 Extract

@@ -7,14 +7,22 @@ import math
 from ..resources import Storage, Data, Extents, Bounds
 
 def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
-        depth=6):
+        depth=6, filter=False):
 
     logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
+
         data = Data(pointcloud, tdb.config, bounds)
         extents = Extents.from_sub(tdb_dir, data.bounds)
-        cell_counts = extent_handle(extents, data, resolution, point_count,
-            depth)
+
+        if filter:
+            chunks = extents.chunk(data, resolution, point_count, depth)
+            breakpoint()
+            cell_counts = [ch.cell_count for ch in chunks]
+
+        else:
+            cell_counts = extent_handle(extents, data, resolution, point_count,
+                depth)
 
         # total = np.array([l.cell_count for l in leaves])
         std = np.std(cell_counts)
