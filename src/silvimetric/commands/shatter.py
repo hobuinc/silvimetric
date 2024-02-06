@@ -135,6 +135,8 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
                     config.point_count = config.point_count + pc
 
         end_time = datetime.datetime.now().timestamp() * 1000
+        config.end_time = end_time
+        config.finished = True
         a = storage.open(timestamp=(start_time, end_time))
         return config.point_count
 
@@ -143,6 +145,7 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
     end_time = datetime.datetime.now().timestamp() * 1000
     with storage.open(timestamp=(start_time, end_time)) as a:
 
+        config.end_time = end_time
         config.finished=True
         config.point_count = pc
         config.nonempty_domain = a.nonempty_domain()

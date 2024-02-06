@@ -12,20 +12,22 @@ from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamTyp
 from .common import dask_handle
 
 @click.group()
-@click.option("--database", '-d', type=click.Path(exists=False))
+@click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
 @click.option("--debug", is_flag=True, default=False, help="Print debug messages?")
 @click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=12)
-@click.option("--threads", type=int, default=4)
-@click.option("--watch", is_flag=True, default=False, type=bool)
+@click.option("--workers", type=int, default=12, help="Number of workers for Dask")
+@click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
+@click.option("--watch", is_flag=True, default=False, type=bool,
+        help="Open dask diagnostic page in default web browser.")
 @click.option("--dasktype", default='processes', type=click.Choice(['threads',
-        'processes']))
+        'processes']), help="What Dask uses for parallelization. For more"
+        "information see here https://docs.dask.org/en/stable/scheduling.html#local-threads")
 @click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
-        'local', 'single-threaded']), help="""Type of dask scheduler. Both are local, but \
-        are run with different dask libraries. See more here \
-        https://docs.dask.org/en/stable/scheduling.html.""")
+        'local', 'single-threaded']), help="Type of dask scheduler. Both are "
+        "local, but are run with different dask libraries. See more here "
+        "https://docs.dask.org/en/stable/scheduling.html.")
 @click.pass_context
 def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
         workers, threads, watch):
@@ -46,12 +48,16 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
 
 
 @cli.command("info")
-@click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']))
+@click.option("--bounds", type=BoundsParamType(), default=None,
+        help="Bounds to filter by")
+@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
+        help="Select processes with this date")
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
-        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
-@click.option("--name", type=str, default=None)
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2,
+        help="Select processes within this date range")
+@click.option("--name", type=str, default=None,
+        help="Select processes with this name")
 @click.pass_obj
 def info_cmd(app, bounds, date, dates, name):
     import json
@@ -68,25 +74,34 @@ def info_cmd(app, bounds, date, dates, name):
 
 @cli.command("scan")
 @click.argument("pointcloud", type=str)
-@click.option("--resolution", type=float, default=100)
-@click.option("--point_count", type=int, default=600000)
-@click.option("--depth", type=int, default=6)
-@click.option("--bounds", type=BoundsParamType(), default=None)
+@click.option("--resolution", type=float, default=100,
+        help="Summary pixel resolution")
+@click.option("--filter", is_flag=True, type=bool, default=False,
+        help="Remove empty space in computation. Will take extra time.")
+@click.option("--point_count", type=int, default=600000,
+        help="Point count threshold.")
+@click.option("--depth", type=int, default=6,
+        help="Quadtree depth threshold.")
+@click.option("--bounds", type=BoundsParamType(), default=None,
+        help="Bounds to scan.")
 @click.pass_obj
-def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth):
+def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
     """Scan point cloud and determine the optimal tile size."""
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth, app.log)
+            depth, filter)
 
 
 @cli.command('initialize')
-@click.option("--bounds", type=BoundsParamType(), required=True)
-@click.option("--crs", type=CRSParamType(), required=True)
+@click.option("--bounds", type=BoundsParamType(), required=True,
+        help="Root bounds that encapsulates all data")
+@click.option("--crs", type=CRSParamType(), required=True,
+        help="Coordinate system of data")
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
         help="List of attributes to include in Database")
 @click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
         help="List of metrics to include in Database")
-@click.option("--resolution", type=float, help="Summary pixel resolution", default=30.0)
+@click.option("--resolution", type=float, default=30.0,
+        help="Summary pixel resolution")
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
@@ -105,13 +120,18 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
 
 @cli.command('shatter')
 @click.argument("pointcloud", type=str)
-@click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--tilesize", type=int, default=None)
-@click.option("--report", is_flag=True, default=False, type=bool)
-@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']))
+@click.option("--bounds", type=BoundsParamType(), default=None,
+        help="Bounds for data to include in processing")
+@click.option("--tilesize", type=int, default=None,
+        help="Number of cells to include per tile")
+@click.option("--report", is_flag=True, default=False, type=bool,
+        help="Whether or not to write a report of the process, useful for debugging")
+@click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
+        help="Date the data was produced.")
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
-        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2)
+        click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2,
+        help="Date range the data was produced during")
 @click.pass_obj
 def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
@@ -143,11 +163,13 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
 @cli.command('extract')
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
-        help="List of attributes to include in Database")
+        help="List of attributes to include output")
 @click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
-        help="List of metrics to include in Database")
-@click.option("--bounds", type=BoundsParamType(), default=None)
-@click.option("--outdir", "-o", type=str, required=True)
+        help="List of metrics to include in output")
+@click.option("--bounds", type=BoundsParamType(), default=None,
+        help="Bounds for data to include in output")
+@click.option("--outdir", "-o", type=click.Path(exists=False), required=True,
+        help="Output directory.")
 @click.pass_obj
 def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE """

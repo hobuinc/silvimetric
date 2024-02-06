@@ -23,6 +23,7 @@ SilviMetric is also available on `Google Slides <https://docs.google.com/present
    api
    QuickStart <quickstart>
    development
+   tutorial
 
 
 

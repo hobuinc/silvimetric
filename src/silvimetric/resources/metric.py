@@ -7,6 +7,7 @@ from tiledb import Attr
 import dask
 import base64
 import pickle
+import dill
 
 from .entry import Attribute, Entry
 
@@ -41,7 +42,7 @@ class Metric(Entry):
             'dtype': np.dtype(self.dtype).str,
             'dependencies': self.dependencies,
             'method_str': getsource(self._method),
-            'method': base64.b64encode(pickle.dumps(self._method)).decode()
+            'method': base64.b64encode(dill.dumps(self._method)).decode()
         }
 
     def from_string(data: Union[str, dict]):
@@ -52,7 +53,7 @@ class Metric(Entry):
         name = j['name']
         dtype = np.dtype(j['dtype'])
         dependencies = j['dependencies']
-        method = pickle.loads(base64.b64decode(j['method'].encode()))
+        method = dill.loads(base64.b64decode(j['method'].encode()))
 
         return Metric(name, dtype, method, dependencies)
 

@@ -129,7 +129,7 @@ class Extents(object):
 
                 return self.get_leaf_children(cell_estimate)
             else:
-                return [ ch.filter(data, res_threshold, depth_threshold, depth=depth+1) for ch in self.split() ]
+                return [ ch.filter(data, res_threshold, pc_threshold, depth_threshold, depth=depth+1) for ch in self.split() ]
 
 
     def _find_dims(self, tile_size):

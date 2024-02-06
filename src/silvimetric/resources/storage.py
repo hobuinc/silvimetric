@@ -266,8 +266,11 @@ class Storage:
                         continue
 
                     # filter dates
-                    if isinstance(s.date, tuple):
+                    if isinstance(s.date, tuple) and len(s.date) == 2:
                         if s.date[1] < start_time or s.date[0] > end_time:
+                            continue
+                    elif isinstance(s.date, tuple) and len(s.date) == 1:
+                        if s.date[0] < start_time or s.date[0] > end_time:
                             continue
                     else:
                         if s.date < start_time or s.date > end_time:

@@ -14,5 +14,6 @@ dependencies:
   - awscli
   - websocket-client
   - python-json-logger
+  - dill
   - pip:
     - line-profiler
