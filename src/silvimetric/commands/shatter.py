@@ -47,12 +47,14 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attr
         return None
 
     empty = pd.DataFrame(columns=data.columns)
-    data['count'] = data.groupby(['xi','yi'])['Z'].transform(len)
-    zeros = data.where(data['count'] == 0)
-    if np.any(zeros):
-        data.drop(zeros)
+    # data['count'] = data.groupby(['xi','yi'])['Z'].transform(len)
+    # zeros = data.where(data['count'] == 0)
+    # if np.any(zeros):
+    #     data.drop(zeros)
 
     grouped = data.groupby(['xi','yi'], as_index=False).agg(list)
+    # grouped['count'] = grouped['count'].map(lambda x: x[0])
+
     return grouped
 
     # di = data
@@ -77,39 +79,68 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attr
     # return (dx, dy, dd)
 
 def get_metrics(data_in, attrs: list[str], storage: Storage):
-    #TODO take dataframe from arrange method above and do grouped[attrs].map(metric_method) for each metric
+    #TODO take dataframe from arrange method above and do
+    # grouped[attrs].map(metric_method) for each metric
     # could probably merge them together at the end
     if data_in is None:
         return None
 
     ## data comes in as [dx, dy, { 'att': [data] }]
-    dx, dy, data = data_in
+    # dx, dy, data = data_in
 
     # make sure it's not empty. No empty writes
-    if not np.any(data['count']):
-        return None
+    # if not np.any(data_in['count']):
+    #     return None
+
+
+
+    for m in storage.config.metrics:
+        def method_map(d):
+            if isinstance(d, list):
+                return m._method(d)
+            else:
+                return d
+
+        cols = {attr: m.entry_name(attr) for attr in attrs}
+        df = data_in[['xi', 'yi', *attrs]].map(method_map).rename(columns=cols, copy=False)
+        data_in = data_in.merge(df)
+    return data_in
 
     # doing dask compute inside the dict array because it was too fine-grained
     # when it was outside
-    metric_data = {
-        f'{m.entry_name(attr)}': [m(cell_data) for cell_data in data[attr]]
-        for attr in attrs for m in storage.config.metrics
-    }
-    data_out = data | metric_data
-    return (dx, dy, data_out)
+    # metric_data = {
+    #     f'{m.entry_name(attr)}': [m(cell_data) for cell_data in data[attr]]
+    #     for attr in attrs for m in storage.config.metrics
+    # }
+    # data_out = data | metric_data
+    # return (dx, dy, data_out)
 
 def write(data_in, tdb):
+    import tiledb
 
     if data_in is None:
         return 0
 
-    dx, dy, dd = data_in
-    tdb[dx,dy] = dd
-    pc = int(dd['count'].sum())
-    p = copy.deepcopy(pc)
-    del pc, data_in
+    dx = data_in['xi'].to_list()
+    dy = data_in['yi'].to_list()
+    data_in = data_in.drop(columns=['xi','yi'])
+    # dd = dict({d: data_in[d] for d in data_in})
 
-    return p
+    # TODO get this working at some point. Might require pr to tiledb
+    # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+
+    # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
+    #         column_types=dict(data_in.dtypes),
+    #         varlen_types=[np.dtype('O')])
+    #         dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in di], None], dtype=object)[:-1]
+    dd = { d: np.fromiter([*[np.array(nd, np.float32) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+
+    tdb[dx,dy] = dd
+    # pc = int(data_in['count'].sum())
+    # p = copy.deepcopy(pc)
+    # del pc, data_in
+
+    return 0
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         tdb: SparseArray):
