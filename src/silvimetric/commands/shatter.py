@@ -2,8 +2,9 @@ import numpy as np
 import signal
 import datetime
 import pandas as pd
+from IPython.core.debugger import Pdb
 
-from line_profiler import LineProfiler
+from line_profiler import profile
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
@@ -20,36 +21,46 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     data.execute()
     return p.get_dataframe(0)
 
+@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     if points is None:
         return None
     if points.size == 0:
         return None
 
-    points = points[points.Y > leaf.bounds.miny]
-    points = points[points.X < leaf.bounds.maxx]
+    points = points.loc[points.Y > leaf.bounds.miny]
+    points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
-    points.xi = da.floor(points.xi)
-    points.yi = da.floor(points.yi)
+    points.loc[:, 'xi'] = da.floor(points.xi)
+    points.loc[:, 'yi'] = da.floor(points.yi)
     points = points.assign(count=lambda x: points.Z.count())
-    grouped = points.groupby(['xi','yi'])[attrs].agg(list)
+    grouped = points.groupby(['xi','yi']).agg(list)
     grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
     return grouped
 
+@profile
 def get_metrics(data_in, attrs: list[str], storage: Storage):
     if data_in is None:
         return None
 
+    import pickle
+    f = open('./before', 'wb')
+    pickle.dump(data_in, f)
+    f.close()
+
+    dfs = []
     for m in storage.config.metrics:
-        data_in = data_in.assign(**{f'{m.entry_name(attr)}':
-                lambda val: [m._method(v) for v in data_in[attr]]
-                for attr in attrs})
+        data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+
+
+    f = open('./after', 'wb')
+    pickle.dump(data_in, f)
+    f.close()
     return data_in
 
+@profile
 def write(data_in, tdb):
-    import tiledb
-
     if data_in is None:
         return 0
 
