@@ -7,6 +7,11 @@ import datetime
 from silvimetric.resources import Extents
 from silvimetric.commands.shatter import run
 
+def check_for_overlap(leaves: list[Extents], chunk: Extents):
+    idx = [i for l in leaves for i in l.get_indices() ]
+    u, c = np.unique(idx, return_counts=True)
+    assert not np.any(np.where(c > 1))
+
 def check_for_holes(leaves: list[Extents], chunk: Extents):
     ind = np.array([], dtype=chunk.get_indices().dtype)
     for leaf in leaves:
@@ -94,8 +99,10 @@ class TestExtents(object):
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)
         check_for_holes(filtered, extents)
+        check_for_overlap(filtered, extents)
         check_indexing(extents, unfiltered)
         check_for_holes(unfiltered, extents)
+        check_for_overlap(unfiltered, extents)
 
     # def test_cells(self, copc_filepath, unfiltered, resolution):
     #     flag = False

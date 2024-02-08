@@ -20,19 +20,20 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     data.execute()
     return p.get_dataframe(0)
 
-def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
+def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
+    if points is None:
+        return None
     if points.size == 0:
         return None
 
+    points = points[points.Y > leaf.bounds.miny]
+    points = points[points.X < leaf.bounds.maxx]
+
     points.xi = da.floor(points.xi)
     points.yi = da.floor(points.yi)
-    return points.set_index(['xi','yi'])[attrs]
-
-def arrange(data: pd.DataFrame):
-    if data is None:
-        return None
-    data['count'] = data.Z.count()
-    grouped = data.groupby(level=data.index.names).agg(list)
+    points = points.assign(count=lambda x: points.Z.count())
+    grouped = points.groupby(['xi','yi'])[attrs].agg(list)
+    grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
     return grouped
 
@@ -40,23 +41,11 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     if data_in is None:
         return None
 
-    def method_map(d, metric):
-        if isinstance(d, list):
-            return metric._method(d)
-        else:
-            return [d]
-
-    df = pd.concat(axis=1, ignore_index=False,
-            objs=[
-                data_in,
-                *[data_in[attrs]
-                    .map(method_map, metric=m)
-                    .rename(
-                        columns={attr:m.entry_name(attr) for attr in attrs},
-                        copy=False)
-                for m in storage.config.metrics]])
-
-    return df
+    for m in storage.config.metrics:
+        data_in = data_in.assign(**{f'{m.entry_name(attr)}':
+                lambda val: [m._method(v) for v in data_in[attr]]
+                for attr in attrs})
+    return data_in
 
 def write(data_in, tdb):
     import tiledb
@@ -67,9 +56,6 @@ def write(data_in, tdb):
     idf = data_in.index.to_frame()
     dx = idf['xi'].to_list()
     dy = idf['yi'].to_list()
-    count = data_in['count'].values[0][0]
-    data_in = data_in.drop(columns=['count'])
-    # data_in = data_in.drop(columns=['xi','yi'])
 
     # TODO get this working at some point. Look at pandas extensions
     # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
@@ -77,20 +63,14 @@ def write(data_in, tdb):
     # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
     #         column_types=dict(data_in.dtypes),
     #         varlen_types=[np.dtype('O')])
-
-    dd = { d: np.fromiter([*[np.array(nd, np.float32) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+    dt = lambda a: tdb.schema.attr(a).dtype
+    dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
 
     tdb[dx,dy] = dd
-    return count
+    return data_in['count'].sum().item()
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
+def run(leaves: list[Extents], config: ShatterConfig, storage: Storage,
         tdb: SparseArray):
-
-    lp = LineProfiler()
-    lp.add_function(write)
-    lp.add_function(arrange)
-    lp.add_function(get_metrics)
-    lp.add_function(get_atts)
 
     start_time = config.start_time
     ## Handle a kill signal
@@ -115,8 +95,7 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
 
     leaf_bag: db.Bag = db.from_sequence(leaves)
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
-    arranged: db.Bag = att_data.map(arrange)
+    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
     writes: db.Bag = metrics.map(write, tdb)
 
@@ -134,7 +113,6 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         config.end_time = end_time
         config.finished = True
         a = storage.open(timestamp=(start_time, end_time))
-        lp.print_stats()
         return config.point_count
 
     ## Handle non-distributed dask scenarios
@@ -148,7 +126,6 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         config.nonempty_domain = a.nonempty_domain()
         tdb.meta['shatter'] = str(config)
 
-    lp.print_stats()
     return pc
 
 

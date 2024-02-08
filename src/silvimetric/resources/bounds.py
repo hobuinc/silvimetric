@@ -1,6 +1,7 @@
 import json
 import ast
 
+#TODO should these bounds have a buffer?
 class Bounds(dict): #for JSON serializing
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
         self.minx = float(minx)

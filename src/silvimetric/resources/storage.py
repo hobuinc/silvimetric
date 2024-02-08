@@ -69,7 +69,7 @@ class Storage:
         dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)
         domain = tiledb.Domain(dim_row, dim_col)
 
-        # count_att = tiledb.Attr(name="count", dtype=np.int32)
+        count_att = tiledb.Attr(name="count", dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
@@ -78,7 +78,7 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[*dim_atts, *metric_atts], allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
