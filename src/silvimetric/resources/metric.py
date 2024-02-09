@@ -89,6 +89,51 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
+def m_variance(data):
+    return np.var(data)
+
+def m_cv(data):
+    return np.std(data) / np.mean(data)
+
+# TODO check performance of other methods
+# syntax may be wrong...need np. somewhere?
+def m_abovemean(data):
+    return (data > np.mean(data)).sum() / len(data)
+
+# TODO check performance of other methods
+# syntax may be wrong...need np. somewhere?
+def m_abovemode(data):
+    return (data > stats.mode(data).mode).sum() / len(data)
+
+def m_skewness(data):
+    return stats.skew(data)
+
+def m_kurtosis(data):
+    return stats.kurtosis(data)
+
+def m_aad(data)
+    m = np.mean(data)
+    return np.mean(np.absolute(data - m))
+
+def m_madmedian(data)
+    return stats.median_abs_deviation(data)
+
+def m_madmean(data)
+    return stats.median_abs_deviation(data, center=mp.mean)
+
+def m_madmode(data)
+    return stats.median_abs_deviation(data, center=stats.mode)
+
+# TODO test various methods for interpolation=: I think the default
+# matches FUSION method
+def m_percentiles(data)
+    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
+
+# TODO test various methods for interpolation=: I think the default
+# matches FUSION method
+def m_iq(data)
+    return stats.iqr(data)
+
 #TODO change to correct dtype
 Metrics = {
     'mean' : Metric('mean', np.float32, m_mean),
