@@ -134,6 +134,14 @@ def m_percentiles(data):
 def m_iq(data):
     return stats.iqr(data)
 
+def m_90m10(data):
+    p = np.percentile(data, [10,90])
+    return p[1] - p[0]
+
+def m_95m05(data):
+    p = np.percentile(data, [5,95])
+    return p[1] - p[0]
+
 #TODO change to correct dtype
 Metrics = {
     'mean' : Metric('mean', np.float32, m_mean),
