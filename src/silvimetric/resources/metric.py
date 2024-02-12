@@ -89,6 +89,7 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
+# start of new metrics to match FUSION
 def m_variance(data):
     return np.var(data)
 
@@ -96,12 +97,10 @@ def m_cv(data):
     return np.std(data) / np.mean(data)
 
 # TODO check performance of other methods
-# syntax may be wrong...need np. somewhere?
 def m_abovemean(data):
     return (data > np.mean(data)).sum() / len(data)
 
 # TODO check performance of other methods
-# syntax may be wrong...need np. somewhere?
 def m_abovemode(data):
     return (data > stats.mode(data).mode).sum() / len(data)
 
@@ -126,12 +125,6 @@ def m_madmode(data):
 
 # TODO test various methods for interpolation=... I think the default
 # matches FUSION method
-# not sure how an array of metrics will be ingested by shatter
-def m_percentiles(data):
-    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
-
-# TODO test various methods for interpolation=... I think the default
-# matches FUSION method
 def m_iq(data):
     return stats.iqr(data)
 
@@ -143,7 +136,60 @@ def m_95m05(data):
     p = np.percentile(data, [5,95])
     return p[1] - p[0]
 
+# TODO test various methods for interpolation=... I think the default
+# matches FUSION method
+# not sure how an array of metrics will be ingested by shatter
+# so do these as 15 separate metrics. may be slower than doing all in one call
+#def m_percentiles(data):
+#    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
+
+def m_p01(data):
+    return(np.percentile(data, 1))
+
+def m_p05(data):
+    return(np.percentile(data, 5))
+
+def m_p10(data):
+    return(np.percentile(data, 10))
+
+def m_p20(data):
+    return(np.percentile(data, 20))
+
+def m_p25(data):
+    return(np.percentile(data, 25))
+
+def m_p30(data):
+    return(np.percentile(data, 30))
+
+def m_p40(data):
+    return(np.percentile(data, 40))
+
+def m_p50(data):
+    return(np.percentile(data, 50))
+
+def m_p60(data):
+    return(np.percentile(data, 60))
+
+def m_p70(data):
+    return(np.percentile(data, 70))
+
+def m_p75(data):
+    return(np.percentile(data, 75))
+
+def m_p80(data):
+    return(np.percentile(data, 80))
+
+def m_p90(data):
+    return(np.percentile(data, 90))
+
+def m_p95(data):
+    return(np.percentile(data, 95))
+
+def m_p99(data):
+    return(np.percentile(data, 99))
+
 #TODO change to correct dtype
+#TODO not sure what to do with percentiles since it is an array of values instead of a single value
 Metrics = {
     'mean' : Metric('mean', np.float32, m_mean),
     'mode' : Metric('mode', np.float32, m_mode),
@@ -151,4 +197,31 @@ Metrics = {
     'min' : Metric('min', np.float32, m_min),
     'max' : Metric('max', np.float32, m_max),
     'stddev' : Metric('stddev', np.float32, m_stddev),
+    'variance' : Metric('variance', np.float32, m_variance),
+    'cv' : Metric('cv', np.float32, m_cv),
+    'abovemean' : Metric('abovemean', np.float32, m_abovemean),
+    'abovemode' : Metric('abovemode', np.float32, m_abovemode),
+    'skewness' : Metric('skewness', np.float32, m_skewness),
+    'kurtosis' : Metric('kurtosis', np.float32, m_kurtosis),
+    'aad' : Metric('aad', np.float32, m_aad),
+    'madmedian' : Metric('madmedian', np.float32, m_madmedian),
+    'madmode' : Metric('madmode', np.float32, m_madmode),
+    'iq' : Metric('iq', np.float32, m_iq,
+    '90m10' : Metric('90m10', np.float32, m_90m10),
+    '95m05' : Metric('95m05', np.float32, m_95m05),
+    'p01' : Metric('p01', np.float32, m_p01),
+    'p05' : Metric('p05', np.float32, m_p05),
+    'p10' : Metric('p10', np.float32, m_p10),
+    'p20' : Metric('p20', np.float32, m_p20),
+    'p25' : Metric('p25', np.float32, m_p25),
+    'p30' : Metric('p30', np.float32, m_p30),
+    'p40' : Metric('p40', np.float32, m_p40),
+    'p50' : Metric('p50', np.float32, m_p50),
+    'p60' : Metric('p60', np.float32, m_p60),
+    'p70' : Metric('p70', np.float32, m_p70),
+    'p75' : Metric('p75', np.float32, m_p75),
+    'p80' : Metric('p80', np.float32, m_p80),
+    'p90' : Metric('p90', np.float32, m_p90),
+    'p95' : Metric('p95', np.float32, m_p95),
+    'p99' : Metric('p99', np.float32, m_p99),
 }
