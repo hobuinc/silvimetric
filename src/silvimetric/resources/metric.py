@@ -206,7 +206,7 @@ Metrics = {
     'aad' : Metric('aad', np.float32, m_aad),
     'madmedian' : Metric('madmedian', np.float32, m_madmedian),
     'madmode' : Metric('madmode', np.float32, m_madmode),
-    'iq' : Metric('iq', np.float32, m_iq,
+    'iq' : Metric('iq', np.float32, m_iq),
     '90m10' : Metric('90m10', np.float32, m_90m10),
     '95m05' : Metric('95m05', np.float32, m_95m05),
     'p01' : Metric('p01', np.float32, m_p01),
