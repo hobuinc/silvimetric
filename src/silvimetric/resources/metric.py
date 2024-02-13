@@ -10,6 +10,7 @@ import pickle
 import dill
 
 from .entry import Attribute, Entry
+from .lmom4 import lmom4
 
 MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
@@ -123,8 +124,8 @@ def m_madmean(data):
 def m_madmode(data):
     return stats.median_abs_deviation(data, center=stats.mode)
 
-# TODO test various methods for interpolation=... I think the default
-# matches FUSION method
+# TODO test various methods for interpolation=... for all percentile-related metrics
+# I think the default matches FUSION method but need to test
 def m_iq(data):
     return stats.iqr(data)
 
@@ -136,9 +137,54 @@ def m_95m05(data):
     p = np.percentile(data, [5,95])
     return p[1] - p[0]
 
-# TODO test various methods for interpolation=... I think the default
-# matches FUSION method
-# not sure how an array of metrics will be ingested by shatter
+def m_crr(data):
+    return (np.mean(data) - np.min(data)) / (np.max(data) - np-min(data))
+
+def m_sqmean(data):
+    return np.sqrt(np.mean(np.square(data)))
+
+def m_cumean(data):
+    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
+
+# TODO compute L-moments. These are done separately because we only add
+# a single element to TileDB. This is very inefficient since we have to 
+# compute all L-moments at once. Ideally, we would have a single metric
+# function that returns an array with 7 values
+
+# added code to compute first 4 l-moments in lmom4.py. There is a package,
+# lmoments3 that can compute the same values but I wanted to avoid the 
+# package as it has some IBM copyright requirements (need to include copyright
+# statement with derived works)
+
+# L1 is same as mean...compute using np.mean for speed
+def m_l1(data):
+    return np.mean(data)
+
+def m_l2(data):
+    l = lmom4(data)
+    return l[1]
+
+def m_l3(data):
+    l = lmom4(data)
+    return l[2]
+
+def m_l4(data):
+    l = lmom4(data)
+    return l[3]
+
+def m_lcv(data):
+    l = lmom4(data)
+    return l[1] / l[0]
+
+def m_lskewness(data):
+    l = lmom4(data)
+    return l[2] / l[1]
+
+def m_lkurtosis(data):
+    l = lmom4(data)
+    return l[3] / l[1]
+
+# not sure how an array of metrics can be ingested by shatter
 # so do these as 15 separate metrics. may be slower than doing all in one call
 #def m_percentiles(data):
 #    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
@@ -188,6 +234,34 @@ def m_p95(data):
 def m_p99(data):
     return(np.percentile(data, 99))
 
+def m_profilearea(data):
+    # sanity check...must have valid heights/elevations
+    if np.max(data) <= 0:
+        return -9999.0
+
+
+    p = np.percentile(data, range(1, 99))
+    p0 = max(np.min(data), 0.0)
+
+    # second sanity check...99th percentile must be > 0
+    if p[98] > 0.0:
+        # compute area under normalized percentile height curve using composite trapeziod rule
+        pa = p0 / p[98]
+        for ip in p[:97]:
+            pa += 2.0 * ip / p[98]
+        pa += 1.0
+
+        return pa * 0.5
+    else:
+        return -9999.0
+
+
+# TODO example for cover using all returns and a height threshold
+# the threshold must be a parameter and not hardcoded
+def m_cover(data):
+    threshold = 2
+    return (data > threshold).sum() / len(data)
+
 #TODO change to correct dtype
 #TODO not sure what to do with percentiles since it is an array of values instead of a single value
 Metrics = {
@@ -207,6 +281,16 @@ Metrics = {
     'madmedian' : Metric('madmedian', np.float32, m_madmedian),
     'madmode' : Metric('madmode', np.float32, m_madmode),
     'iq' : Metric('iq', np.float32, m_iq),
+    'crr' : Metric('crr', np.float32, m_crr),
+    'sqmean' : Metric('sqmean', np.float32, m_sqmean),
+    'cumean' : Metric('cumean', np.float32, m_cumean),
+    'l1' : Metric('l1', np.float32, m_l1),
+    'l2' : Metric('l2', np.float32, m_l2),
+    'l3' : Metric('l3', np.float32, m_l3),
+    'l4' : Metric('l4', np.float32, m_l4),
+    'lcv' : Metric('iq', np.float32, m_lcv),
+    'lskewness' : Metric('lskewness', np.float32, m_lskewness),
+    'lkurtosis' : Metric('lkurtosis', np.float32, m_lkurtosis),
     '90m10' : Metric('90m10', np.float32, m_90m10),
     '95m05' : Metric('95m05', np.float32, m_95m05),
     'p01' : Metric('p01', np.float32, m_p01),
@@ -224,4 +308,6 @@ Metrics = {
     'p90' : Metric('p90', np.float32, m_p90),
     'p95' : Metric('p95', np.float32, m_p95),
     'p99' : Metric('p99', np.float32, m_p99),
+    'cover' : Metric('cover', np.float32, m_cover),
+    'profilearea' : Metric('profilearea', np.float32, m_profilearea),
 }
