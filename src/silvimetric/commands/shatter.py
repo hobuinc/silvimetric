@@ -2,8 +2,6 @@ import numpy as np
 import signal
 import datetime
 import pandas as pd
-from IPython.core.debugger import Pdb
-
 from line_profiler import profile
 
 import dask
@@ -34,33 +32,36 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     points.loc[:, 'xi'] = da.floor(points.xi)
     points.loc[:, 'yi'] = da.floor(points.yi)
     points = points.assign(count=lambda x: points.Z.count())
-    grouped = points.groupby(['xi','yi']).agg(list)
-    grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    grouped = points.groupby(['xi','yi'])#.agg(list)
+    # grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
     return grouped
 
 @profile
-def get_metrics(data_in, attrs: list[str], storage: Storage):
+def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    import pickle
-    f = open('./before', 'wb')
-    pickle.dump(data_in, f)
-    f.close()
+    # import pickle
+    # f = open('./before', 'wb')
+    # pickle.dump(data_in, f)
+    # f.close()
 
     dfs = []
-    for m in storage.config.metrics:
-        data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+    ms = [m._method for m in storage.config.metrics]
+    cols = {col: m.entry_name(col) for col in data_in.columns}
+    dfs.append(data_in.agg(ms).rename(columns=cols))
+        # data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
 
 
-    f = open('./after', 'wb')
-    pickle.dump(data_in, f)
-    f.close()
-    return data_in
+    # f = open('./after', 'wb')
+    # pickle.dump(data_in, f)
+    # f.close()
+
+    return dfs
 
 @profile
-def write(data_in, tdb):
+def write(metrics, data_in, tdb):
     if data_in is None:
         return 0
 
@@ -107,8 +108,8 @@ def run(leaves: list[Extents], config: ShatterConfig, storage: Storage,
     leaf_bag: db.Bag = db.from_sequence(leaves)
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
-    writes: db.Bag = metrics.map(write, tdb)
+    metrics: db.Bag = arranged.map(get_metrics, storage)
+    writes: db.Bag = metrics.map(write, arranged, tdb)
 
     ## If dask is distributed, use the futures feature
     if dask.config.get('scheduler') == 'distributed':

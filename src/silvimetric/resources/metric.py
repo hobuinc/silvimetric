@@ -72,22 +72,26 @@ class Metric(Entry):
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
 def m_mean(data):
-    return np.mean(data)
+    return data.mean()
 
 def m_mode(data):
-    return stats.mode(data).mode
+    u, c = np.unique(data, return_counts=True)
+    i = np.where(c == c.max())
+    v = u[i[0][0]]
+    return v
+
 
 def m_median(data):
     return np.median(data)
 
 def m_min(data):
-    return np.min(data)
+    return data.min()
 
 def m_max(data):
-    return np.max(data)
+    return data.max()
 
 def m_stddev(data):
-    return np.std(data)
+    return data.std()
 
 #TODO change to correct dtype
 Metrics = {
