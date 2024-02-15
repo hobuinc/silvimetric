@@ -6,7 +6,6 @@ from inspect import getsource
 from tiledb import Attr
 import dask
 import base64
-import pickle
 import dill
 
 from .entry import Attribute, Entry
@@ -18,12 +17,13 @@ MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
+    def __init__(self, name: str, method: MetricFn, dtype: np.dtype=np.float32,
+            deps: list[Attribute]=None):
         super().__init__()
         self.name = name
-        self.dtype = dtype = np.float32
-        self.dependencies = deps
         self._method = method
+        self.dtype = dtype
+        self.dependencies = deps
 
     def schema(self, attr: Attribute):
         entry_name = self.entry_name(attr.name)
@@ -56,7 +56,7 @@ class Metric(Entry):
         dependencies = j['dependencies']
         method = dill.loads(base64.b64decode(j['method'].encode()))
 
-        return Metric(name, dtype, method, dependencies)
+        return Metric(name=name, method=method, dtype=dtype, deps=dependencies)
 
     def __eq__(self, other):
         return (self.name == other.name and
@@ -75,8 +75,10 @@ class Metric(Entry):
 def m_mean(data):
     return np.mean(data)
 
-def m_mode(data):
-    return stats.mode(data).mode
+# TODO this currently returns a list if multiple modes exist, disable until
+# we support lists
+# def m_mode(data):
+    # return stats.mode(data).mode
 
 def m_median(data):
     return np.median(data)
@@ -266,49 +268,49 @@ def m_cover(data):
 #TODO change to correct dtype
 #TODO not sure what to do with percentiles since it is an array of values instead of a single value
 Metrics = {
-    'mean' : Metric('mean', np.float32, m_mean),
-    'mode' : Metric('mode', np.float32, m_mode),
-    'median' : Metric('median', np.float32, m_median),
-    'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max),
-    'stddev' : Metric('stddev', np.float32, m_stddev),
-    'variance' : Metric('variance', np.float32, m_variance),
-    'cv' : Metric('cv', np.float32, m_cv),
-    'abovemean' : Metric('abovemean', np.float32, m_abovemean),
-    'abovemode' : Metric('abovemode', np.float32, m_abovemode),
-    'skewness' : Metric('skewness', np.float32, m_skewness),
-    'kurtosis' : Metric('kurtosis', np.float32, m_kurtosis),
-    'aad' : Metric('aad', np.float32, m_aad),
-    'madmedian' : Metric('madmedian', np.float32, m_madmedian),
-    'madmode' : Metric('madmode', np.float32, m_madmode),
-    'iq' : Metric('iq', np.float32, m_iq),
-    'crr' : Metric('crr', np.float32, m_crr),
-    'sqmean' : Metric('sqmean', np.float32, m_sqmean),
-    'cumean' : Metric('cumean', np.float32, m_cumean),
-    'l1' : Metric('l1', np.float32, m_l1),
-    'l2' : Metric('l2', np.float32, m_l2),
-    'l3' : Metric('l3', np.float32, m_l3),
-    'l4' : Metric('l4', np.float32, m_l4),
-    'lcv' : Metric('lcv', np.float32, m_lcv),
-    'lskewness' : Metric('lskewness', np.float32, m_lskewness),
-    'lkurtosis' : Metric('lkurtosis', np.float32, m_lkurtosis),
-    '90m10' : Metric('90m10', np.float32, m_90m10),
-    '95m05' : Metric('95m05', np.float32, m_95m05),
-    'p01' : Metric('p01', np.float32, m_p01),
-    'p05' : Metric('p05', np.float32, m_p05),
-    'p10' : Metric('p10', np.float32, m_p10),
-    'p20' : Metric('p20', np.float32, m_p20),
-    'p25' : Metric('p25', np.float32, m_p25),
-    'p30' : Metric('p30', np.float32, m_p30),
-    'p40' : Metric('p40', np.float32, m_p40),
-    'p50' : Metric('p50', np.float32, m_p50),
-    'p60' : Metric('p60', np.float32, m_p60),
-    'p70' : Metric('p70', np.float32, m_p70),
-    'p75' : Metric('p75', np.float32, m_p75),
-    'p80' : Metric('p80', np.float32, m_p80),
-    'p90' : Metric('p90', np.float32, m_p90),
-    'p95' : Metric('p95', np.float32, m_p95),
-    'p99' : Metric('p99', np.float32, m_p99),
-    'cover' : Metric('cover', np.float32, m_cover),
-    'profilearea' : Metric('profilearea', np.float32, m_profilearea),
+    'mean' : Metric('mean', m_mean),
+    # 'mode' : Metric('mode', m_mode),
+    'median' : Metric('median', m_median),
+    'min' : Metric('min', m_min),
+    'max' : Metric('max', m_max),
+    'stddev' : Metric('stddev', m_stddev),
+    'variance' : Metric('variance', m_variance),
+    'cv' : Metric('cv', m_cv),
+    'abovemean' : Metric('abovemean', m_abovemean),
+    'abovemode' : Metric('abovemode', m_abovemode),
+    'skewness' : Metric('skewness', m_skewness),
+    'kurtosis' : Metric('kurtosis', m_kurtosis),
+    'aad' : Metric('aad', m_aad),
+    'madmedian' : Metric('madmedian', m_madmedian),
+    'madmode' : Metric('madmode', m_madmode),
+    'iq' : Metric('iq', m_iq),
+    'crr' : Metric('crr', m_crr),
+    'sqmean' : Metric('sqmean', m_sqmean),
+    'cumean' : Metric('cumean', m_cumean),
+    'l1' : Metric('l1', m_l1),
+    'l2' : Metric('l2', m_l2),
+    'l3' : Metric('l3', m_l3),
+    'l4' : Metric('l4', m_l4),
+    'lcv' : Metric('lcv', m_lcv),
+    'lskewness' : Metric('lskewness', m_lskewness),
+    'lkurtosis' : Metric('lkurtosis', m_lkurtosis),
+    '90m10' : Metric('90m10', m_90m10),
+    '95m05' : Metric('95m05', m_95m05),
+    'p01' : Metric('p01', m_p01),
+    'p05' : Metric('p05', m_p05),
+    'p10' : Metric('p10', m_p10),
+    'p20' : Metric('p20', m_p20),
+    'p25' : Metric('p25', m_p25),
+    'p30' : Metric('p30', m_p30),
+    'p40' : Metric('p40', m_p40),
+    'p50' : Metric('p50', m_p50),
+    'p60' : Metric('p60', m_p60),
+    'p70' : Metric('p70', m_p70),
+    'p75' : Metric('p75', m_p75),
+    'p80' : Metric('p80', m_p80),
+    'p90' : Metric('p90', m_p90),
+    'p95' : Metric('p95', m_p95),
+    'p99' : Metric('p99', m_p99),
+    'cover' : Metric('cover', m_cover),
+    'profilearea' : Metric('profilearea', m_profilearea),
 }
