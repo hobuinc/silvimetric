@@ -21,7 +21,7 @@ class Metric(Entry):
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
         super().__init__()
         self.name = name
-        self.dtype = dtype
+        self.dtype = dtype = np.float32
         self.dependencies = deps
         self._method = method
 
@@ -122,7 +122,8 @@ def m_madmean(data):
     return stats.median_abs_deviation(data, center=np.mean)
 
 def m_madmode(data):
-    return stats.median_abs_deviation(data, center=stats.mode)
+    stats_mode = lambda v,axis : stats.mode(v,axis).mode
+    return stats.median_abs_deviation(data, center=stats_mode)
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
 # I think the default matches FUSION method but need to test
@@ -138,7 +139,7 @@ def m_95m05(data):
     return p[1] - p[0]
 
 def m_crr(data):
-    return (np.mean(data) - np.min(data)) / (np.max(data) - np-min(data))
+    return (np.mean(data) - np.min(data)) / (np.max(data) - np.min(data))
 
 def m_sqmean(data):
     return np.sqrt(np.mean(np.square(data)))
@@ -147,12 +148,12 @@ def m_cumean(data):
     return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
 
 # TODO compute L-moments. These are done separately because we only add
-# a single element to TileDB. This is very inefficient since we have to 
+# a single element to TileDB. This is very inefficient since we have to
 # compute all L-moments at once. Ideally, we would have a single metric
 # function that returns an array with 7 values
 
 # added code to compute first 4 l-moments in lmom4.py. There is a package,
-# lmoments3 that can compute the same values but I wanted to avoid the 
+# lmoments3 that can compute the same values but I wanted to avoid the
 # package as it has some IBM copyright requirements (need to include copyright
 # statement with derived works)
 
@@ -240,7 +241,7 @@ def m_profilearea(data):
         return -9999.0
 
 
-    p = np.percentile(data, range(1, 99))
+    p = np.percentile(data, range(1, 100))
     p0 = max(np.min(data), 0.0)
 
     # second sanity check...99th percentile must be > 0
@@ -288,7 +289,7 @@ Metrics = {
     'l2' : Metric('l2', np.float32, m_l2),
     'l3' : Metric('l3', np.float32, m_l3),
     'l4' : Metric('l4', np.float32, m_l4),
-    'lcv' : Metric('iq', np.float32, m_lcv),
+    'lcv' : Metric('lcv', np.float32, m_lcv),
     'lskewness' : Metric('lskewness', np.float32, m_lskewness),
     'lkurtosis' : Metric('lkurtosis', np.float32, m_lkurtosis),
     '90m10' : Metric('90m10', np.float32, m_90m10),
