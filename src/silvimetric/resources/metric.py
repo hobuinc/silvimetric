@@ -78,7 +78,7 @@ def m_mean(data):
 # TODO this currently returns a list if multiple modes exist, disable until
 # we support lists
 # def m_mode(data):
-    # return stats.mode(data).mode
+#    return stats.mode(data).mode
 
 def m_median(data):
     return np.median(data)
@@ -141,7 +141,12 @@ def m_95m05(data):
     return p[1] - p[0]
 
 def m_crr(data):
-    return (np.mean(data) - np.min(data)) / (np.max(data) - np.min(data))
+    maxv = np.max(data)
+    minv = np.min(data)
+    if minv == maxv:
+        return -9999.0
+    
+    return (np.mean(data) - minv) / (maxv - minv)
 
 def m_sqmean(data):
     return np.sqrt(np.mean(np.square(data)))
@@ -161,30 +166,61 @@ def m_cumean(data):
 
 # L1 is same as mean...compute using np.mean for speed
 def m_l1(data):
+    if len(data) < 4:
+        return -9999.0
+
     return np.mean(data)
 
 def m_l2(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
     return l[1]
 
 def m_l3(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
     return l[2]
 
 def m_l4(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
     return l[3]
 
 def m_lcv(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
+
+    if l[0] == 0.0:
+        return -9999.0
+    
     return l[1] / l[0]
 
 def m_lskewness(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
+    if l[1] == 0.0:
+        return -9999.0
+    
     return l[2] / l[1]
 
 def m_lkurtosis(data):
+    if len(data) < 4:
+        return -9999.0
+
     l = lmom4(data)
+    if l[1] == 0.0:
+        return -9999.0
+    
     return l[3] / l[1]
 
 # not sure how an array of metrics can be ingested by shatter

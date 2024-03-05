@@ -18,5 +18,8 @@ stats/
 **/tifs_test/**
 autzen-classified.copc.laz
 
+#sample metrics
+metrics/
+metrics_aligned/
 
 .DS_Store
