@@ -72,6 +72,9 @@ class Metric(Entry):
 
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
+def m_count(data):
+    return len(data)
+
 def m_mean(data):
     return np.mean(data)
 
@@ -108,9 +111,15 @@ def m_abovemode(data):
     return (data > stats.mode(data).mode).sum() / len(data)
 
 def m_skewness(data):
+    if len(data) < 4:
+        return -9999.0
+
     return stats.skew(data)
 
 def m_kurtosis(data):
+    if len(data) < 4:
+        return -9999.0
+
     return stats.kurtosis(data)
 
 def m_aad(data):
