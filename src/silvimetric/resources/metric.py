@@ -148,7 +148,7 @@ def m_madmean(data, htthreshold, coverthreshold):
     return stats.median_abs_deviation(data, center=np.mean)
 
 def m_madmode(data, htthreshold, coverthreshold):
-    stats_mode = m_mode(data)
+    stats_mode = m_mode(data, htthreshold, coverthreshold)
     return stats.median_abs_deviation(data, center=stats_mode)
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
