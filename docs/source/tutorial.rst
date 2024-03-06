@@ -140,6 +140,8 @@ Usage:
     -a, --attributes ATTRS  List of attributes to include in Database
     -m, --metrics METRICS   List of metrics to include in Database
     --resolution FLOAT      Summary pixel resolution
+    --htthreshold FLOAT     Height threshold for all metrics
+    --coverthreshold FLOAT  Height threshold for cover metrics
     --help                  Show this message and exit.
 
 
@@ -258,9 +260,9 @@ Shatter
 SilviMetric will take all the previously defined variables like the bounds,
 resolution, and our tile size, and it will split all data values up into their
 respective bins. From here, SilviMetric will perform each `Metric` previously
-defined in :ref:`initialize` over the data in each cell. At the end of all that,
-this data will be written to a `SparseArray` in `TileDB`, where it will be much
-easier to access.
+defined in :ref:`initialize` over the data in each cell, applying the --htthreshold
+and coverthreshold. At the end of all that, this data will be written to a 
+`SparseArray` in `TileDB`, where it will be much easier to access.
 
 Usage:
 

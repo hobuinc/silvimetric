@@ -78,10 +78,25 @@ def m_count(data):
 def m_mean(data):
     return np.mean(data)
 
-# TODO this currently returns a list if multiple modes exist, disable until
-# we support lists
-# def m_mode(data):
-#    return stats.mode(data).mode
+# mode is somewhat undefined for floating point values. FUSION logic is to
+# partition data into 64 bins then find the bin with the highest count.
+# This approach has the disadvantage that the bin size varies depending on
+# the Z range.
+# Before binning, subtract min value. Computing the scaled value involves
+# the bin number * bin width (max - min / #bins) + min.
+def m_mode(data):
+    nbins = 64
+    maxv = np.max(data)
+    minv = np.min(data)
+    if minv == maxv:
+        return minv
+    
+    bins = np.histogram(data, bins = nbins, density = False)
+
+    thebin = np.argmax(data, keepdims=False)
+    
+    # compute the height and return...bins - 1 is to get the bottom Z of the bin
+    return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data):
     return np.median(data)
@@ -108,7 +123,7 @@ def m_abovemean(data):
 
 # TODO check performance of other methods
 def m_abovemode(data):
-    return (data > stats.mode(data).mode).sum() / len(data)
+    return (data > m_mode(data)).sum() / len(data)
 
 def m_skewness(data):
     if len(data) < 4:
@@ -133,7 +148,7 @@ def m_madmean(data):
     return stats.median_abs_deviation(data, center=np.mean)
 
 def m_madmode(data):
-    stats_mode = lambda v,axis : stats.mode(v,axis).mode
+    stats_mode = m_mode(data)
     return stats.median_abs_deviation(data, center=stats_mode)
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
@@ -306,13 +321,14 @@ def m_profilearea(data):
 
 # TODO example for cover using all returns and a height threshold
 # the threshold must be a parameter and not hardcoded
-def m_cover(data):
+def m_allcover(data):
     threshold = 2
     return (data > threshold).sum() / len(data)
 
 #TODO change to correct dtype
 #TODO not sure what to do with percentiles since it is an array of values instead of a single value
 Metrics = {
+    'count' : Metric('count', m_count),
     'mean' : Metric('mean', m_mean),
     # 'mode' : Metric('mode', m_mode),
     'median' : Metric('median', m_median),
@@ -356,6 +372,6 @@ Metrics = {
     'p90' : Metric('p90', m_p90),
     'p95' : Metric('p95', m_p95),
     'p99' : Metric('p99', m_p99),
-    'cover' : Metric('cover', m_cover),
+    'allcover' : Metric('allcover', m_allcover),
     'profilearea' : Metric('profilearea', m_profilearea),
 }

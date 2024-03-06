@@ -24,13 +24,15 @@ def threaded_dask():
     dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='function')
-def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
+def storage_config(tdb_filepath, bounds, resolution, htthreshold, coverthreshold, crs, attrs, metrics):
     log = Log(20)
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
                         root = bounds,
                         resolution = resolution,
+                        htthreshold = htthreshold,
+                        coverthreshold = coverthreshold,
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
@@ -68,6 +70,8 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics):
                         crs = crs,
                         root = bounds,
                         resolution = 7,
+                        htthreshold = 2,
+                        coverthreshold = 2,
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
@@ -151,6 +155,14 @@ def dims():
 @pytest.fixture(scope='class')
 def resolution() -> int:
     yield 30
+
+@pytest.fixture(scope='class')
+def htthreshold() -> int:
+    yield 2
+
+@pytest.fixture(scope='class')
+def coverthreshold() -> int:
+    yield 2
 
 @pytest.fixture(scope='class')
 def test_point_count() -> int:

@@ -28,6 +28,8 @@ Synopsis
     -a, --attributes ATTRS  List of attributes to include in Database
     -m, --metrics METRICS   List of metrics to include in Database
     --resolution FLOAT      Summary pixel resolution
+    --htthreshold FLOAT     Height threshold for all metrics
+    --coverthreshold FLOAT  Height threshold for cover metrics
     --help                  Show this message and exit.
 
 
