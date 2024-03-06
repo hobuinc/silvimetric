@@ -1,0 +1,2136 @@
+2024-03-06 16:44:18,393 - silvimetric - INFO - info:153 - {
+  "attributes": [
+    {
+      "name": "Z",
+      "dtype": "<f8",
+      "dependencies": null
+    },
+    {
+      "name": "NumberOfReturns",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "ReturnNumber",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "Intensity",
+      "dtype": "<u2",
+      "dependencies": null
+    }
+  ],
+  "metadata": {
+    "tdb_dir": "autzen-aligned.tdb",
+    "log": {
+      "logdir": null,
+      "log_level": "INFO",
+      "logtype": "stream",
+      "logfilename": "silvimetric-log.txt"
+    },
+    "debug": false,
+    "root": [
+      635535.0,
+      848865.0,
+      639045.0,
+      853575.0
+    ],
+    "crs": {
+      "$schema": "https://proj.org/schemas/v0.7/projjson.schema.json",
+      "type": "ProjectedCRS",
+      "name": "NAD83 / Oregon GIC Lambert (ft)",
+      "base_crs": {
+        "name": "NAD83",
+        "datum": {
+          "type": "GeodeticReferenceFrame",
+          "name": "North American Datum 1983",
+          "ellipsoid": {
+            "name": "GRS 1980",
+            "semi_major_axis": 6378137,
+            "inverse_flattening": 298.257222101
+          }
+        },
+        "coordinate_system": {
+          "subtype": "ellipsoidal",
+          "axis": [
+            {
+              "name": "Geodetic latitude",
+              "abbreviation": "Lat",
+              "direction": "north",
+              "unit": "degree"
+            },
+            {
+              "name": "Geodetic longitude",
+              "abbreviation": "Lon",
+              "direction": "east",
+              "unit": "degree"
+            }
+          ]
+        },
+        "id": {
+          "authority": "EPSG",
+          "code": 4269
+        }
+      },
+      "conversion": {
+        "name": "Oregon GIC Lambert (international foot)",
+        "method": {
+          "name": "Lambert Conic Conformal (2SP)",
+          "id": {
+            "authority": "EPSG",
+            "code": 9802
+          }
+        },
+        "parameters": [
+          {
+            "name": "Latitude of false origin",
+            "value": 41.75,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8821
+            }
+          },
+          {
+            "name": "Longitude of false origin",
+            "value": -120.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8822
+            }
+          },
+          {
+            "name": "Latitude of 1st standard parallel",
+            "value": 43,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8823
+            }
+          },
+          {
+            "name": "Latitude of 2nd standard parallel",
+            "value": 45.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8824
+            }
+          },
+          {
+            "name": "Easting at false origin",
+            "value": 1312335.958,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8826
+            }
+          },
+          {
+            "name": "Northing at false origin",
+            "value": 0,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8827
+            }
+          }
+        ]
+      },
+      "coordinate_system": {
+        "subtype": "Cartesian",
+        "axis": [
+          {
+            "name": "Easting",
+            "abbreviation": "X",
+            "direction": "east",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          },
+          {
+            "name": "Northing",
+            "abbreviation": "Y",
+            "direction": "north",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          }
+        ]
+      },
+      "scope": "State-wide spatial data management.",
+      "area": "United States (USA) - Oregon.",
+      "bbox": {
+        "south_latitude": 41.98,
+        "west_longitude": -124.6,
+        "north_latitude": 46.26,
+        "east_longitude": -116.47
+      },
+      "id": {
+        "authority": "EPSG",
+        "code": 2992
+      }
+    },
+    "resolution": 30.0,
+    "htthreshold": 2.0,
+    "coverthreshold": 2.0,
+    "attrs": [
+      {
+        "name": "Z",
+        "dtype": "<f8",
+        "dependencies": null
+      },
+      {
+        "name": "NumberOfReturns",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "ReturnNumber",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "Intensity",
+        "dtype": "<u2",
+        "dependencies": null
+      }
+    ],
+    "metrics": [
+      {
+        "name": "count",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_count(data, htthreshold, coverthreshold):\n    return len(data)\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtX2NvdW50lJOULg=="
+      },
+      {
+        "name": "mean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_mean(data, htthreshold, coverthreshold):\n    return np.mean(data)\n",
+        "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+      },
+      {
+        "name": "median",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_median(data, htthreshold, coverthreshold):\n    return np.median(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX21lZGlhbpSTlC4="
+      },
+      {
+        "name": "min",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_min(data, htthreshold, coverthreshold):\n    return np.min(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21pbpSTlC4="
+      },
+      {
+        "name": "max",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_max(data, htthreshold, coverthreshold):\n    return np.max(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21heJSTlC4="
+      },
+      {
+        "name": "stddev",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_stddev(data, htthreshold, coverthreshold):\n    return np.std(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3N0ZGRldpSTlC4="
+      },
+      {
+        "name": "variance",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_variance(data, htthreshold, coverthreshold):\n    return np.var(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3ZhcmlhbmNllJOULg=="
+      },
+      {
+        "name": "cv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cv(data, htthreshold, coverthreshold):\n    return np.std(data) / np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2N2lJOULg=="
+      },
+      {
+        "name": "abovemean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemean(data, htthreshold, coverthreshold):\n    return (data > np.mean(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbWVhbpSTlC4="
+      },
+      {
+        "name": "abovemode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemode(data, htthreshold, coverthreshold):\n    return (data > m_mode(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbW9kZZSTlC4="
+      },
+      {
+        "name": "skewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_skewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.skew(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3NrZXduZXNzlJOULg=="
+      },
+      {
+        "name": "kurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_kurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.kurtosis(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2t1cnRvc2lzlJOULg=="
+      },
+      {
+        "name": "aad",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_aad(data, htthreshold, coverthreshold):\n    m = np.mean(data)\n    return np.mean(np.absolute(data - m))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2FhZJSTlC4="
+      },
+      {
+        "name": "madmedian",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmedian(data, htthreshold, coverthreshold):\n    return stats.median_abs_deviation(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX21hZG1lZGlhbpSTlC4="
+      },
+      {
+        "name": "madmode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmode(data, htthreshold, coverthreshold):\n    stats_mode = m_mode(data)\n    return stats.median_abs_deviation(data, center=stats_mode)\n",
+        "method": "gASVLgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAltX21hZG1vZGWUk5Qu"
+      },
+      {
+        "name": "iq",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_iq(data, htthreshold, coverthreshold):\n    return stats.iqr(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2lxlJOULg=="
+      },
+      {
+        "name": "crr",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_crr(data, htthreshold, coverthreshold):\n    maxv = np.max(data)\n    minv = np.min(data)\n    if minv == maxv:\n        return -9999.0\n    \n    return (np.mean(data) - minv) / (maxv - minv)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2NycpSTlC4="
+      },
+      {
+        "name": "sqmean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_sqmean(data, htthreshold, coverthreshold):\n    return np.sqrt(np.mean(np.square(data)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3NxbWVhbpSTlC4="
+      },
+      {
+        "name": "cumean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cumean(data, htthreshold, coverthreshold):\n    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX2N1bWVhbpSTlC4="
+      },
+      {
+        "name": "l1",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l1(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wxlJOULg=="
+      },
+      {
+        "name": "l2",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l2(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[1]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wylJOULg=="
+      },
+      {
+        "name": "l3",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l3(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[2]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wzlJOULg=="
+      },
+      {
+        "name": "l4",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l4(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[3]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2w0lJOULg=="
+      },
+      {
+        "name": "lcv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lcv(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n\n    if l[0] == 0.0:\n        return -9999.0\n    \n    return l[1] / l[0]\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2xjdpSTlC4="
+      },
+      {
+        "name": "lskewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lskewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[2] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xza2V3bmVzc5STlC4="
+      },
+      {
+        "name": "lkurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lkurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[3] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xrdXJ0b3Npc5STlC4="
+      },
+      {
+        "name": "90m10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_90m10(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [10,90])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzkwbTEwlJOULg=="
+      },
+      {
+        "name": "95m05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_95m05(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [5,95])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzk1bTA1lJOULg=="
+      },
+      {
+        "name": "p01",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p01(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 1))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwMZSTlC4="
+      },
+      {
+        "name": "p05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p05(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 5))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwNZSTlC4="
+      },
+      {
+        "name": "p10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p10(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 10))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AxMJSTlC4="
+      },
+      {
+        "name": "p20",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p20(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 20))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyMJSTlC4="
+      },
+      {
+        "name": "p25",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p25(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 25))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyNZSTlC4="
+      },
+      {
+        "name": "p30",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p30(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 30))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AzMJSTlC4="
+      },
+      {
+        "name": "p40",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p40(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 40))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A0MJSTlC4="
+      },
+      {
+        "name": "p50",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p50(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 50))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A1MJSTlC4="
+      },
+      {
+        "name": "p60",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p60(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 60))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A2MJSTlC4="
+      },
+      {
+        "name": "p70",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p70(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 70))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3MJSTlC4="
+      },
+      {
+        "name": "p75",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p75(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 75))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3NZSTlC4="
+      },
+      {
+        "name": "p80",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p80(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 80))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A4MJSTlC4="
+      },
+      {
+        "name": "p90",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p90(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 90))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5MJSTlC4="
+      },
+      {
+        "name": "p95",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p95(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 95))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5NZSTlC4="
+      },
+      {
+        "name": "p99",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p99(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 99))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5OZSTlC4="
+      },
+      {
+        "name": "allcover",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_allcover(data, htthreshold, coverthreshold):\n    return (data > coverthreshold).sum() / len(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2FsbGNvdmVylJOULg=="
+      },
+      {
+        "name": "profilearea",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_profilearea(data, htthreshold, coverthreshold):\n    # sanity check...must have valid heights/elevations\n    if np.max(data) <= 0:\n        return -9999.0\n\n\n    p = np.percentile(data, range(1, 100))\n    p0 = max(np.min(data), 0.0)\n\n    # second sanity check...99th percentile must be > 0\n    if p[98] > 0.0:\n        # compute area under normalized percentile height curve using composite trapeziod rule\n        pa = p0 / p[98]\n        for ip in p[:97]:\n            pa += 2.0 * ip / p[98]\n        pa += 1.0\n\n        return pa * 0.5\n    else:\n        return -9999.0\n",
+        "method": "gASVMgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjA1tX3Byb2ZpbGVhcmVhlJOULg=="
+      }
+    ],
+    "version": "0.0.1",
+    "capacity": 1000000
+  },
+  "history": []
+}
+2024-03-06 16:44:18,393 - silvimetric - INFO - info:153 - {
+  "attributes": [
+    {
+      "name": "Z",
+      "dtype": "<f8",
+      "dependencies": null
+    },
+    {
+      "name": "NumberOfReturns",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "ReturnNumber",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "Intensity",
+      "dtype": "<u2",
+      "dependencies": null
+    }
+  ],
+  "metadata": {
+    "tdb_dir": "autzen-aligned.tdb",
+    "log": {
+      "logdir": null,
+      "log_level": "INFO",
+      "logtype": "stream",
+      "logfilename": "silvimetric-log.txt"
+    },
+    "debug": false,
+    "root": [
+      635535.0,
+      848865.0,
+      639045.0,
+      853575.0
+    ],
+    "crs": {
+      "$schema": "https://proj.org/schemas/v0.7/projjson.schema.json",
+      "type": "ProjectedCRS",
+      "name": "NAD83 / Oregon GIC Lambert (ft)",
+      "base_crs": {
+        "name": "NAD83",
+        "datum": {
+          "type": "GeodeticReferenceFrame",
+          "name": "North American Datum 1983",
+          "ellipsoid": {
+            "name": "GRS 1980",
+            "semi_major_axis": 6378137,
+            "inverse_flattening": 298.257222101
+          }
+        },
+        "coordinate_system": {
+          "subtype": "ellipsoidal",
+          "axis": [
+            {
+              "name": "Geodetic latitude",
+              "abbreviation": "Lat",
+              "direction": "north",
+              "unit": "degree"
+            },
+            {
+              "name": "Geodetic longitude",
+              "abbreviation": "Lon",
+              "direction": "east",
+              "unit": "degree"
+            }
+          ]
+        },
+        "id": {
+          "authority": "EPSG",
+          "code": 4269
+        }
+      },
+      "conversion": {
+        "name": "Oregon GIC Lambert (international foot)",
+        "method": {
+          "name": "Lambert Conic Conformal (2SP)",
+          "id": {
+            "authority": "EPSG",
+            "code": 9802
+          }
+        },
+        "parameters": [
+          {
+            "name": "Latitude of false origin",
+            "value": 41.75,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8821
+            }
+          },
+          {
+            "name": "Longitude of false origin",
+            "value": -120.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8822
+            }
+          },
+          {
+            "name": "Latitude of 1st standard parallel",
+            "value": 43,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8823
+            }
+          },
+          {
+            "name": "Latitude of 2nd standard parallel",
+            "value": 45.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8824
+            }
+          },
+          {
+            "name": "Easting at false origin",
+            "value": 1312335.958,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8826
+            }
+          },
+          {
+            "name": "Northing at false origin",
+            "value": 0,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8827
+            }
+          }
+        ]
+      },
+      "coordinate_system": {
+        "subtype": "Cartesian",
+        "axis": [
+          {
+            "name": "Easting",
+            "abbreviation": "X",
+            "direction": "east",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          },
+          {
+            "name": "Northing",
+            "abbreviation": "Y",
+            "direction": "north",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          }
+        ]
+      },
+      "scope": "State-wide spatial data management.",
+      "area": "United States (USA) - Oregon.",
+      "bbox": {
+        "south_latitude": 41.98,
+        "west_longitude": -124.6,
+        "north_latitude": 46.26,
+        "east_longitude": -116.47
+      },
+      "id": {
+        "authority": "EPSG",
+        "code": 2992
+      }
+    },
+    "resolution": 30.0,
+    "htthreshold": 2.0,
+    "coverthreshold": 2.0,
+    "attrs": [
+      {
+        "name": "Z",
+        "dtype": "<f8",
+        "dependencies": null
+      },
+      {
+        "name": "NumberOfReturns",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "ReturnNumber",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "Intensity",
+        "dtype": "<u2",
+        "dependencies": null
+      }
+    ],
+    "metrics": [
+      {
+        "name": "count",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_count(data, htthreshold, coverthreshold):\n    return len(data)\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtX2NvdW50lJOULg=="
+      },
+      {
+        "name": "mean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_mean(data, htthreshold, coverthreshold):\n    return np.mean(data)\n",
+        "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+      },
+      {
+        "name": "median",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_median(data, htthreshold, coverthreshold):\n    return np.median(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX21lZGlhbpSTlC4="
+      },
+      {
+        "name": "min",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_min(data, htthreshold, coverthreshold):\n    return np.min(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21pbpSTlC4="
+      },
+      {
+        "name": "max",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_max(data, htthreshold, coverthreshold):\n    return np.max(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21heJSTlC4="
+      },
+      {
+        "name": "stddev",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_stddev(data, htthreshold, coverthreshold):\n    return np.std(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3N0ZGRldpSTlC4="
+      },
+      {
+        "name": "variance",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_variance(data, htthreshold, coverthreshold):\n    return np.var(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3ZhcmlhbmNllJOULg=="
+      },
+      {
+        "name": "cv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cv(data, htthreshold, coverthreshold):\n    return np.std(data) / np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2N2lJOULg=="
+      },
+      {
+        "name": "abovemean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemean(data, htthreshold, coverthreshold):\n    return (data > np.mean(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbWVhbpSTlC4="
+      },
+      {
+        "name": "abovemode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemode(data, htthreshold, coverthreshold):\n    return (data > m_mode(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbW9kZZSTlC4="
+      },
+      {
+        "name": "skewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_skewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.skew(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3NrZXduZXNzlJOULg=="
+      },
+      {
+        "name": "kurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_kurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.kurtosis(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2t1cnRvc2lzlJOULg=="
+      },
+      {
+        "name": "aad",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_aad(data, htthreshold, coverthreshold):\n    m = np.mean(data)\n    return np.mean(np.absolute(data - m))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2FhZJSTlC4="
+      },
+      {
+        "name": "madmedian",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmedian(data, htthreshold, coverthreshold):\n    return stats.median_abs_deviation(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX21hZG1lZGlhbpSTlC4="
+      },
+      {
+        "name": "madmode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmode(data, htthreshold, coverthreshold):\n    stats_mode = m_mode(data)\n    return stats.median_abs_deviation(data, center=stats_mode)\n",
+        "method": "gASVLgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAltX21hZG1vZGWUk5Qu"
+      },
+      {
+        "name": "iq",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_iq(data, htthreshold, coverthreshold):\n    return stats.iqr(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2lxlJOULg=="
+      },
+      {
+        "name": "crr",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_crr(data, htthreshold, coverthreshold):\n    maxv = np.max(data)\n    minv = np.min(data)\n    if minv == maxv:\n        return -9999.0\n    \n    return (np.mean(data) - minv) / (maxv - minv)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2NycpSTlC4="
+      },
+      {
+        "name": "sqmean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_sqmean(data, htthreshold, coverthreshold):\n    return np.sqrt(np.mean(np.square(data)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3NxbWVhbpSTlC4="
+      },
+      {
+        "name": "cumean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cumean(data, htthreshold, coverthreshold):\n    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX2N1bWVhbpSTlC4="
+      },
+      {
+        "name": "l1",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l1(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wxlJOULg=="
+      },
+      {
+        "name": "l2",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l2(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[1]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wylJOULg=="
+      },
+      {
+        "name": "l3",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l3(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[2]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wzlJOULg=="
+      },
+      {
+        "name": "l4",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l4(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[3]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2w0lJOULg=="
+      },
+      {
+        "name": "lcv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lcv(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n\n    if l[0] == 0.0:\n        return -9999.0\n    \n    return l[1] / l[0]\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2xjdpSTlC4="
+      },
+      {
+        "name": "lskewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lskewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[2] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xza2V3bmVzc5STlC4="
+      },
+      {
+        "name": "lkurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lkurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[3] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xrdXJ0b3Npc5STlC4="
+      },
+      {
+        "name": "90m10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_90m10(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [10,90])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzkwbTEwlJOULg=="
+      },
+      {
+        "name": "95m05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_95m05(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [5,95])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzk1bTA1lJOULg=="
+      },
+      {
+        "name": "p01",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p01(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 1))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwMZSTlC4="
+      },
+      {
+        "name": "p05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p05(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 5))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwNZSTlC4="
+      },
+      {
+        "name": "p10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p10(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 10))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AxMJSTlC4="
+      },
+      {
+        "name": "p20",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p20(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 20))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyMJSTlC4="
+      },
+      {
+        "name": "p25",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p25(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 25))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyNZSTlC4="
+      },
+      {
+        "name": "p30",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p30(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 30))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AzMJSTlC4="
+      },
+      {
+        "name": "p40",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p40(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 40))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A0MJSTlC4="
+      },
+      {
+        "name": "p50",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p50(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 50))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A1MJSTlC4="
+      },
+      {
+        "name": "p60",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p60(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 60))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A2MJSTlC4="
+      },
+      {
+        "name": "p70",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p70(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 70))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3MJSTlC4="
+      },
+      {
+        "name": "p75",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p75(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 75))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3NZSTlC4="
+      },
+      {
+        "name": "p80",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p80(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 80))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A4MJSTlC4="
+      },
+      {
+        "name": "p90",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p90(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 90))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5MJSTlC4="
+      },
+      {
+        "name": "p95",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p95(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 95))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5NZSTlC4="
+      },
+      {
+        "name": "p99",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p99(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 99))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5OZSTlC4="
+      },
+      {
+        "name": "allcover",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_allcover(data, htthreshold, coverthreshold):\n    return (data > coverthreshold).sum() / len(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2FsbGNvdmVylJOULg=="
+      },
+      {
+        "name": "profilearea",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_profilearea(data, htthreshold, coverthreshold):\n    # sanity check...must have valid heights/elevations\n    if np.max(data) <= 0:\n        return -9999.0\n\n\n    p = np.percentile(data, range(1, 100))\n    p0 = max(np.min(data), 0.0)\n\n    # second sanity check...99th percentile must be > 0\n    if p[98] > 0.0:\n        # compute area under normalized percentile height curve using composite trapeziod rule\n        pa = p0 / p[98]\n        for ip in p[:97]:\n            pa += 2.0 * ip / p[98]\n        pa += 1.0\n\n        return pa * 0.5\n    else:\n        return -9999.0\n",
+        "method": "gASVMgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjA1tX3Byb2ZpbGVhcmVhlJOULg=="
+      }
+    ],
+    "version": "0.0.1",
+    "capacity": 1000000
+  },
+  "history": []
+}
+2024-03-06 16:44:18,393 - silvimetric - INFO - info:153 - {
+  "attributes": [
+    {
+      "name": "Z",
+      "dtype": "<f8",
+      "dependencies": null
+    },
+    {
+      "name": "NumberOfReturns",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "ReturnNumber",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "Intensity",
+      "dtype": "<u2",
+      "dependencies": null
+    }
+  ],
+  "metadata": {
+    "tdb_dir": "autzen-aligned.tdb",
+    "log": {
+      "logdir": null,
+      "log_level": "INFO",
+      "logtype": "stream",
+      "logfilename": "silvimetric-log.txt"
+    },
+    "debug": false,
+    "root": [
+      635535.0,
+      848865.0,
+      639045.0,
+      853575.0
+    ],
+    "crs": {
+      "$schema": "https://proj.org/schemas/v0.7/projjson.schema.json",
+      "type": "ProjectedCRS",
+      "name": "NAD83 / Oregon GIC Lambert (ft)",
+      "base_crs": {
+        "name": "NAD83",
+        "datum": {
+          "type": "GeodeticReferenceFrame",
+          "name": "North American Datum 1983",
+          "ellipsoid": {
+            "name": "GRS 1980",
+            "semi_major_axis": 6378137,
+            "inverse_flattening": 298.257222101
+          }
+        },
+        "coordinate_system": {
+          "subtype": "ellipsoidal",
+          "axis": [
+            {
+              "name": "Geodetic latitude",
+              "abbreviation": "Lat",
+              "direction": "north",
+              "unit": "degree"
+            },
+            {
+              "name": "Geodetic longitude",
+              "abbreviation": "Lon",
+              "direction": "east",
+              "unit": "degree"
+            }
+          ]
+        },
+        "id": {
+          "authority": "EPSG",
+          "code": 4269
+        }
+      },
+      "conversion": {
+        "name": "Oregon GIC Lambert (international foot)",
+        "method": {
+          "name": "Lambert Conic Conformal (2SP)",
+          "id": {
+            "authority": "EPSG",
+            "code": 9802
+          }
+        },
+        "parameters": [
+          {
+            "name": "Latitude of false origin",
+            "value": 41.75,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8821
+            }
+          },
+          {
+            "name": "Longitude of false origin",
+            "value": -120.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8822
+            }
+          },
+          {
+            "name": "Latitude of 1st standard parallel",
+            "value": 43,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8823
+            }
+          },
+          {
+            "name": "Latitude of 2nd standard parallel",
+            "value": 45.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8824
+            }
+          },
+          {
+            "name": "Easting at false origin",
+            "value": 1312335.958,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8826
+            }
+          },
+          {
+            "name": "Northing at false origin",
+            "value": 0,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8827
+            }
+          }
+        ]
+      },
+      "coordinate_system": {
+        "subtype": "Cartesian",
+        "axis": [
+          {
+            "name": "Easting",
+            "abbreviation": "X",
+            "direction": "east",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          },
+          {
+            "name": "Northing",
+            "abbreviation": "Y",
+            "direction": "north",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          }
+        ]
+      },
+      "scope": "State-wide spatial data management.",
+      "area": "United States (USA) - Oregon.",
+      "bbox": {
+        "south_latitude": 41.98,
+        "west_longitude": -124.6,
+        "north_latitude": 46.26,
+        "east_longitude": -116.47
+      },
+      "id": {
+        "authority": "EPSG",
+        "code": 2992
+      }
+    },
+    "resolution": 30.0,
+    "htthreshold": 2.0,
+    "coverthreshold": 2.0,
+    "attrs": [
+      {
+        "name": "Z",
+        "dtype": "<f8",
+        "dependencies": null
+      },
+      {
+        "name": "NumberOfReturns",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "ReturnNumber",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "Intensity",
+        "dtype": "<u2",
+        "dependencies": null
+      }
+    ],
+    "metrics": [
+      {
+        "name": "count",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_count(data, htthreshold, coverthreshold):\n    return len(data)\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtX2NvdW50lJOULg=="
+      },
+      {
+        "name": "mean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_mean(data, htthreshold, coverthreshold):\n    return np.mean(data)\n",
+        "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+      },
+      {
+        "name": "median",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_median(data, htthreshold, coverthreshold):\n    return np.median(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX21lZGlhbpSTlC4="
+      },
+      {
+        "name": "min",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_min(data, htthreshold, coverthreshold):\n    return np.min(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21pbpSTlC4="
+      },
+      {
+        "name": "max",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_max(data, htthreshold, coverthreshold):\n    return np.max(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21heJSTlC4="
+      },
+      {
+        "name": "stddev",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_stddev(data, htthreshold, coverthreshold):\n    return np.std(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3N0ZGRldpSTlC4="
+      },
+      {
+        "name": "variance",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_variance(data, htthreshold, coverthreshold):\n    return np.var(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3ZhcmlhbmNllJOULg=="
+      },
+      {
+        "name": "cv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cv(data, htthreshold, coverthreshold):\n    return np.std(data) / np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2N2lJOULg=="
+      },
+      {
+        "name": "abovemean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemean(data, htthreshold, coverthreshold):\n    return (data > np.mean(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbWVhbpSTlC4="
+      },
+      {
+        "name": "abovemode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemode(data, htthreshold, coverthreshold):\n    return (data > m_mode(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbW9kZZSTlC4="
+      },
+      {
+        "name": "skewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_skewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.skew(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3NrZXduZXNzlJOULg=="
+      },
+      {
+        "name": "kurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_kurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.kurtosis(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2t1cnRvc2lzlJOULg=="
+      },
+      {
+        "name": "aad",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_aad(data, htthreshold, coverthreshold):\n    m = np.mean(data)\n    return np.mean(np.absolute(data - m))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2FhZJSTlC4="
+      },
+      {
+        "name": "madmedian",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmedian(data, htthreshold, coverthreshold):\n    return stats.median_abs_deviation(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX21hZG1lZGlhbpSTlC4="
+      },
+      {
+        "name": "madmode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmode(data, htthreshold, coverthreshold):\n    stats_mode = m_mode(data)\n    return stats.median_abs_deviation(data, center=stats_mode)\n",
+        "method": "gASVLgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAltX21hZG1vZGWUk5Qu"
+      },
+      {
+        "name": "iq",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_iq(data, htthreshold, coverthreshold):\n    return stats.iqr(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2lxlJOULg=="
+      },
+      {
+        "name": "crr",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_crr(data, htthreshold, coverthreshold):\n    maxv = np.max(data)\n    minv = np.min(data)\n    if minv == maxv:\n        return -9999.0\n    \n    return (np.mean(data) - minv) / (maxv - minv)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2NycpSTlC4="
+      },
+      {
+        "name": "sqmean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_sqmean(data, htthreshold, coverthreshold):\n    return np.sqrt(np.mean(np.square(data)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3NxbWVhbpSTlC4="
+      },
+      {
+        "name": "cumean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cumean(data, htthreshold, coverthreshold):\n    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX2N1bWVhbpSTlC4="
+      },
+      {
+        "name": "l1",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l1(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wxlJOULg=="
+      },
+      {
+        "name": "l2",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l2(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[1]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wylJOULg=="
+      },
+      {
+        "name": "l3",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l3(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[2]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wzlJOULg=="
+      },
+      {
+        "name": "l4",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l4(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[3]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2w0lJOULg=="
+      },
+      {
+        "name": "lcv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lcv(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n\n    if l[0] == 0.0:\n        return -9999.0\n    \n    return l[1] / l[0]\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2xjdpSTlC4="
+      },
+      {
+        "name": "lskewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lskewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[2] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xza2V3bmVzc5STlC4="
+      },
+      {
+        "name": "lkurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lkurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[3] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xrdXJ0b3Npc5STlC4="
+      },
+      {
+        "name": "90m10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_90m10(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [10,90])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzkwbTEwlJOULg=="
+      },
+      {
+        "name": "95m05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_95m05(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [5,95])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzk1bTA1lJOULg=="
+      },
+      {
+        "name": "p01",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p01(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 1))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwMZSTlC4="
+      },
+      {
+        "name": "p05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p05(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 5))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwNZSTlC4="
+      },
+      {
+        "name": "p10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p10(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 10))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AxMJSTlC4="
+      },
+      {
+        "name": "p20",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p20(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 20))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyMJSTlC4="
+      },
+      {
+        "name": "p25",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p25(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 25))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyNZSTlC4="
+      },
+      {
+        "name": "p30",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p30(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 30))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AzMJSTlC4="
+      },
+      {
+        "name": "p40",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p40(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 40))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A0MJSTlC4="
+      },
+      {
+        "name": "p50",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p50(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 50))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A1MJSTlC4="
+      },
+      {
+        "name": "p60",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p60(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 60))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A2MJSTlC4="
+      },
+      {
+        "name": "p70",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p70(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 70))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3MJSTlC4="
+      },
+      {
+        "name": "p75",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p75(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 75))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3NZSTlC4="
+      },
+      {
+        "name": "p80",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p80(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 80))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A4MJSTlC4="
+      },
+      {
+        "name": "p90",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p90(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 90))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5MJSTlC4="
+      },
+      {
+        "name": "p95",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p95(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 95))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5NZSTlC4="
+      },
+      {
+        "name": "p99",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p99(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 99))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5OZSTlC4="
+      },
+      {
+        "name": "allcover",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_allcover(data, htthreshold, coverthreshold):\n    return (data > coverthreshold).sum() / len(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2FsbGNvdmVylJOULg=="
+      },
+      {
+        "name": "profilearea",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_profilearea(data, htthreshold, coverthreshold):\n    # sanity check...must have valid heights/elevations\n    if np.max(data) <= 0:\n        return -9999.0\n\n\n    p = np.percentile(data, range(1, 100))\n    p0 = max(np.min(data), 0.0)\n\n    # second sanity check...99th percentile must be > 0\n    if p[98] > 0.0:\n        # compute area under normalized percentile height curve using composite trapeziod rule\n        pa = p0 / p[98]\n        for ip in p[:97]:\n            pa += 2.0 * ip / p[98]\n        pa += 1.0\n\n        return pa * 0.5\n    else:\n        return -9999.0\n",
+        "method": "gASVMgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjA1tX3Byb2ZpbGVhcmVhlJOULg=="
+      }
+    ],
+    "version": "0.0.1",
+    "capacity": 1000000
+  },
+  "history": []
+}
+2024-03-06 16:44:18,393 - silvimetric - INFO - info:153 - {
+  "attributes": [
+    {
+      "name": "Z",
+      "dtype": "<f8",
+      "dependencies": null
+    },
+    {
+      "name": "NumberOfReturns",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "ReturnNumber",
+      "dtype": "|u1",
+      "dependencies": null
+    },
+    {
+      "name": "Intensity",
+      "dtype": "<u2",
+      "dependencies": null
+    }
+  ],
+  "metadata": {
+    "tdb_dir": "autzen-aligned.tdb",
+    "log": {
+      "logdir": null,
+      "log_level": "INFO",
+      "logtype": "stream",
+      "logfilename": "silvimetric-log.txt"
+    },
+    "debug": false,
+    "root": [
+      635535.0,
+      848865.0,
+      639045.0,
+      853575.0
+    ],
+    "crs": {
+      "$schema": "https://proj.org/schemas/v0.7/projjson.schema.json",
+      "type": "ProjectedCRS",
+      "name": "NAD83 / Oregon GIC Lambert (ft)",
+      "base_crs": {
+        "name": "NAD83",
+        "datum": {
+          "type": "GeodeticReferenceFrame",
+          "name": "North American Datum 1983",
+          "ellipsoid": {
+            "name": "GRS 1980",
+            "semi_major_axis": 6378137,
+            "inverse_flattening": 298.257222101
+          }
+        },
+        "coordinate_system": {
+          "subtype": "ellipsoidal",
+          "axis": [
+            {
+              "name": "Geodetic latitude",
+              "abbreviation": "Lat",
+              "direction": "north",
+              "unit": "degree"
+            },
+            {
+              "name": "Geodetic longitude",
+              "abbreviation": "Lon",
+              "direction": "east",
+              "unit": "degree"
+            }
+          ]
+        },
+        "id": {
+          "authority": "EPSG",
+          "code": 4269
+        }
+      },
+      "conversion": {
+        "name": "Oregon GIC Lambert (international foot)",
+        "method": {
+          "name": "Lambert Conic Conformal (2SP)",
+          "id": {
+            "authority": "EPSG",
+            "code": 9802
+          }
+        },
+        "parameters": [
+          {
+            "name": "Latitude of false origin",
+            "value": 41.75,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8821
+            }
+          },
+          {
+            "name": "Longitude of false origin",
+            "value": -120.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8822
+            }
+          },
+          {
+            "name": "Latitude of 1st standard parallel",
+            "value": 43,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8823
+            }
+          },
+          {
+            "name": "Latitude of 2nd standard parallel",
+            "value": 45.5,
+            "unit": "degree",
+            "id": {
+              "authority": "EPSG",
+              "code": 8824
+            }
+          },
+          {
+            "name": "Easting at false origin",
+            "value": 1312335.958,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8826
+            }
+          },
+          {
+            "name": "Northing at false origin",
+            "value": 0,
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            },
+            "id": {
+              "authority": "EPSG",
+              "code": 8827
+            }
+          }
+        ]
+      },
+      "coordinate_system": {
+        "subtype": "Cartesian",
+        "axis": [
+          {
+            "name": "Easting",
+            "abbreviation": "X",
+            "direction": "east",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          },
+          {
+            "name": "Northing",
+            "abbreviation": "Y",
+            "direction": "north",
+            "unit": {
+              "type": "LinearUnit",
+              "name": "foot",
+              "conversion_factor": 0.3048
+            }
+          }
+        ]
+      },
+      "scope": "State-wide spatial data management.",
+      "area": "United States (USA) - Oregon.",
+      "bbox": {
+        "south_latitude": 41.98,
+        "west_longitude": -124.6,
+        "north_latitude": 46.26,
+        "east_longitude": -116.47
+      },
+      "id": {
+        "authority": "EPSG",
+        "code": 2992
+      }
+    },
+    "resolution": 30.0,
+    "htthreshold": 2.0,
+    "coverthreshold": 2.0,
+    "attrs": [
+      {
+        "name": "Z",
+        "dtype": "<f8",
+        "dependencies": null
+      },
+      {
+        "name": "NumberOfReturns",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "ReturnNumber",
+        "dtype": "|u1",
+        "dependencies": null
+      },
+      {
+        "name": "Intensity",
+        "dtype": "<u2",
+        "dependencies": null
+      }
+    ],
+    "metrics": [
+      {
+        "name": "count",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_count(data, htthreshold, coverthreshold):\n    return len(data)\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtX2NvdW50lJOULg=="
+      },
+      {
+        "name": "mean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_mean(data, htthreshold, coverthreshold):\n    return np.mean(data)\n",
+        "method": "gASVKwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAZtX21lYW6Uk5Qu"
+      },
+      {
+        "name": "median",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_median(data, htthreshold, coverthreshold):\n    return np.median(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX21lZGlhbpSTlC4="
+      },
+      {
+        "name": "min",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_min(data, htthreshold, coverthreshold):\n    return np.min(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21pbpSTlC4="
+      },
+      {
+        "name": "max",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_max(data, htthreshold, coverthreshold):\n    return np.max(data)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX21heJSTlC4="
+      },
+      {
+        "name": "stddev",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_stddev(data, htthreshold, coverthreshold):\n    return np.std(data)\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3N0ZGRldpSTlC4="
+      },
+      {
+        "name": "variance",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_variance(data, htthreshold, coverthreshold):\n    return np.var(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3ZhcmlhbmNllJOULg=="
+      },
+      {
+        "name": "cv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cv(data, htthreshold, coverthreshold):\n    return np.std(data) / np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2N2lJOULg=="
+      },
+      {
+        "name": "abovemean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemean(data, htthreshold, coverthreshold):\n    return (data > np.mean(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbWVhbpSTlC4="
+      },
+      {
+        "name": "abovemode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_abovemode(data, htthreshold, coverthreshold):\n    return (data > m_mode(data)).sum() / len(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2Fib3ZlbW9kZZSTlC4="
+      },
+      {
+        "name": "skewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_skewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.skew(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX3NrZXduZXNzlJOULg=="
+      },
+      {
+        "name": "kurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_kurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return stats.kurtosis(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2t1cnRvc2lzlJOULg=="
+      },
+      {
+        "name": "aad",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_aad(data, htthreshold, coverthreshold):\n    m = np.mean(data)\n    return np.mean(np.absolute(data - m))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2FhZJSTlC4="
+      },
+      {
+        "name": "madmedian",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmedian(data, htthreshold, coverthreshold):\n    return stats.median_abs_deviation(data)\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX21hZG1lZGlhbpSTlC4="
+      },
+      {
+        "name": "madmode",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_madmode(data, htthreshold, coverthreshold):\n    stats_mode = m_mode(data)\n    return stats.median_abs_deviation(data, center=stats_mode)\n",
+        "method": "gASVLgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAltX21hZG1vZGWUk5Qu"
+      },
+      {
+        "name": "iq",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_iq(data, htthreshold, coverthreshold):\n    return stats.iqr(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2lxlJOULg=="
+      },
+      {
+        "name": "crr",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_crr(data, htthreshold, coverthreshold):\n    maxv = np.max(data)\n    minv = np.min(data)\n    if minv == maxv:\n        return -9999.0\n    \n    return (np.mean(data) - minv) / (maxv - minv)\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2NycpSTlC4="
+      },
+      {
+        "name": "sqmean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_sqmean(data, htthreshold, coverthreshold):\n    return np.sqrt(np.mean(np.square(data)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX3NxbWVhbpSTlC4="
+      },
+      {
+        "name": "cumean",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_cumean(data, htthreshold, coverthreshold):\n    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))\n",
+        "method": "gASVLQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAhtX2N1bWVhbpSTlC4="
+      },
+      {
+        "name": "l1",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l1(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    return np.mean(data)\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wxlJOULg=="
+      },
+      {
+        "name": "l2",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l2(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[1]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wylJOULg=="
+      },
+      {
+        "name": "l3",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l3(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[2]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2wzlJOULg=="
+      },
+      {
+        "name": "l4",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_l4(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    return l[3]\n",
+        "method": "gASVKQAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjARtX2w0lJOULg=="
+      },
+      {
+        "name": "lcv",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lcv(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n\n    if l[0] == 0.0:\n        return -9999.0\n    \n    return l[1] / l[0]\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX2xjdpSTlC4="
+      },
+      {
+        "name": "lskewness",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lskewness(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[2] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xza2V3bmVzc5STlC4="
+      },
+      {
+        "name": "lkurtosis",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_lkurtosis(data, htthreshold, coverthreshold):\n    if len(data) < 4:\n        return -9999.0\n\n    l = lmom4(data)\n    if l[1] == 0.0:\n        return -9999.0\n    \n    return l[3] / l[1]\n",
+        "method": "gASVMAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAttX2xrdXJ0b3Npc5STlC4="
+      },
+      {
+        "name": "90m10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_90m10(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [10,90])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzkwbTEwlJOULg=="
+      },
+      {
+        "name": "95m05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_95m05(data, htthreshold, coverthreshold):\n    p = np.percentile(data, [5,95])\n    return p[1] - p[0]\n",
+        "method": "gASVLAAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAdtXzk1bTA1lJOULg=="
+      },
+      {
+        "name": "p01",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p01(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 1))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwMZSTlC4="
+      },
+      {
+        "name": "p05",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p05(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 5))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AwNZSTlC4="
+      },
+      {
+        "name": "p10",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p10(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 10))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AxMJSTlC4="
+      },
+      {
+        "name": "p20",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p20(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 20))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyMJSTlC4="
+      },
+      {
+        "name": "p25",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p25(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 25))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AyNZSTlC4="
+      },
+      {
+        "name": "p30",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p30(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 30))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3AzMJSTlC4="
+      },
+      {
+        "name": "p40",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p40(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 40))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A0MJSTlC4="
+      },
+      {
+        "name": "p50",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p50(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 50))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A1MJSTlC4="
+      },
+      {
+        "name": "p60",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p60(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 60))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A2MJSTlC4="
+      },
+      {
+        "name": "p70",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p70(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 70))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3MJSTlC4="
+      },
+      {
+        "name": "p75",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p75(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 75))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A3NZSTlC4="
+      },
+      {
+        "name": "p80",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p80(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 80))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A4MJSTlC4="
+      },
+      {
+        "name": "p90",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p90(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 90))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5MJSTlC4="
+      },
+      {
+        "name": "p95",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p95(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 95))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5NZSTlC4="
+      },
+      {
+        "name": "p99",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_p99(data, htthreshold, coverthreshold):\n    return(np.percentile(data, 99))\n",
+        "method": "gASVKgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAVtX3A5OZSTlC4="
+      },
+      {
+        "name": "allcover",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_allcover(data, htthreshold, coverthreshold):\n    return (data > coverthreshold).sum() / len(data)\n",
+        "method": "gASVLwAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjAptX2FsbGNvdmVylJOULg=="
+      },
+      {
+        "name": "profilearea",
+        "dtype": "<f4",
+        "dependencies": null,
+        "method_str": "def m_profilearea(data, htthreshold, coverthreshold):\n    # sanity check...must have valid heights/elevations\n    if np.max(data) <= 0:\n        return -9999.0\n\n\n    p = np.percentile(data, range(1, 100))\n    p0 = max(np.min(data), 0.0)\n\n    # second sanity check...99th percentile must be > 0\n    if p[98] > 0.0:\n        # compute area under normalized percentile height curve using composite trapeziod rule\n        pa = p0 / p[98]\n        for ip in p[:97]:\n            pa += 2.0 * ip / p[98]\n        pa += 1.0\n\n        return pa * 0.5\n    else:\n        return -9999.0\n",
+        "method": "gASVMgAAAAAAAACMHHNpbHZpbWV0cmljLnJlc291cmNlcy5tZXRyaWOUjA1tX3Byb2ZpbGVhcmVhlJOULg=="
+      }
+    ],
+    "version": "0.0.1",
+    "capacity": 1000000
+  },
+  "history": []
+}

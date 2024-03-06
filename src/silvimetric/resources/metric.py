@@ -64,8 +64,8 @@ class Metric(Entry):
                 self.dependencies == other.dependencies and
                 self._method == other._method)
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
-        return self._method(data)
+    def __call__(self, data: np.ndarray, htthreshold: float, coverthreshold: float) -> np.ndarray:
+        return self._method(data, htthreshold, coverthreshold)
 
     def __repr__(self) -> str:
         return json.dumps(self.to_json())
