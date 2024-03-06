@@ -343,7 +343,7 @@ Metrics = {
     'kurtosis' : Metric('kurtosis', m_kurtosis),
     'aad' : Metric('aad', m_aad),
     'madmedian' : Metric('madmedian', m_madmedian),
-    'madmode' : Metric('madmode', m_madmode),
+#    'madmode' : Metric('madmode', m_madmode),
     'iq' : Metric('iq', m_iq),
     'crr' : Metric('crr', m_crr),
     'sqmean' : Metric('sqmean', m_sqmean),
