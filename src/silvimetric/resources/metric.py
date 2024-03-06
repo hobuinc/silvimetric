@@ -123,7 +123,7 @@ def m_abovemean(data, htthreshold, coverthreshold):
 
 # TODO check performance of other methods
 def m_abovemode(data, htthreshold, coverthreshold):
-    return (data > m_mode(data)).sum() / len(data)
+    return (data > m_mode(data, htthreshold, coverthreshold)).sum() / len(data)
 
 def m_skewness(data, htthreshold, coverthreshold):
     if len(data) < 4:
