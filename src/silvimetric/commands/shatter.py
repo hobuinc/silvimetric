@@ -71,6 +71,8 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     if not np.any(data['count']):
         return None
 
+    storage.config.log.info(data[attr])
+    
     # doing dask compute inside the dict array because it was too fine-grained
     # when it was outside
     metric_data = {

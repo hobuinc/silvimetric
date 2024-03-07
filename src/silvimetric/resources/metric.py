@@ -84,20 +84,19 @@ def m_mean(data, htthreshold, coverthreshold):
 # the Z range.
 # Before binning, subtract min value. Computing the scaled value involves
 # the bin number * bin width (max - min / #bins) + min.
-# def m_mode(data, htthreshold, coverthreshold):
-#     nbins = 64
-#     d = data
-#     maxv = np.max(d)
-#     minv = np.min(d)
-#     if minv == maxv:
-#         return minv
+def m_mode(data, htthreshold, coverthreshold):
+    nbins = 64
+    maxv = np.max(data)
+    minv = np.min(data)
+    if minv == maxv:
+        return minv
     
-#     bins = np.histogram(d, bins = nbins, density = False)
-
-#     thebin = np.argmax(bins, axis = -1)
+    bins = np.histogram(data, bins = nbins, density = False)
     
-#     # compute the height and return...nbins - 1 is to get the bottom Z of the bin
-#     return minv + thebin * (maxv - minv) / (nbins - 1)
+    thebin = np.argmax(bins, axis = -1)
+    
+    # compute the height and return...nbins - 1 is to get the bottom Z of the bin
+    return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data, htthreshold, coverthreshold):
     return np.median(data)
@@ -124,7 +123,7 @@ def m_abovemean(data, htthreshold, coverthreshold):
 
 # TODO check performance of other methods
 def m_abovemode(data, htthreshold, coverthreshold):
-    return (d > m_mode(data, htthreshold, coverthreshold)).sum() / len(data)
+    return (data > m_mode(data, htthreshold, coverthreshold)).sum() / len(data)
 
 def m_skewness(data, htthreshold, coverthreshold):
     if len(data) < 4:
@@ -139,7 +138,7 @@ def m_kurtosis(data, htthreshold, coverthreshold):
     return stats.kurtosis(data)
 
 def m_aad(data, htthreshold, coverthreshold):
-    m = m_mean(data=, htthreshold, coverthreshold)
+    m = m_mean(data, htthreshold, coverthreshold)
     return np.mean(np.absolute(data - m))
 
 def m_madmedian(data, htthreshold, coverthreshold):
