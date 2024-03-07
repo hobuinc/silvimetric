@@ -84,20 +84,20 @@ def m_mean(data, htthreshold, coverthreshold):
 # the Z range.
 # Before binning, subtract min value. Computing the scaled value involves
 # the bin number * bin width (max - min / #bins) + min.
-def m_mode(data, htthreshold, coverthreshold):
-    nbins = 64
-    d = data[data > htthreshold]
-    maxv = np.max(d)
-    minv = np.min(d)
-    if minv == maxv:
-        return minv
+# def m_mode(data, htthreshold, coverthreshold):
+#     nbins = 64
+#     d = data[data > htthreshold]
+#     maxv = np.max(d)
+#     minv = np.min(d)
+#     if minv == maxv:
+#         return minv
     
-    bins = np.histogram(d, bins = nbins, density = False)
+#     bins = np.histogram(d, bins = nbins, density = False)
 
-    thebin = np.argmax(bins, axis = -1)
+#     thebin = np.argmax(bins, axis = -1)
     
-    # compute the height and return...nbins - 1 is to get the bottom Z of the bin
-    return minv + thebin * (maxv - minv) / (nbins - 1)
+#     # compute the height and return...nbins - 1 is to get the bottom Z of the bin
+#     return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data, htthreshold, coverthreshold):
     return np.median(data)[data > htthreshold]
@@ -125,9 +125,9 @@ def m_abovemean(data, htthreshold, coverthreshold):
     return (d > np.mean(d)).sum() / len(d)
 
 # TODO check performance of other methods
-def m_abovemode(data, htthreshold, coverthreshold):
-    d = data[data > htthreshold]
-    return (d > m_mode(d, htthreshold, coverthreshold)).sum() / len(d)
+# def m_abovemode(data, htthreshold, coverthreshold):
+#     d = data[data > htthreshold]
+#     return (d > m_mode(d, htthreshold, coverthreshold)).sum() / len(d)
 
 def m_skewness(data, htthreshold, coverthreshold):
     d = data[data > htthreshold]
@@ -155,10 +155,10 @@ def m_madmean(data, htthreshold, coverthreshold):
     return stats.median_abs_deviation(data[data > htthreshold], center=np.mean)
 
 # TODO needs work
-def m_madmode(data, htthreshold, coverthreshold):
-    d = data[data > htthreshold]
-    m = m_mode(d, htthreshold, coverthreshold)
-    return np.median(np.absolute(d - m))
+# def m_madmode(data, htthreshold, coverthreshold):
+#     d = data[data > htthreshold]
+#     m = m_mode(d, htthreshold, coverthreshold)
+#     return np.median(np.absolute(d - m))
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
 # I think the default matches FUSION method but need to test
@@ -341,7 +341,7 @@ def m_allcover(data, htthreshold, coverthreshold):
 Metrics = {
     'count' : Metric('count', m_count),
     'mean' : Metric('mean', m_mean),
-    'mode' : Metric('mode', m_mode),
+#    'mode' : Metric('mode', m_mode),
     'median' : Metric('median', m_median),
     'min' : Metric('min', m_min),
     'max' : Metric('max', m_max),
@@ -349,12 +349,12 @@ Metrics = {
     'variance' : Metric('variance', m_variance),
     'cv' : Metric('cv', m_cv),
     'abovemean' : Metric('abovemean', m_abovemean),
-    'abovemode' : Metric('abovemode', m_abovemode),
+#    'abovemode' : Metric('abovemode', m_abovemode),
     'skewness' : Metric('skewness', m_skewness),
     'kurtosis' : Metric('kurtosis', m_kurtosis),
     'aad' : Metric('aad', m_aad),
     'madmedian' : Metric('madmedian', m_madmedian),
-    'madmode' : Metric('madmode', m_madmode),
+#    'madmode' : Metric('madmode', m_madmode),
     'iq' : Metric('iq', m_iq),
     'crr' : Metric('crr', m_crr),
     'sqmean' : Metric('sqmean', m_sqmean),
