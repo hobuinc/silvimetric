@@ -94,7 +94,7 @@ def m_mode(data, htthreshold, coverthreshold):
     
     bins = np.histogram(d, bins = nbins, density = False)
 
-    thebin = np.argmax(bins)
+    thebin = np.argmax(bins, keepdims=False)
     
     # compute the height and return...nbins - 1 is to get the bottom Z of the bin
     return minv + thebin * (maxv - minv) / (nbins - 1)
