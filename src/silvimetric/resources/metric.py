@@ -100,7 +100,7 @@ def m_mean(data, htthreshold, coverthreshold):
 #     return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data, htthreshold, coverthreshold):
-    return np.median(data)[data > htthreshold]
+    return np.median(data[data > htthreshold])
 
 def m_min(data, htthreshold, coverthreshold):
     return np.min(data[data > htthreshold])
