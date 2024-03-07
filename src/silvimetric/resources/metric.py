@@ -92,7 +92,7 @@ def m_mode(data, htthreshold, coverthreshold):
     if minv == maxv:
         return minv
     
-    bins = np.histogram(d - minv, bins = nbins, density = False)
+    bins = np.histogram(np.subtract(d, minv), bins = nbins, density = False)
 
     thebin = np.argmax(bins)
     
