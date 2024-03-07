@@ -21,5 +21,6 @@ autzen-classified.copc.laz
 #sample metrics
 metrics/
 metrics_aligned/
+autzen-aligned.tdb/
 
 .DS_Store

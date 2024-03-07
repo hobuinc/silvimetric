@@ -73,10 +73,10 @@ class Metric(Entry):
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
 def m_count(data, htthreshold, coverthreshold):
-    return len(data)
+    return (data > htthreshold).sum()
 
 def m_mean(data, htthreshold, coverthreshold):
-    return np.mean(data)
+    return np.mean(data[data > htthreshold])
 
 # mode is somewhat undefined for floating point values. FUSION logic is to
 # partition data into 64 bins then find the bin with the highest count.
@@ -86,98 +86,107 @@ def m_mean(data, htthreshold, coverthreshold):
 # the bin number * bin width (max - min / #bins) + min.
 def m_mode(data, htthreshold, coverthreshold):
     nbins = 64
-    maxv = np.max(data)
-    minv = np.min(data)
+    d = data[data > htthreshold]
+    maxv = np.max(d)
+    minv = np.min(d)
     if minv == maxv:
         return minv
     
-    bins = np.histogram(data, bins = nbins, density = False)
+    bins = np.histogram(d - minv, bins = nbins, density = False)
 
-    thebin = np.argmax(data, keepdims=False)
+    thebin = np.argmax(bins, keepdims=False)
     
     # compute the height and return...bins - 1 is to get the bottom Z of the bin
     return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data, htthreshold, coverthreshold):
-    return np.median(data)
+    return np.median(data)[data > htthreshold]
 
 def m_min(data, htthreshold, coverthreshold):
-    return np.min(data)
+    return np.min(data[data > htthreshold])
 
 def m_max(data, htthreshold, coverthreshold):
-    return np.max(data)
+    return np.max(data[data > htthreshold])
 
 def m_stddev(data, htthreshold, coverthreshold):
-    return np.std(data)
+    return np.std(data[data > htthreshold])
 
 # start of new metrics to match FUSION
 def m_variance(data, htthreshold, coverthreshold):
-    return np.var(data)
+    return np.var(data[data > htthreshold])
 
 def m_cv(data, htthreshold, coverthreshold):
-    return np.std(data) / np.mean(data)
+    d = data[data > htthreshold]
+    return np.std(d) / np.mean(d)
 
 # TODO check performance of other methods
 def m_abovemean(data, htthreshold, coverthreshold):
-    return (data > np.mean(data)).sum() / len(data)
+    d = data[data > htthreshold]
+    return (d > np.mean(d)).sum() / len(d)
 
 # TODO check performance of other methods
 def m_abovemode(data, htthreshold, coverthreshold):
-    return (data > m_mode(data, htthreshold, coverthreshold)).sum() / len(data)
+    d = data[data > htthreshold]
+    return (d > m_mode(d, htthreshold, coverthreshold)).sum() / len(d)
 
 def m_skewness(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    return stats.skew(data)
+    return stats.skew(d)
 
 def m_kurtosis(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    return stats.kurtosis(data)
+    return stats.kurtosis(d)
 
 def m_aad(data, htthreshold, coverthreshold):
-    m = np.mean(data)
-    return np.mean(np.absolute(data - m))
+    d = data[data > htthreshold]
+    m = m_mean(d, htthreshold, coverthreshold)
+    return np.mean(np.absolute(d - m))
 
 def m_madmedian(data, htthreshold, coverthreshold):
-    return stats.median_abs_deviation(data)
+    return stats.median_abs_deviation(data[data > htthreshold])
 
 def m_madmean(data, htthreshold, coverthreshold):
-    return stats.median_abs_deviation(data, center=np.mean)
+    return stats.median_abs_deviation(data[data > htthreshold], center=np.mean)
 
 # TODO needs work
-#def m_madmode(data, htthreshold, coverthreshold):
-#    stats_mode = m_mode(data, htthreshold, coverthreshold)
-#    return stats.median_abs_deviation(data, center=stats_mode)
+def m_madmode(data, htthreshold, coverthreshold):
+    d = data[data > htthreshold]
+    m = m_mode(d, htthreshold, coverthreshold)
+    return np.median(np.absolute(d - m))
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
 # I think the default matches FUSION method but need to test
 def m_iq(data, htthreshold, coverthreshold):
-    return stats.iqr(data)
+    return stats.iqr(data[data > htthreshold])
 
 def m_90m10(data, htthreshold, coverthreshold):
-    p = np.percentile(data, [10,90])
+    p = np.percentile(data[data > htthreshold], [10,90])
     return p[1] - p[0]
 
 def m_95m05(data, htthreshold, coverthreshold):
-    p = np.percentile(data, [5,95])
+    p = np.percentile(data[data > htthreshold], [5,95])
     return p[1] - p[0]
 
 def m_crr(data, htthreshold, coverthreshold):
-    maxv = np.max(data)
-    minv = np.min(data)
+    d = data[data > htthreshold]
+    maxv = np.max(d)
+    minv = np.min(d)
     if minv == maxv:
         return -9999.0
     
-    return (np.mean(data) - minv) / (maxv - minv)
+    return (np.mean(d) - minv) / (maxv - minv)
 
 def m_sqmean(data, htthreshold, coverthreshold):
-    return np.sqrt(np.mean(np.square(data)))
+    return np.sqrt(np.mean(np.square(data[data > htthreshold])))
 
 def m_cumean(data, htthreshold, coverthreshold):
-    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
+    return np.cbrt(np.mean(np.power(np.absolute(data[data > htthreshold]), 3)))
 
 # TODO compute L-moments. These are done separately because we only add
 # a single element to TileDB. This is very inefficient since we have to
@@ -191,37 +200,42 @@ def m_cumean(data, htthreshold, coverthreshold):
 
 # L1 is same as mean...compute using np.mean for speed
 def m_l1(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    return np.mean(data)
+    return np.mean(d)
 
 def m_l2(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
     return l[1]
 
 def m_l3(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
     return l[2]
 
 def m_l4(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
     return l[3]
 
 def m_lcv(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
 
     if l[0] == 0.0:
         return -9999.0
@@ -229,20 +243,22 @@ def m_lcv(data, htthreshold, coverthreshold):
     return l[1] / l[0]
 
 def m_lskewness(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
     if l[1] == 0.0:
         return -9999.0
     
     return l[2] / l[1]
 
 def m_lkurtosis(data, htthreshold, coverthreshold):
-    if len(data) < 4:
+    d = data[data > htthreshold]
+    if len(d) < 4:
         return -9999.0
 
-    l = lmom4(data)
+    l = lmom4(d)
     if l[1] == 0.0:
         return -9999.0
     
@@ -254,49 +270,49 @@ def m_lkurtosis(data, htthreshold, coverthreshold):
 #    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
 
 def m_p01(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 1))
+    return(np.percentile(data[data > htthreshold], 1))
 
 def m_p05(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 5))
+    return(np.percentile(data[data > htthreshold], 5))
 
 def m_p10(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 10))
+    return(np.percentile(data[data > htthreshold], 10))
 
 def m_p20(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 20))
+    return(np.percentile(data[data > htthreshold], 20))
 
 def m_p25(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 25))
+    return(np.percentile(data[data > htthreshold], 25))
 
 def m_p30(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 30))
+    return(np.percentile(data[data > htthreshold], 30))
 
 def m_p40(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 40))
+    return(np.percentile(data[data > htthreshold], 40))
 
 def m_p50(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 50))
+    return(np.percentile(data[data > htthreshold], 50))
 
 def m_p60(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 60))
+    return(np.percentile(data[data > htthreshold], 60))
 
 def m_p70(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 70))
+    return(np.percentile(data[data > htthreshold], 70))
 
 def m_p75(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 75))
+    return(np.percentile(data[data > htthreshold], 75))
 
 def m_p80(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 80))
+    return(np.percentile(data[data > htthreshold], 80))
 
 def m_p90(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 90))
+    return(np.percentile(data[data > htthreshold], 90))
 
 def m_p95(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 95))
+    return(np.percentile(data[data > htthreshold], 95))
 
 def m_p99(data, htthreshold, coverthreshold):
-    return(np.percentile(data, 99))
+    return(np.percentile(data[data > htthreshold], 99))
 
 def m_profilearea(data, htthreshold, coverthreshold):
     # sanity check...must have valid heights/elevations
@@ -319,18 +335,13 @@ def m_profilearea(data, htthreshold, coverthreshold):
     else:
         return -9999.0
 
-
-# TODO example for cover using all returns and a height threshold
-# the threshold must be a parameter and not hardcoded
 def m_allcover(data, htthreshold, coverthreshold):
-    return (data > coverthreshold).sum() / len(data)
+    return (data > coverthreshold).sum() / len(data) * 100.0
 
-#TODO change to correct dtype
-#TODO not sure what to do with percentiles since it is an array of values instead of a single value
 Metrics = {
     'count' : Metric('count', m_count),
     'mean' : Metric('mean', m_mean),
-    # 'mode' : Metric('mode', m_mode),
+    'mode' : Metric('mode', m_mode),
     'median' : Metric('median', m_median),
     'min' : Metric('min', m_min),
     'max' : Metric('max', m_max),
@@ -343,7 +354,7 @@ Metrics = {
     'kurtosis' : Metric('kurtosis', m_kurtosis),
     'aad' : Metric('aad', m_aad),
     'madmedian' : Metric('madmedian', m_madmedian),
-#    'madmode' : Metric('madmode', m_madmode),
+    'madmode' : Metric('madmode', m_madmode),
     'iq' : Metric('iq', m_iq),
     'crr' : Metric('crr', m_crr),
     'sqmean' : Metric('sqmean', m_sqmean),
