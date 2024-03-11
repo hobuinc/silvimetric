@@ -1,4 +1,5 @@
 import json
+# import warnings
 import numpy as np
 from typing import Callable, Optional, Any, Union
 from scipy import stats
@@ -10,6 +11,10 @@ import dill
 
 from .entry import Attribute, Entry
 from .lmom4 import lmom4
+
+# trap warnings as errors...mainly for scipy.stats.skew and scipy.stats.kurtosis
+# looks like this causes trouble for dask
+# warnings.filterwarnings("error")
 
 MetricFn = Callable[[np.ndarray, float, float, Optional[Union[Any, None]]], np.ndarray]
 
@@ -91,9 +96,9 @@ def m_mode(data, htthreshold, coverthreshold):
     if minv == maxv:
         return minv
     
-    bins = np.histogram(data, bins = nbins, density = False)
+    bins, binedges = np.histogram(data, bins = nbins, density = False)
     
-    thebin = np.argmax(bins, axis = -1)
+    thebin = np.argmax(bins)
     
     # compute the height and return...nbins - 1 is to get the bottom Z of the bin
     return minv + thebin * (maxv - minv) / (nbins - 1)
@@ -125,17 +130,34 @@ def m_abovemean(data, htthreshold, coverthreshold):
 def m_abovemode(data, htthreshold, coverthreshold):
     return (data > m_mode(data, htthreshold, coverthreshold)).sum() / len(data)
 
+# both stats.skew and stats.kurtosis throw a warning:
+# Precision loss occurred in moment calculation due to catastrophic cancellation. 
+# This occurs when the data are nearly identical. Results may be unreliable.
+#
+# I think this is because values are very similar...end up close to the mean
+# GridMetrics computes these using a different formula that may also have trouble
+# with numeric stability.
 def m_skewness(data, htthreshold, coverthreshold):
     if len(data) < 4:
         return -9999.0
 
-    return stats.skew(data)
+    try:
+        s = stats.skew(data)
+    except:
+        s = -9999.0
+
+    return s
 
 def m_kurtosis(data, htthreshold, coverthreshold):
     if len(data) < 4:
         return -9999.0
 
-    return stats.kurtosis(data)
+    try:
+        k = stats.kurtosis(data)
+    except:
+        k = -9999.0
+
+    return k
 
 def m_aad(data, htthreshold, coverthreshold):
     m = m_mean(data, htthreshold, coverthreshold)
