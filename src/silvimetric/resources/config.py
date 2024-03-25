@@ -53,6 +53,8 @@ class StorageConfig(Config):
     root: Bounds
     crs: pyproj.CRS
     resolution: float = 30.0
+    htthreshold: float = 2.0
+    coverthreshold: float = 2.0
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
@@ -122,6 +124,8 @@ class StorageConfig(Config):
                 root = root,
                 log = Log(**x['log']),
                 resolution = x['resolution'],
+                htthreshold = x['htthreshold'],
+                coverthreshold = x['coverthreshold'],
                 attrs = attrs,
                 crs = crs,
                 metrics = ms,
@@ -245,6 +249,8 @@ class ExtractConfig(Config):
         p.mkdir(parents=True, exist_ok=True)
 
         self.resolution: float = config.resolution
+        self.htthreshold: float = config.htthreshold
+        self.coverthreshold: float = config.coverthreshold
         self.crs: pyproj.CRS = config.crs
 
     def to_json(self):
