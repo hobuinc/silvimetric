@@ -81,15 +81,52 @@ def m_count(data, htthreshold, coverthreshold):
     return len(data)
 
 def m_mean(data, htthreshold, coverthreshold):
+    """
+    Return the arithmetic mean.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Data for dimension
+    htthreshold: float
+        Height threshold for points used to compute metric
+    coverthreshold: float
+        Height threshold for cover calculations
+
+    Returns
+    -------
+    float
+        Value for metric computed using values in data. Returns
+        NODATA value when metric cannot be computed
+    """
+
     return np.mean(data)
 
-# mode is somewhat undefined for floating point values. FUSION logic is to
-# partition data into 64 bins then find the bin with the highest count.
-# This approach has the disadvantage that the bin size varies depending on
-# the Z range.
-# Before binning, subtract min value. Computing the scaled value involves
-# the bin number * bin width (max - min / #bins) + min.
 def m_mode(data, htthreshold, coverthreshold):
+    """
+    Return the mode (most common value).
+
+    Mode is somewhat undefined for floating point values. FUSION's logic is to
+    partition data into 64 bins then find the bin with the highest count.
+    This approach has the disadvantage that the bin size varies depending on
+    the Z range.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        Data for dimension
+    htthreshold: float
+        Height threshold for points used to compute metric
+    coverthreshold: float
+        Height threshold for cover calculations
+
+    Returns
+    -------
+    float
+        Value for metric computed using values in data. Returns
+        NODATA value when metric cannot be computed
+    """
+
     nbins = 64
     maxv = np.max(data)
     minv = np.min(data)
@@ -100,7 +137,7 @@ def m_mode(data, htthreshold, coverthreshold):
     
     thebin = np.argmax(bins)
     
-    # compute the height and return...nbins - 1 is to get the bottom Z of the bin
+    # compute the height and return...nbins - 1 is to get the bottom value of the bin
     return minv + thebin * (maxv - minv) / (nbins - 1)
 
 def m_median(data, htthreshold, coverthreshold):
