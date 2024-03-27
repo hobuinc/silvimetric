@@ -1,5 +1,6 @@
 from datetime import datetime
 from uuid import UUID
+from typing import Union
 
 from ..resources import Storage, Bounds
 
@@ -11,13 +12,18 @@ def check_values(start_time, end_time, bounds, name):
     if bounds is not None and not isinstance(bounds, Bounds):
         raise TypeError(f'Incorrect type of "bounds" argument.')
     if name is not None:
-        try:
-            UUID(name)
-        except:
+        if isinstance(name, UUID):
+            pass
+        elif isinstance(name, str):
+            try:
+                    UUID(name)
+            except:
+                raise TypeError(f'Incorrect type of "name" argument.')
+        else:
             raise TypeError(f'Incorrect type of "name" argument.')
 
 def info(tdb_dir, start_time:datetime=None, end_time:datetime=None,
-          bounds:Bounds=None, name:str=None):
+          bounds:Bounds=None, name:Union[str, UUID]=None):
     """Print info about Silvimetric database"""
     check_values(start_time, end_time, bounds, name)
 
@@ -29,7 +35,8 @@ def info(tdb_dir, start_time:datetime=None, end_time:datetime=None,
         if bounds is None:
             bounds = tdb.config.root
         if name is not None:
-            name = UUID(name)
+            if isinstance(name, str):
+                name = UUID(name)
 
         # We always have these
         meta = tdb.getConfig()

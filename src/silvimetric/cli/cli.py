@@ -7,7 +7,7 @@ import logging
 from ..resources import Bounds, Log
 from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract, scan, info, initialize
+from ..commands import shatter, extract, scan, info, initialize, delete
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
 from .common import dask_handle
 
@@ -184,6 +184,12 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
             metrics = metrics,
             bounds = bounds)
     extract.extract(config)
+
+@cli.command('delete')
+@click.option('--id', type=click.UUIDParameterType(), required=True,
+    help="Shatter Task UUID.")
+def delete_cmd(app, id):
+    pass
 
 
 if __name__ == "__main__":

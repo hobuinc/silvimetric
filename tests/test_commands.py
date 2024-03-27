@@ -19,13 +19,13 @@ def config_split(shatter_config: ShatterConfig) -> List[ShatterConfig]:
         date = datetime(2011, 1, day)
 
         config_split.append(ShatterConfig(
-            sc.filename,
-            date,
-            sc.attrs,
-            sc.metrics,
-            b,
-            uuid.uuid4(),
-            sc.tile_size,
+            filename=sc.filename,
+            date=date,
+            attrs=sc.attrs,
+            metrics=sc.metrics,
+            bounds=b,
+            name=uuid.uuid4(),
+            tile_size=sc.tile_size,
             tdb_dir=sc.tdb_dir,
             log=sc.log
         ))
@@ -68,3 +68,13 @@ class TestCommands(object):
         i = info.info(tdb_filepath, start_time=d, end_time=d)
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[1].to_json()
+
+    def test_delete(self, tdb_filepath, config_split):
+
+        ids = [c.name for c in config_split]
+        i = info.info(tdb_dir=tdb_filepath, name=ids[0])
+        assert bool(i['history'])
+        assert len(i['history']) == 1
+
+
+        pass
