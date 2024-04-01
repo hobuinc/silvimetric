@@ -1,5 +1,5 @@
 import numpy as np
-import gc
+import tiledb
 import copy
 import signal
 import datetime
@@ -95,7 +95,6 @@ def write(data_in, tdb):
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         tdb: SparseArray):
-
     start_time = config.start_time
     ## Handle a kill signal
     def kill_gracefully(signum, frame):
@@ -104,12 +103,13 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
             client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
-        with storage.open(timestamp=(start_time, end_time)) as a:
+
+        with storage.open('r', timestamp=(config.time_slot, config.time_slot)) as a:
             config.nonempty_domain = a.nonempty_domain()
             config.finished=False
 
             config.log.info('Saving config before quitting...')
-            tdb.meta['shatter'] = str(config)
+            storage.saveMetadata('shatter', str(config), config.time_slot)
             config.log.info('Quitting.')
 
     signal.signal(signal.SIGINT, kill_gracefully)
@@ -137,19 +137,20 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-        a = storage.open(timestamp=(start_time, end_time))
+        a = storage.open(tdb.timestamp_range)
         return config.point_count
 
     ## Handle non-distributed dask scenarios
     pc = sum(writes)
     end_time = datetime.datetime.now().timestamp() * 1000
-    with storage.open(timestamp=(start_time, end_time)) as a:
+    with storage.open('r', tdb.timestamp_range) as a:
 
+        config.log.debug('Saving shatter metadata')
         config.end_time = end_time
-        config.finished=True
+        config.finished = True
         config.point_count = pc
         config.nonempty_domain = a.nonempty_domain()
-        tdb.meta['shatter'] = str(config)
+        storage.saveMetadata('shatter', str(config), config.time_slot)
 
     return pc
 
@@ -162,8 +163,10 @@ def shatter(config: ShatterConfig):
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
+    if not config.time_slot:
+        config.time_slot = storage.reserve_time_slot()
 
-    with storage.open('w') as tdb:
+    with storage.open('w', (config.time_slot, config.time_slot)) as tdb:
 
         ## shatter should still output a config if it's interrupted
         # TODO add slices yet to be finished so we can pick up this process
@@ -180,9 +183,4 @@ def shatter(config: ShatterConfig):
 
         # Begin main operations
         config.log.debug('Fetching and arranging data...')
-        pc = run(leaves, config, storage, tdb)
-        config.point_count = int(pc)
-
-        config.log.debug('Saving shatter metadata')
-        tdb.meta['shatter'] = str(config)
-        return config.point_count
+        return run(leaves, config, storage, tdb)

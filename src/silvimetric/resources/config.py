@@ -61,6 +61,7 @@ class StorageConfig(Config):
                                   for m in Metrics.keys() ])
     version: str = __version__
     capacity: int = 1000000
+    next_time_slot: int = 1
 
 
     def __post_init__(self) -> None:
@@ -167,6 +168,7 @@ class ShatterConfig(Config):
     point_count: int = 0
     nonempty_domain: tuple[tuple[int, int], ...] = ()
     finished: bool = False
+    time_slot: int = 0
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -183,10 +185,11 @@ class ShatterConfig(Config):
         d = super().to_json()
 
         d['name'] = str(self.name)
+        d['time_slot'] = self.time_slot
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['nonempty_domain'] = [ list(a) for a in self.nonempty_domain]
+        d['nonempty_domain'] = [ list(a) for a in self.nonempty_domain] if self.nonempty_domain else ()
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
@@ -214,9 +217,10 @@ class ShatterConfig(Config):
                 metrics = ms,
                 debug = x['debug'],
                 name = uuid.UUID(x['name']),
-                bounds=Bounds(*x['bounds']),
-                nonempty_domain=nonempty_domains,
-                date= date)
+                bounds = Bounds(*x['bounds']),
+                nonempty_domain = nonempty_domains,
+                date = date,
+                time_slot = x['time_slot'])
 
         return n
 

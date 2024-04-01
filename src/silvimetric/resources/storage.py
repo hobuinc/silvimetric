@@ -8,7 +8,7 @@ from typing import Any
 
 from math import floor
 
-from .config import StorageConfig
+from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
 from ..resources import Bounds
 
@@ -87,6 +87,7 @@ class Storage:
             a.meta['config'] = meta
 
         s = Storage(config, ctx)
+        s.saveConfig()
 
         return s
 
@@ -116,8 +117,8 @@ class Storage:
         Save StorageConfig to the Database
 
         """
-        with self.open('w') as a:
-            a.meta['config'] = str(self.config)
+        with self.open('w') as w:
+            w.meta['config'] = str(self.config)
 
     def getConfig(self) -> StorageConfig:
         """
@@ -134,7 +135,7 @@ class Storage:
 
         return config
 
-    def getMetadata(self, key: str, default=None) -> str:
+    def getMetadata(self, key: str, timestamp: int) -> str:
         """
         Return metadata at given key
 
@@ -148,17 +149,14 @@ class Storage:
         str
             Metadata value found in storage
         """
-        with self.open('r') as r:
-            try:
-                val = r.meta[key]
-            except KeyError as e:
-                if default is not None:
-                    return default
-                raise(e)
+
+        with self.open('r', (timestamp, timestamp)) as r:
+            val = r.meta[f'{key}']
 
         return val
 
-    def saveMetadata(self, key: str, data: Any) -> None:
+
+    def saveMetadata(self, key: str, data: str, timestamp: int) -> None:
         """
         Save metadata to storage
 
@@ -169,8 +167,8 @@ class Storage:
         data : any
             Metadata value. Must be translatable to and from string.
         """
-        with self.open('w') as w:
-            w.meta[key] = data
+        with self.open('w', (timestamp, timestamp)) as w:
+            w.meta[f'{key}'] = data
 
     def getAttributes(self) -> list[Attribute]:
         """
@@ -214,10 +212,8 @@ class Storage:
             Path does not exist
         """
         if tiledb.object_type(self.config.tdb_dir) == "array":
-            if mode == 'w':
-                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp)
-            elif mode == 'r':
-                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp)
+            if mode in ['w', 'r', 'd', 'm']:
+                tdb = tiledb.open(self.config.tdb_dir, mode, timestamp=timestamp)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
@@ -231,76 +227,86 @@ class Storage:
         finally:
             tdb.close()
 
+    def reserve_time_slot(self) -> int:
+        """
+        Increment time slot in database and reserve that spot for a new
+        shatter process.
+
+        Parameters
+        ----------
+        config : ShatterConfig
+            Shatter config will be written as metadata to reserve time slot
+
+        Returns
+        -------
+        int
+            Time slot
+        """
+        with tiledb.open(self.config.tdb_dir, 'r') as r:
+            latest = json.loads(r.meta['config'])
+
+        time = latest['next_time_slot']
+        latest['next_time_slot'] = time + 1
+
+        with tiledb.open(self.config.tdb_dir, 'w') as w:
+            w.meta['config'] = json.dumps(latest)
+
+        return time
+
     def get_history(self, start_time: datetime, end_time: datetime,
                     bounds: Bounds, name:str=None):
+        """
+        Retrieve history of the database.
 
-        from ..resources import ShatterConfig
+        Parameters
+        ----------
+        start_time : datetime
+        end_time : datetime
+        bounds : Bounds
+        name : str, optional
+            Shatter process uuid, by default None
+
+        Returns
+        -------
+        tiledb.FragmentInfoList
+
+        """
 
         af = tiledb.array_fragments(self.config.tdb_dir, True)
         m = [ ]
         for idx in range(len(af)):
 
-            # if processes are too short, begin and end times can be the same
-            # so it's necessary to adjust time bounds so we can grab information
+            time_range =  af[idx].timestamp_range
+            # all shatter processes should be input as a point in time, eg (1,1)
+            if isinstance(time_range, tuple):
+                time_range = time_range[0]
 
-            if idx == 0:
-                begin = 0
+            try:
+                s_str = self.getMetadata('shatter', time_range)
+            except KeyError:
+                continue
+            s = ShatterConfig.from_string(s_str)
+            if s.bounds.disjoint(bounds):
+                continue
+
+            # filter name
+            if name is not None and name != s.name:
+                continue
+
+            # filter dates
+            if isinstance(s.date, tuple) and len(s.date) == 2:
+                if s.date[1] < start_time or s.date[0] > end_time:
+                    continue
+            elif isinstance(s.date, tuple) and len(s.date) == 1:
+                if s.date[0] < start_time or s.date[0] > end_time:
+                    continue
             else:
-                begin = af[idx-1].timestamp_range[1]
-
-            end = af[idx].timestamp_range[1]
-
-            with self.open('r', (begin, end)) as r:
-                try:
-                    if not bool(r.meta['shatter']):
-                        continue
-
-                    s = ShatterConfig.from_string(r.meta['shatter'])
-
-                    # filter bounds
-                    if s.bounds.disjoint(bounds):
-                        continue
-
-                    # filter name
-                    if name is not None and name != s.name:
-                        continue
-
-                    # filter dates
-                    if isinstance(s.date, tuple) and len(s.date) == 2:
-                        if s.date[1] < start_time or s.date[0] > end_time:
-                            continue
-                    elif isinstance(s.date, tuple) and len(s.date) == 1:
-                        if s.date[0] < start_time or s.date[0] > end_time:
-                            continue
-                    else:
-                        if s.date < start_time or s.date > end_time:
-                            continue
-
-                    m.append(json.loads(r.meta['shatter']))
-                except KeyError:
+                if s.date < start_time or s.date > end_time:
                     continue
 
+            m.append(s)
+
         return m
-
-    #TODO what are we reading? queries are probably going to be specific
-    def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
-        """
-        Read from the Database
-        Parameters
-        ----------
-        xs : np.ndarray
-            X index
-        ys : np.ndarray
-            Y index
-
-        Returns
-        -------
-        np.ndarray
-            Items found at the indicated cell
-        """
-        with self.open('r') as tdb:
-            data = tdb[xs, ys]
-        return data
 
     def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
@@ -327,3 +333,20 @@ class Storage:
             # if self.config.app.debug:
             #     tiledb.stats_dump()
             #     tiledb.stats_reset()
+
+    def delete(self, proc_num: int) -> None:
+        """
+        Delete Shatter process and all associated data from database.
+
+        Parameters
+        ----------
+        proc_num : int
+            Shatter process time slot
+        """
+        with self.open('r', (proc_num, proc_num)) as r:
+            sh_cfg = ShatterConfig.from_string(r.meta['shatter'])
+            sh_cfg.finished = False
+        with self.open('m', (proc_num, proc_num)) as m:
+            m.delete_fragments(proc_num, proc_num)
+        with self.open('w', (proc_num, proc_num)) as w:
+            w.meta['shatter'] = json.dumps(sh_cfg.to_json())

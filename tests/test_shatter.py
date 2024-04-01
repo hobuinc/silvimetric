@@ -4,8 +4,6 @@ import numpy as np
 import dask
 import json
 import uuid
-import platform
-
 
 from silvimetric.commands.shatter import shatter
 from silvimetric.commands.info import info
@@ -75,7 +73,7 @@ class Test_Shatter(object):
     def test_config(self, shatter_config, storage, test_point_count):
         shatter(shatter_config)
         try:
-            meta = storage.getMetadata('shatter')
+            meta = storage.getMetadata('shatter', shatter_config.time_slot)
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
         meta_j = json.loads(meta)

@@ -16,6 +16,11 @@ class Test_Storage(object):
                 assert s.has_attr(a.name)
                 # assert s.attr(a.name) == a.schema()
 
+    def test_time_reserve(self, storage):
+        for x in range(5):
+            time_slot = storage.reserve_time_slot()
+            assert time_slot == x + 1
+
     def test_local(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
             sc = st.schema

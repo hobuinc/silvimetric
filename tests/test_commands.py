@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime
 
 from silvimetric.commands import scan, info, shatter
-from silvimetric.resources import ShatterConfig
+from silvimetric.resources import ShatterConfig, Storage
 
 import pytest
 import conftest
@@ -69,12 +69,18 @@ class TestCommands(object):
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[1].to_json()
 
-    def test_delete(self, tdb_filepath, config_split):
-
+    def test_delete(self, tdb_filepath, config_split, storage: Storage):
         ids = [c.name for c in config_split]
-        i = info.info(tdb_dir=tdb_filepath, name=ids[0])
-        assert bool(i['history'])
-        assert len(i['history']) == 1
+
+        for i in range(1,5):
+            h = info.info(tdb_dir=tdb_filepath)
+
+            assert bool(h['history'])
+            assert len(h['history']) == 5-i
+            storage.delete(i)
+
+        h = info.info(tdb_dir=tdb_filepath)
+        assert not bool(h['history'])
 
 
-        pass
+
