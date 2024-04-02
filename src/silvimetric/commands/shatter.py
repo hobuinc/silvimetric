@@ -1,15 +1,12 @@
 import numpy as np
-import tiledb
 import copy
 import signal
 import datetime
 
 import dask
-from dask.distributed import Client, as_completed, futures_of, CancelledError
+from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
-
-from tiledb import SparseArray
 
 from ..resources import Extents, Storage, ShatterConfig, Data
 
@@ -93,10 +90,61 @@ def write(data_in, tdb):
 
     return p
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
-        tdb: SparseArray):
-    start_time = config.start_time
-    ## Handle a kill signal
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
+    ## Handle dask bag transitions through work states
+    attrs = [a.name for a in config.attrs]
+    timestamp = (config.time_slot, config.time_slot)
+
+    with storage.open('w', timestamp=timestamp) as tdb:
+        leaf_bag: db.Bag = db.from_sequence(leaves)
+        points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+        att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
+        arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
+        metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
+        writes: db.Bag = metrics.map(write, tdb)
+
+        ## If dask is distributed, use the futures feature
+        if dask.config.get('scheduler') == 'distributed':
+            pc_futures = futures_of(writes.persist())
+            for batch in as_completed(pc_futures, with_results=True).batches():
+                for future, pack in batch:
+                    if isinstance(pack, CancelledError):
+                        continue
+                    for pc in pack:
+                        config.point_count = config.point_count + pc
+
+            end_time = datetime.datetime.now().timestamp() * 1000
+            config.end_time = end_time
+            config.finished = True
+            return config.point_count
+
+        ## Handle non-distributed dask scenarios
+        pc = sum(writes)
+
+    # modify config to reflect result of shattter process
+    with storage.open('r', timestamp=timestamp) as a:
+        config.nonempty_domain = a.nonempty_domain()
+    config.log.debug('Saving shatter metadata')
+    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.finished = True
+    config.point_count = pc
+
+    storage.saveMetadata('shatter', str(config), config.time_slot)
+    return pc
+
+
+def shatter(config: ShatterConfig):
+    # get start time in milliseconds
+    config.start_time = datetime.datetime.now().timestamp() * 1000
+    # set up tiledb
+    storage = Storage.from_db(config.tdb_dir)
+    data = Data(config.filename, storage.config, config.bounds)
+    extents = Extents.from_sub(config.tdb_dir, data.bounds)
+
+    if not config.time_slot: # defaults to 0, which is reserved for storage cfg
+        config.time_slot = storage.reserve_time_slot()
+
+    # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
         client = dask.config.get('distributed.client')
         if client is not None:
@@ -114,73 +162,15 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
-    ## Handle dask bag transitions through work states
-    attrs = [a.name for a in config.attrs]
+    if config.bounds is None:
+        config.bounds = extents.bounds
 
-    leaf_bag: db.Bag = db.from_sequence(leaves)
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
-    arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
-    writes: db.Bag = metrics.map(write, tdb)
+    config.log.debug('Grabbing leaf nodes...')
+    if config.tile_size is not None:
+        leaves = extents.get_leaf_children(config.tile_size)
+    else:
+        leaves = extents.chunk(data, 100)
 
-    ## If dask is distributed, use the futures feature
-    if dask.config.get('scheduler') == 'distributed':
-        pc_futures = futures_of(writes.persist())
-        for batch in as_completed(pc_futures, with_results=True).batches():
-            for future, pack in batch:
-                if isinstance(pack, CancelledError):
-                    continue
-                for pc in pack:
-                    config.point_count = config.point_count + pc
-
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        config.finished = True
-        a = storage.open(tdb.timestamp_range)
-        return config.point_count
-
-    ## Handle non-distributed dask scenarios
-    pc = sum(writes)
-    end_time = datetime.datetime.now().timestamp() * 1000
-    with storage.open('r', tdb.timestamp_range) as a:
-
-        config.log.debug('Saving shatter metadata')
-        config.end_time = end_time
-        config.finished = True
-        config.point_count = pc
-        config.nonempty_domain = a.nonempty_domain()
-        storage.saveMetadata('shatter', str(config), config.time_slot)
-
-    return pc
-
-
-def shatter(config: ShatterConfig):
-    # get start time in milliseconds
-    config.start_time = datetime.datetime.now().timestamp() * 1000
-    # set up tiledb
-    storage = Storage.from_db(config.tdb_dir)
-    data = Data(config.filename, storage.config, config.bounds)
-    extents = Extents.from_sub(config.tdb_dir, data.bounds)
-
-    if not config.time_slot:
-        config.time_slot = storage.reserve_time_slot()
-
-    with storage.open('w', (config.time_slot, config.time_slot)) as tdb:
-
-        ## shatter should still output a config if it's interrupted
-        # TODO add slices yet to be finished so we can pick up this process
-        # in the future
-
-        if config.bounds is None:
-            config.bounds = extents.bounds
-
-        config.log.debug('Grabbing leaf nodes...')
-        if config.tile_size is not None:
-            leaves = extents.get_leaf_children(config.tile_size)
-        else:
-            leaves = extents.chunk(data, 100)
-
-        # Begin main operations
-        config.log.debug('Fetching and arranging data...')
-        return run(leaves, config, storage, tdb)
+    # Begin main operations
+    config.log.debug('Fetching and arranging data...')
+    return run(leaves, config, storage)

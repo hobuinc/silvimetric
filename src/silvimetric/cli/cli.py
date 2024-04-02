@@ -7,7 +7,7 @@ import logging
 from ..resources import Bounds, Log
 from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract, scan, info, initialize, delete
+from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
 from .common import dask_handle
 
@@ -189,8 +189,14 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 @click.option('--id', type=click.UUIDParameterType(), required=True,
     help="Shatter Task UUID.")
 def delete_cmd(app, id):
-    pass
+    manage.delete(app.tdb_dir, id)
 
+
+@cli.command('restart')
+@click.option('--id', type=click.UUIDParameterType(), required=True,
+    help="Shatter Task UUID.")
+def restart_cmd(app, id):
+    manage.restart(tdb_dir=app.tdb_dir, name=id)
 
 if __name__ == "__main__":
     cli()

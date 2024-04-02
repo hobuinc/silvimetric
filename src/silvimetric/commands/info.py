@@ -61,4 +61,4 @@ def info(tdb_dir, start_time:datetime=None, end_time:datetime=None,
         except KeyError:
             history = {}
 
-        return info
+    return info

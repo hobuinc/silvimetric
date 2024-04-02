@@ -173,7 +173,6 @@ class Extents(object):
 
     @staticmethod
     def from_sub(tdb_dir: str, sub: Bounds):
-
         storage = Storage.from_db(tdb_dir)
 
         meta = storage.getConfig()

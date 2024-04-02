@@ -220,7 +220,8 @@ class ShatterConfig(Config):
                 bounds = Bounds(*x['bounds']),
                 nonempty_domain = nonempty_domains,
                 date = date,
-                time_slot = x['time_slot'])
+                time_slot = x['time_slot'],
+                finished=x['finished'])
 
         return n
 

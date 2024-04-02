@@ -3,7 +3,7 @@ from time import sleep
 from typing import List
 from datetime import datetime
 
-from silvimetric.commands import scan, info, shatter
+from silvimetric.commands import scan, info, shatter, manage
 from silvimetric.resources import ShatterConfig, Storage
 
 import pytest
@@ -35,7 +35,6 @@ def config_split(shatter_config: ShatterConfig) -> List[ShatterConfig]:
     sleep(1)
 
     return config_split
-
 
 class TestCommands(object):
 
@@ -69,18 +68,46 @@ class TestCommands(object):
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[1].to_json()
 
-    def test_delete(self, tdb_filepath, config_split, storage: Storage):
+    def test_delete(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]
 
-        for i in range(1,5):
+        for i in range(1,len(ids)+1):
             h = info.info(tdb_dir=tdb_filepath)
 
             assert bool(h['history'])
             assert len(h['history']) == 5-i
-            storage.delete(i)
+            idx = i - 1
+            manage.delete(tdb_filepath, ids[idx])
 
         h = info.info(tdb_dir=tdb_filepath)
         assert not bool(h['history'])
 
+    def test_restart(self, tdb_filepath, config_split):
+        ids = [c.name for c in config_split]
 
+        for i in range(1,len(ids)+1):
+            h = info.info(tdb_dir=tdb_filepath)
+
+            assert bool(h['history'])
+            assert len(h['history']) == 4
+            idx = i - 1
+            manage.restart(tdb_filepath, ids[idx])
+
+        h = info.info(tdb_dir=tdb_filepath)
+        assert bool(h['history'])
+        assert len(h['history']) == 4
+
+    def test_resume(self, shatter_config: ShatterConfig):
+        # test that shatter only operates on cells not touched by nonempty_domain
+        storage = Storage.from_db(shatter_config.tdb_dir)
+
+        # modify shatter config
+        shatter_config.nonempty_domain = ((0,4), (0,4))
+        # send to shatter
+        pc = shatter.shatter(shatter_config)
+        # check output config to see what the nonempthy_domain is
+        #   - should be only only values outside of that tuple
+        storage.getMetadata('shatter', 1)
+
+        pass
 

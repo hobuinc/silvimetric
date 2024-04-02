@@ -169,6 +169,7 @@ class Storage:
         """
         with self.open('w', (timestamp, timestamp)) as w:
             w.meta[f'{key}'] = data
+        return
 
     def getAttributes(self) -> list[Attribute]:
         """
