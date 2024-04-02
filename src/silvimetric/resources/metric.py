@@ -10,7 +10,8 @@ import base64
 import dill
 
 from .entry import Attribute, Entry
-from .lmom4 import lmom4
+from . import lmom4
+from . import constants
 
 # trap warnings as errors...mainly for scipy.stats.skew and scipy.stats.kurtosis
 # looks like this causes trouble for dask
@@ -176,23 +177,23 @@ def m_abovemode(data, htthreshold, coverthreshold):
 # with numeric stability.
 def m_skewness(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     try:
         s = stats.skew(data)
     except:
-        s = -9999.0
+        s = NODATA
 
     return s
 
 def m_kurtosis(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     try:
         k = stats.kurtosis(data)
     except:
-        k = -9999.0
+        k = NODATA
 
     return k
 
@@ -228,7 +229,7 @@ def m_crr(data, htthreshold, coverthreshold):
     maxv = np.max(data)
     minv = np.min(data)
     if minv == maxv:
-        return -9999.0
+        return NODATA
     
     return (np.mean(data) - minv) / (maxv - minv)
 
@@ -251,59 +252,59 @@ def m_cumean(data, htthreshold, coverthreshold):
 # L1 is same as mean...compute using np.mean for speed
 def m_l1(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     return np.mean(data)
 
 def m_l2(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
     return l[1]
 
 def m_l3(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
     return l[2]
 
 def m_l4(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
     return l[3]
 
 def m_lcv(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
 
     if l[0] == 0.0:
-        return -9999.0
+        return NODATA
     
     return l[1] / l[0]
 
 def m_lskewness(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
     if l[1] == 0.0:
-        return -9999.0
+        return NODATA
     
     return l[2] / l[1]
 
 def m_lkurtosis(data, htthreshold, coverthreshold):
     if len(data) < 4:
-        return -9999.0
+        return NODATA
 
     l = lmom4(data)
     if l[1] == 0.0:
-        return -9999.0
+        return NODATA
     
     return l[3] / l[1]
 
@@ -360,7 +361,7 @@ def m_p99(data, htthreshold, coverthreshold):
 def m_profilearea(data, htthreshold, coverthreshold):
     # sanity check...must have valid heights/elevations
     if np.max(data) <= 0:
-        return -9999.0
+        return NODATA
 
 
     p = np.percentile(data, range(1, 100))
@@ -376,7 +377,7 @@ def m_profilearea(data, htthreshold, coverthreshold):
 
         return pa * 0.5
     else:
-        return -9999.0
+        return NODATA
 
 def m_allcover(data, htthreshold, coverthreshold):
     return (data > coverthreshold).sum() / len(data) * 100.0
