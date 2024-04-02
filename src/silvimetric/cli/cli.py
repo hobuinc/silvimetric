@@ -102,14 +102,9 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
         help="List of metrics to include in Database")
 @click.option("--resolution", type=float, default=30.0,
         help="Summary pixel resolution")
-@click.option("--htthreshold", type=float, default=2.0,
-        help="Height threshold for all metrics")
-@click.option("--coverthreshold", type=float, default=2.0,
-        help="Height threshold for cover metrics")
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
-        attributes: list[Attribute], resolution: float, htthreshold: float,
-        coverthreshold: float, metrics: list[Metric]):
+        attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     import itertools
     """Initialize silvimetrics DATABASE
     """
@@ -119,9 +114,7 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
             crs = crs,
             attrs = attributes,
             metrics = list(itertools.chain(*metrics)),
-            resolution = resolution,
-            htthreshold = htthreshold,
-            coverthreshold = coverthreshold)
+            resolution = resolution)
     return initialize.initialize(storageconfig)
 
 

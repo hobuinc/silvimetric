@@ -74,7 +74,7 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     # doing dask compute inside the dict array because it was too fine-grained
     # when it was outside
     metric_data = {
-        f'{m.entry_name(attr)}': [m(cell_data, storage.config.htthreshold, storage.config.coverthreshold) for cell_data in data[attr]]
+        f'{m.entry_name(attr)}': [m(cell_data) for cell_data in data[attr]]
         for attr in attrs for m in storage.config.metrics
     }
     data_out = data | metric_data

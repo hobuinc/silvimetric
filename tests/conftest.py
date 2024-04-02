@@ -24,15 +24,13 @@ def threaded_dask():
     dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='function')
-def storage_config(tdb_filepath, bounds, resolution, htthreshold, coverthreshold, crs, attrs, metrics):
+def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics):
     log = Log(20)
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
                         root = bounds,
                         resolution = resolution,
-                        htthreshold = htthreshold,
-                        coverthreshold = coverthreshold,
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
@@ -70,8 +68,6 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics):
                         crs = crs,
                         root = bounds,
                         resolution = 7,
-                        htthreshold = 2,
-                        coverthreshold = 2,
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
@@ -102,8 +98,8 @@ def s3_uri(s3_bucket):
     yield f"s3://{s3_bucket}/test_silvimetric/{uuid}"
 
 @pytest.fixture(scope="function")
-def s3_storage_config(s3_uri, bounds, resolution, htthreshold, coverthreshold, crs, attrs, metrics):
-    yield StorageConfig(bounds, crs, resolution, htthreshold, coverthreshold, attrs, metrics,
+def s3_storage_config(s3_uri, bounds, resolution, crs, attrs, metrics):
+    yield StorageConfig(bounds, crs, resolution, attrs, metrics,
                         svversion, tdb_dir=s3_uri)
 
 @pytest.fixture(scope='function')
@@ -155,14 +151,6 @@ def dims():
 @pytest.fixture(scope='class')
 def resolution() -> int:
     yield 30
-
-@pytest.fixture(scope='class')
-def htthreshold() -> int:
-    yield 2
-
-@pytest.fixture(scope='class')
-def coverthreshold() -> int:
-    yield 2
 
 @pytest.fixture(scope='class')
 def test_point_count() -> int:
