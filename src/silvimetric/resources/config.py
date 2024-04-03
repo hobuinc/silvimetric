@@ -15,6 +15,7 @@ from .log import Log
 from .extents import Bounds
 from .metric import Metric, Metrics
 from .entry import Attribute, Attributes
+from . import constants
 from . import __version__
 
 
@@ -52,7 +53,7 @@ class Config(ABC):
 class StorageConfig(Config):
     root: Bounds
     crs: pyproj.CRS
-    resolution: float = 30.0
+    resolution: float = DEFAULT_RESOLUTION
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
