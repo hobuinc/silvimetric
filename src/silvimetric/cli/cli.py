@@ -186,17 +186,25 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
     extract.extract(config)
 
 @cli.command('delete')
-@click.option('--id', type=click.UUIDParameterType(), required=True,
+@click.option('--id', type=click.UUID, required=True,
     help="Shatter Task UUID.")
+@click.pass_obj
 def delete_cmd(app, id):
     manage.delete(app.tdb_dir, id)
 
-
 @cli.command('restart')
-@click.option('--id', type=click.UUIDParameterType(), required=True,
+@click.option('--id', type=click.UUID, required=True,
     help="Shatter Task UUID.")
+@click.pass_obj
 def restart_cmd(app, id):
     manage.restart(tdb_dir=app.tdb_dir, name=id)
+
+@cli.command('resume')
+@click.option('--id', type=click.UUID, required=True,
+    help="Shatter Task UUID.")
+@click.pass_obj
+def resume_cmd(app, id):
+    manage.resume(tdb_dir=app.tdb_dir, name=id)
 
 if __name__ == "__main__":
     cli()

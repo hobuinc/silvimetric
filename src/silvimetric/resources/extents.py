@@ -12,6 +12,9 @@ from .bounds import Bounds
 from .storage import Storage
 from .data import Data
 
+IndexDomain = tuple[np.ScalarType, np.ScalarType]
+IndexDomainList = tuple[IndexDomain, IndexDomain]
+
 class Extents(object):
 
     def __init__(self,
@@ -33,6 +36,7 @@ class Extents(object):
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
         self.x2 = math.ceil((maxx - self.root.minx) / resolution)
         self.y2 = math.ceil((self.root.maxy - miny) / resolution)
+        self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
 
     def get_indices(self):
         return np.array(
@@ -40,6 +44,19 @@ class Extents(object):
             for j in range(self.y1, self.y2)],
             dtype=[('x', np.int32), ('y', np.int32)]
         )
+
+    def disjoint_by_mbr(self, mbr):
+        xs, ys = mbr
+        x1, x2 = xs
+        y1, y2 = ys
+        if x1 > self.x2 or x2 < self.x1:
+            return True
+        if y1 > self.y2 or y2 < self.y1:
+            return True
+        return False
+
+    def disjoint(self, other: Self):
+        return self.bounds.disjoint(other.bounds)
 
     def chunk(self, data: Data, res_threshold=100, pc_threshold=600000,
             depth_threshold=6, scan=False):
@@ -181,6 +198,7 @@ class Extents(object):
         base = base_extents.bounds
 
         return Extents(sub, res, base)
+
 
     def __repr__(self):
         minx, miny, maxx, maxy = self.bounds.get()

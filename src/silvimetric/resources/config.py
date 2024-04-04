@@ -154,6 +154,7 @@ class ApplicationConfig(Config):
     def __repr__(self):
         return json.dumps(self.to_json())
 
+Mbr = tuple[tuple[tuple[int,int], tuple[int,int]], ...]
 @dataclass
 class ShatterConfig(Config):
     filename: str
@@ -166,7 +167,7 @@ class ShatterConfig(Config):
     start_time:float = 0
     end_time:float = 0
     point_count: int = 0
-    nonempty_domain: tuple[tuple[int, int], ...] = ()
+    mbr: Mbr = field(default_factory=tuple)
     finished: bool = False
     time_slot: int = 0
 
@@ -189,7 +190,7 @@ class ShatterConfig(Config):
         d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['nonempty_domain'] = [ list(a) for a in self.nonempty_domain] if self.nonempty_domain else ()
+        d['mbr'] = self.mbr
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
@@ -207,20 +208,20 @@ class ShatterConfig(Config):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
             date = datetime.strptime(x['date'], '%Y-%m-%dT%H:%M:%SZ')
-        nonempty_domains = tuple(tuple(ned) for ned in x['nonempty_domain'])
+        mbr = tuple(tuple(tuple(mb) for mb in m) for m in x['mbr'])
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
-        n = cls(tdb_dir = x['tdb_dir'],
-                filename = x['filename'],
-                attrs = attrs,
-                metrics = ms,
-                debug = x['debug'],
-                name = uuid.UUID(x['name']),
-                bounds = Bounds(*x['bounds']),
-                nonempty_domain = nonempty_domains,
-                date = date,
-                time_slot = x['time_slot'],
+        n = cls(tdb_dir=x['tdb_dir'],
+                filename=x['filename'],
+                attrs=attrs,
+                metrics=ms,
+                debug=x['debug'],
+                name=uuid.UUID(x['name']),
+                bounds=Bounds(*x['bounds']),
+                mbr=mbr,
+                date=date,
+                time_slot=x['time_slot'],
                 finished=x['finished'])
 
         return n

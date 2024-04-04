@@ -1,4 +1,5 @@
 import uuid
+import json
 from time import sleep
 from typing import List
 from datetime import datetime
@@ -97,17 +98,17 @@ class TestCommands(object):
         assert bool(h['history'])
         assert len(h['history']) == 4
 
-    def test_resume(self, shatter_config: ShatterConfig):
+    def test_resume(self, shatter_config: ShatterConfig, test_point_count):
         # test that shatter only operates on cells not touched by nonempty_domain
         storage = Storage.from_db(shatter_config.tdb_dir)
 
         # modify shatter config
-        shatter_config.nonempty_domain = ((0,4), (0,4))
+        shatter_config.tile_size=1
+        shatter_config.mbr = (((0,4), (0,4)),)
         # send to shatter
         pc = shatter.shatter(shatter_config)
+        assert pc == test_point_count - (test_point_count / 4)
         # check output config to see what the nonempthy_domain is
         #   - should be only only values outside of that tuple
-        storage.getMetadata('shatter', 1)
-
-        pass
-
+        m = json.loads(storage.getMetadata('shatter', 1))
+        assert len(m['mbr']) == 75

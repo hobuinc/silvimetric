@@ -309,6 +309,15 @@ class Storage:
 
         return m
 
+    def mbrs(self, proc_num):
+        timestamp_range = (proc_num, proc_num)
+
+        af_all = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
+        mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs
+                if af.timestamp_range == timestamp_range)
+        mbrs = tuple(tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list)
+        return mbrs
+
     def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
         """
         Write data to TileDB database
@@ -346,8 +355,13 @@ class Storage:
         """
         with self.open('r', (proc_num, proc_num)) as r:
             sh_cfg = ShatterConfig.from_string(r.meta['shatter'])
+            sh_cfg.bounds_done = [ ]
             sh_cfg.finished = False
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
+
+    def consolidate_shatter(self, proc_num: int) -> None:
+        tiledb.consolidate(self.config.tdb_dir, timestamp=(proc_num, proc_num))
+        # tiledb.vacuum(self.config.tdb_dir, timestamp=(proc_num, proc_num))

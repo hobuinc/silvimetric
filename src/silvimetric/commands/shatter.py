@@ -91,12 +91,37 @@ def write(data_in, tdb):
     return p
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
+
+    # Process kill handler. Make sure we write out a config even if we fail.
+    def kill_gracefully(signum, frame):
+        client = dask.config.get('distributed.client')
+        if client is not None:
+            client.close()
+        end_time = datetime.datetime.now().timestamp() * 1000
+
+        storage.consolidate_shatter(config.time_slot)
+        config.end_time = end_time
+        config.mbrs = storage.mbrs(config.time_slot)
+        config.finished=False
+        config.log.info('Saving config before quitting...')
+
+        storage.saveMetadata('shatter', str(config), config.time_slot)
+        config.log.info('Quitting.')
+
+    signal.signal(signal.SIGINT, kill_gracefully)
+
+
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in config.attrs]
     timestamp = (config.time_slot, config.time_slot)
 
     with storage.open('w', timestamp=timestamp) as tdb:
         leaf_bag: db.Bag = db.from_sequence(leaves)
+        if config.mbr:
+            def f(one: Extents):
+                return all(one.disjoint_by_mbr(m) for m in config.mbr)
+            leaf_bag = leaf_bag.filter(f)
+
         points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
         att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
         arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
@@ -116,21 +141,19 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
             end_time = datetime.datetime.now().timestamp() * 1000
             config.end_time = end_time
             config.finished = True
-            return config.point_count
 
         ## Handle non-distributed dask scenarios
-        pc = sum(writes)
+        else:
+            config.point_count = sum(writes)
 
     # modify config to reflect result of shattter process
-    with storage.open('r', timestamp=timestamp) as a:
-        config.nonempty_domain = a.nonempty_domain()
+    config.mbr = storage.mbrs(config.time_slot)
     config.log.debug('Saving shatter metadata')
     config.end_time = datetime.datetime.now().timestamp() * 1000
     config.finished = True
-    config.point_count = pc
 
     storage.saveMetadata('shatter', str(config), config.time_slot)
-    return pc
+    return config.point_count
 
 
 def shatter(config: ShatterConfig):
@@ -144,24 +167,6 @@ def shatter(config: ShatterConfig):
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()
 
-    # Process kill handler. Make sure we write out a config even if we fail.
-    def kill_gracefully(signum, frame):
-        client = dask.config.get('distributed.client')
-        if client is not None:
-            client.close()
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-
-        with storage.open('r', timestamp=(config.time_slot, config.time_slot)) as a:
-            config.nonempty_domain = a.nonempty_domain()
-            config.finished=False
-
-            config.log.info('Saving config before quitting...')
-            storage.saveMetadata('shatter', str(config), config.time_slot)
-            config.log.info('Quitting.')
-
-    signal.signal(signal.SIGINT, kill_gracefully)
-
     if config.bounds is None:
         config.bounds = extents.bounds
 
@@ -173,4 +178,6 @@ def shatter(config: ShatterConfig):
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
-    return run(leaves, config, storage)
+    pc = run(leaves, config, storage)
+    storage.consolidate_shatter(config.time_slot)
+    return pc

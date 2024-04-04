@@ -24,5 +24,8 @@ def restart(tdb_dir: str, name: str):
     cfg = delete(tdb_dir, name)
     shatter(cfg)
 
-def resume(config: ShatterConfig):
-    pass
+def resume(tdb_dir: str, name: str):
+    res = info(tdb_dir=tdb_dir, name=name)
+    assert len(res['history']) == 1
+    config = res['history'][0]
+    shatter(config)
