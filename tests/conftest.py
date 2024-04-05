@@ -52,7 +52,7 @@ def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, N
 @pytest.fixture(scope='function')
 def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
         app_config, storage, date) -> Generator[ShatterConfig, None, None]:
-    log = Log(20) # INFO
+    log = Log('INFO') # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,
@@ -66,7 +66,7 @@ def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
 
 @pytest.fixture(scope='function')
 def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
-    log = Log(20)
+    log = Log('INFO')
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
@@ -82,7 +82,7 @@ def uneven_storage(uneven_storage_config) -> Generator[Storage, None, None]:
 
 @pytest.fixture(scope='function')
 def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, storage, date) -> Generator[ShatterConfig, None, None]:
-    log = Log(20) # INFO
+    log = Log('INFO') # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
                       log = log,
                       filename = copc_filepath,

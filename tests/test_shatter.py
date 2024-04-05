@@ -36,7 +36,11 @@ class Test_Shatter(object):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
 
+        # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
+        shatter_config.mbr = ()
+        shatter_config.time_slot = 2
+
         shatter(shatter_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
@@ -51,8 +55,8 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/storage.config.resolution)-yi)))
 
-            m = info(storage.config.tdb_dir)
-            assert len(m['history']) == 2
+        m = info(storage.config.tdb_dir)
+        assert len(m['history']) == 2
 
     def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
@@ -89,6 +93,7 @@ class Test_Shatter(object):
         pc = 0
         for b in e.split():
             log = Log(20)
+            time_slot = storage.reserve_time_slot()
             sc = ShatterConfig(tdb_dir = s.tdb_dir,
                                log = log,
                                filename = s.filename,
@@ -97,11 +102,13 @@ class Test_Shatter(object):
                                metrics = s.metrics,
                                debug = s.debug,
                                bounds = b.bounds,
-                               date=s.date)
+                               date=s.date,
+                               time_slot=time_slot)
             pc = pc + shatter(sc)
         history = info(s.tdb_dir)['history']
+        assert len(history) == 4
         assert isinstance(history, list)
-        pcs = [ h['point_count'] for h in history ]
+        pcs = [ h.point_count for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 

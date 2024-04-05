@@ -310,11 +310,8 @@ class Storage:
         return m
 
     def mbrs(self, proc_num):
-        timestamp_range = (proc_num, proc_num)
-
-        af_all = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
-        mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs
-                if af.timestamp_range == timestamp_range)
+        af_all = self.get_fragments_by_time(proc_num)
+        mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
         mbrs = tuple(tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list)
         return mbrs
 
@@ -344,6 +341,10 @@ class Storage:
             #     tiledb.stats_dump()
             #     tiledb.stats_reset()
 
+    def get_fragments_by_time(self, proc_num: int) -> list[tiledb.FragmentInfo]:
+        af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
+        return [a for a in af if a.timestamp_range == (proc_num, proc_num)]
+
     def delete(self, proc_num: int) -> None:
         """
         Delete Shatter process and all associated data from database.
@@ -354,14 +355,17 @@ class Storage:
             Shatter process time slot
         """
         with self.open('r', (proc_num, proc_num)) as r:
-            sh_cfg = ShatterConfig.from_string(r.meta['shatter'])
-            sh_cfg.bounds_done = [ ]
+            sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
+            sh_cfg.mbr = ()
             sh_cfg.finished = False
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
+        return sh_cfg
 
     def consolidate_shatter(self, proc_num: int) -> None:
-        tiledb.consolidate(self.config.tdb_dir, timestamp=(proc_num, proc_num))
-        # tiledb.vacuum(self.config.tdb_dir, timestamp=(proc_num, proc_num))
+        # TODO move from timestamp to fragment_uris, timestamp is deprecated
+        # this is currently failing, I believe from a bug in tiledb
+        # afs = self.get_fragments_by_time(proc_num)
+        tiledb.consolidate(self.config.tdb_dir, timestamp=(proc_num,proc_num))

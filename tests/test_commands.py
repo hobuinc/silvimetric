@@ -26,7 +26,7 @@ def config_split(shatter_config: ShatterConfig) -> List[ShatterConfig]:
             metrics=sc.metrics,
             bounds=b,
             name=uuid.uuid4(),
-            tile_size=sc.tile_size,
+            tile_size=4,
             tdb_dir=sc.tdb_dir,
             log=sc.log
         ))
@@ -53,21 +53,21 @@ class TestCommands(object):
 
         for idx, c in enumerate(i['history']):
             osc = config_split[idx]
-            assert c == osc.to_json()
+            assert c == osc
 
         nb = list(config_split[0].bounds.bisect())[0]
         i = info.info(tdb_filepath, bounds=nb)
         assert len(i['history']) == 1
-        assert i['history'][0] == config_split[0].to_json()
+        assert i['history'][0] == config_split[0]
 
         i = info.info(tdb_filepath, name=str(config_split[0].name))
         assert len(i['history']) == 1
-        assert i['history'][0] == config_split[0].to_json()
+        assert i['history'][0] == config_split[0]
 
         d = config_split[1].date
         i = info.info(tdb_filepath, start_time=d, end_time=d)
         assert len(i['history']) == 1
-        assert i['history'][0] == config_split[1].to_json()
+        assert i['history'][0] == config_split[1]
 
     def test_delete(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]
@@ -90,9 +90,8 @@ class TestCommands(object):
             h = info.info(tdb_dir=tdb_filepath)
 
             assert bool(h['history'])
-            assert len(h['history']) == 4
-            idx = i - 1
-            manage.restart(tdb_filepath, ids[idx])
+            assert len(h['history']) == len(ids)
+            manage.restart(tdb_filepath, ids[i-1])
 
         h = info.info(tdb_dir=tdb_filepath)
         assert bool(h['history'])

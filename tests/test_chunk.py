@@ -122,8 +122,8 @@ class TestExtents(object):
 
         with storage.open('w') as tdb:
             shatter_config.start_time = datetime.datetime.now().timestamp() * 1000
-            fc = run(filtered, shatter_config, storage, tdb)
-            ufc = run(unfiltered, shatter_config, storage, tdb)
+            fc = run(filtered, shatter_config, storage)
+            ufc = run(unfiltered, shatter_config, storage)
 
             assert fc == ufc, f"""
                 Filtered and unfiltered point counts don't match.

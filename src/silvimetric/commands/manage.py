@@ -16,9 +16,7 @@ def delete(tdb_dir: str, name:str):
         raise ValueError(f'Shatter process with ID {name} missing time reservation.')
 
     storage = Storage.from_db(tdb_dir)
-    storage.delete(time_slot)
-
-    return config
+    return storage.delete(time_slot)
 
 def restart(tdb_dir: str, name: str):
     cfg = delete(tdb_dir, name)
