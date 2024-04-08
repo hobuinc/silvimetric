@@ -162,9 +162,9 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
 
 @cli.command('extract')
-@click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
+@click.option("--attributes", "-a", multiple=True, type=AttrParamType(), default=[],
         help="List of attributes to include output")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
+@click.option("--metrics", "-m", multiple=True, type=MetricParamType(), default=[],
         help="List of metrics to include in output")
 @click.option("--bounds", type=BoundsParamType(), default=None,
         help="Bounds for data to include in output")

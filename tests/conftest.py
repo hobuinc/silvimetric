@@ -4,6 +4,7 @@ import dask
 import pdal
 from uuid import uuid4
 from datetime import datetime
+from click.testing import CliRunner
 
 from typing import Generator
 
@@ -25,6 +26,10 @@ def tdb_filepath(tmp_path_factory) -> Generator[str, None, None]:
 @pytest.fixture(scope="function")
 def threaded_dask() -> None:
     dask.config.set(scheduler="threads")
+
+@pytest.fixture
+def runner():
+    return CliRunner()
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:

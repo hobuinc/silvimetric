@@ -10,7 +10,7 @@ def initialize(storage: StorageConfig):
 
     """
 
-    storage.log.debug(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
+    storage.log.info(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
 
     s = Storage.create(storage)
     return s
