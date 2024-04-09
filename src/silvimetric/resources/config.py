@@ -126,7 +126,8 @@ class StorageConfig(Config):
                 attrs = attrs,
                 crs = crs,
                 metrics = ms,
-                capacity = x['capacity'])
+                capacity = x['capacity'],
+                version = x['version'])
 
         return n
 
@@ -201,6 +202,11 @@ class ShatterConfig(Config):
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
+        return cls.from_dict(x)
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        x = data
 
         ms = list([ Metric.from_string(m) for m in x['metrics']])
         attrs = list([ Attribute.from_string(a) for a in x['attrs']])
@@ -260,7 +266,7 @@ class ExtractConfig(Config):
     def to_json(self):
         d = super().to_json()
 
-        d['metrics'] = [a.to_json() for a in self.attrs]
+        d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = json.loads(self.bounds.to_json())
@@ -273,7 +279,15 @@ class ExtractConfig(Config):
             ms = [ Metric.from_string(m) for m in x['metrics']]
         if 'attrs' in x:
             attrs = [ Attribute.from_string(a) for a in x['attrs']]
-        n = cls(x['out_dir'], attrs, ms, x['debug'])
+        if 'bounds' in x:
+            bounds = Bounds(*x['bounds'])
+        if 'log' in x:
+            l = x['log']
+            log = Log(l['log_level'], l['logdir'], l['logtype'], l['logfilename'])
+        else:
+            log = Log("INFO")
+        n = cls(tdb_dir=x['tdb_dir'], out_dir=x['out_dir'], attrs=attrs,
+                metrics=ms, debug=x['debug'], bounds=bounds, log=log)
 
         return n
 

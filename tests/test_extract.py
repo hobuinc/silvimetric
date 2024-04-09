@@ -1,56 +1,9 @@
-import pytest
-import os
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
-import copy
-import uuid
-from typing import Generator
 
-from silvimetric.commands.shatter import shatter
 from silvimetric.commands.extract import extract
-from silvimetric.resources import Metrics, Attribute, ExtractConfig, Extents, Log
-
-@pytest.fixture(scope='function')
-def tif_filepath(tmp_path_factory) -> Generator[str, None, None]:
-    path = tmp_path_factory.mktemp("test_tifs")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope='function')
-def extract_attrs(dims)->Generator[list[str], None, None]:
-    yield [Attribute('Z', dtype=dims['Z']), Attribute('Intensity', dtype=dims['Intensity'])]
-
-@pytest.fixture(scope='function')
-def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
-    shatter(shatter_config)
-    log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
-                       log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
-    yield c
-
-@pytest.fixture(scope='function')
-def multivalue_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
-
-    shatter(shatter_config)
-    e = Extents.from_storage(shatter_config.tdb_dir)
-    b: Extents = e.split()[0]
-
-    second_config = copy.deepcopy(shatter_config)
-    second_config.bounds = b.bounds
-    second_config.name = uuid.uuid4()
-    second_config.point_count = 0
-
-    shatter(second_config)
-    log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
-                       log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
-    yield c
+from silvimetric.resources import Metrics, ExtractConfig, Extents, Log
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
@@ -107,18 +60,3 @@ class Test_Extract(object):
     def test_multi_value(self, multivalue_config):
         extract(multivalue_config)
         tif_test(multivalue_config)
-
-    def test_cli_extract(self, runner, extract_config):
-        from silvimetric.cli import cli
-
-        atts = ' '.join([f'-a {a.name}' for a in extract_config.attrs])
-        ms = ' '.join([f'-m {m.name}' for m in extract_config.metrics])
-        out_dir = extract_config.out_dir
-        tdb_dir = extract_config.tdb_dir
-
-        res = runner.invoke(cli.cli, args=(f'-d {tdb_dir} --scheduler '+
-            f'single-threaded extract {atts} {ms} --outdir {out_dir}'))
-
-        assert res.exit_code == 0
-
-        tif_test(extract_config)

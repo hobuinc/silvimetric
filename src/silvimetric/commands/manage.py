@@ -6,7 +6,7 @@ def delete(tdb_dir: str, name:str):
     res = info(tdb_dir=tdb_dir, name=name)
 
     try:
-        config: ShatterConfig = res['history'][0]
+        config = ShatterConfig.from_dict(res['history'][0])
     except LookupError:
         raise KeyError(f'Shatter process with ID {name} does not exist')
 

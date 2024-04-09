@@ -16,10 +16,6 @@ class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
 
     def __init__(self, config: StorageConfig, ctx:tiledb.Ctx=None):
-        # if not ctx:
-        #     self.ctx = tiledb.default_ctx()
-        # else:
-        #     self.ctx = ctx
 
         if not tiledb.object_type(config.tdb_dir) == "array":
             raise Exception(f"Given database directory '{config.tdb_dir}' does not exist")
@@ -305,7 +301,7 @@ class Storage:
                 if s.date < start_time or s.date > end_time:
                     continue
 
-            m.append(s)
+            m.append(s.to_json())
 
         return m
 

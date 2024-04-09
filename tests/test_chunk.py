@@ -1,7 +1,4 @@
 import numpy as np
-import dask
-import pdal
-import pytest
 import datetime
 
 from silvimetric.resources import Extents
@@ -83,14 +80,6 @@ def check_indexing(extents: Extents, leaf_list):
 
 
 class TestExtents(object):
-    @pytest.fixture(scope='function', autouse=True)
-    def filtered(self, copc_data, extents: Extents):
-        return list(extents.chunk(copc_data, 1))
-
-    @pytest.fixture(scope='function')
-    def unfiltered(self, extents: Extents):
-        return list(extents.get_leaf_children(30))
-
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)
         check_for_holes(filtered, extents)

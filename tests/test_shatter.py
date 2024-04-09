@@ -9,6 +9,7 @@ from silvimetric.commands.shatter import shatter
 from silvimetric.commands.info import info
 from silvimetric.resources import Storage, Extents, ShatterConfig, Log
 
+
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
     m_list = [m.entry_name(a.name) for m in metrics for a in attrs]
@@ -108,7 +109,7 @@ class Test_Shatter(object):
         history = info(s.tdb_dir)['history']
         assert len(history) == 4
         assert isinstance(history, list)
-        pcs = [ h.point_count for h in history ]
+        pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
