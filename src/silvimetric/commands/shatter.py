@@ -2,6 +2,8 @@ import numpy as np
 import copy
 import signal
 import datetime
+import tiledb
+from typing import Any, Union
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
@@ -10,7 +12,21 @@ import dask.bag as db
 
 from ..resources import Extents, Storage, ShatterConfig, Data
 
-def get_data(extents: Extents, filename: str, storage: Storage):
+def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
+    """
+    Execute pipeline and retrieve point cloud data for this extent
+
+    Parameters
+    ----------
+    extents : Extents
+    filename : str
+    storage : Storage
+
+    Returns
+    -------
+    np.ndarray
+        Numpy structured array of point data from PDAL
+    """
     #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
     data.execute()
@@ -19,7 +35,24 @@ def get_data(extents: Extents, filename: str, storage: Storage):
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
+def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]) -> list[np.ndarray[Any, np._dtype]]:
+    """
+    Filter point data to just attributes we want
+
+    Parameters
+    ----------
+    points : np.ndarray
+        Point data
+    leaf : Extents
+        Current extents
+    attrs : list[str]
+        List of attributes to select
+
+    Returns
+    -------
+    list[np.ndarray[Any, np._dtype]]
+        Attribute point data
+    """
     if points.size == 0:
         return None
 
@@ -31,7 +64,29 @@ def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
     return l
 
-def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs):
+ArrangeType = tuple[np.NDArray[Any], np.NDArray[Any], dict]
+def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs) -> Union[ArrangeType, None]:
+    """
+    Arrange data to fit TileDB input format of
+
+    Parameters
+    ----------
+    data : tuple[np.ndarray, np.ndarray, np.ndarray]
+        _description_
+    leaf : Extents
+        _description_
+    attrs : _type_
+        _description_
+
+    Returns
+    -------
+    Union[ArrangeType, None]
+        Returns None if empty work order
+    Raises
+    ------
+    Exception
+        Missing attribute error
+    """
     if data is None:
         return None
 
@@ -57,7 +112,25 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attr
     dy = idx['y']
     return (dx, dy, dd)
 
-def get_metrics(data_in, attrs: list[str], storage: Storage):
+def get_metrics(data_in: ArrangeType, attrs: list[str], storage: Storage) -> ArrangeType:
+    """
+    Performs metric operations over point data
+
+    Parameters
+    ----------
+    data_in : ArrangeType
+        Data without metrics
+    attrs : list[str]
+        List of attributes
+    storage : Storage
+        Storage object
+
+    Returns
+    -------
+    ArrangeType
+        Point data combined with metric data and indices
+    """
+
     if data_in is None:
         return None
 
@@ -77,7 +150,22 @@ def get_metrics(data_in, attrs: list[str], storage: Storage):
     data_out = data | metric_data
     return (dx, dy, data_out)
 
-def write(data_in, tdb):
+def write(data_in: ArrangeType, tdb: tiledb.Array) -> int:
+    """
+    Write cell data to database
+
+    Parameters
+    ----------
+    data_in : ArrangeType
+        Point data combined with indices
+    tdb : tiledb.Array
+        Tiledb array write stream
+
+    Returns
+    -------
+    int
+        Point count
+    """
 
     if data_in is None:
         return 0
@@ -90,7 +178,24 @@ def write(data_in, tdb):
 
     return p
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
+def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
+    """
+    Coordinate running of shatter process
+
+    Parameters
+    ----------
+    leaves : db.Bag
+        Dask bag of Extents to operate on
+    config : ShatterConfig
+        Shatter process config
+    storage : Storage
+        Storage object
+
+    Returns
+    -------
+    int
+        Point count
+    """
 
     # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
@@ -156,7 +261,20 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage):
     return config.point_count
 
 
-def shatter(config: ShatterConfig):
+def shatter(config: ShatterConfig) -> int:
+    """
+    Handle setup and running of shatter process
+
+    Parameters
+    ----------
+    config : ShatterConfig
+        Shatter process config
+
+    Returns
+    -------
+    int
+        Point count
+    """
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb

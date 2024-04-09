@@ -341,7 +341,7 @@ class Storage:
         af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
         return [a for a in af if a.timestamp_range == (proc_num, proc_num)]
 
-    def delete(self, proc_num: int) -> None:
+    def delete(self, proc_num: int) -> ShatterConfig:
         """
         Delete Shatter process and all associated data from database.
 
@@ -349,6 +349,11 @@ class Storage:
         ----------
         proc_num : int
             Shatter process time slot
+
+        Returns
+        -------
+        ShatterConfig
+            Config of deleted Shatter process
         """
         with self.open('r', (proc_num, proc_num)) as r:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])

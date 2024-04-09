@@ -4,7 +4,31 @@ from typing import Union
 
 from ..resources import Storage, Bounds
 
-def check_values(start_time, end_time, bounds, name):
+def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
+        name: Union[UUID, str]):
+    """
+    Validate arguments for info
+
+    Parameters
+    ----------
+    start_time : datetime
+    end_time : datetime
+    bounds : Bounds
+    name : Union[UUID, str]
+
+    Raises
+    ------
+    TypeError
+        Incorrect start_time type
+    TypeError
+        Incorrect end_time type
+    TypeError
+        Incorrect bounds type
+    TypeError
+        Incorrect name type
+    TypeError
+        Incorrect name type
+    """
     if start_time is not None and not isinstance(start_time, datetime):
         raise TypeError(f'Incorrect type of "start_time" argument.')
     if end_time is not None and not isinstance(end_time, datetime):
@@ -22,9 +46,29 @@ def check_values(start_time, end_time, bounds, name):
         else:
             raise TypeError(f'Incorrect type of "name" argument.')
 
-def info(tdb_dir, start_time:datetime=None, end_time:datetime=None,
-          bounds:Bounds=None, name:Union[str, UUID]=None):
-    """Print info about Silvimetric database"""
+def info(tdb_dir:str, start_time:datetime=None, end_time:datetime=None,
+          bounds:Bounds=None, name:Union[str, UUID]=None) -> dict:
+    """
+    Collect information about database in current state
+
+    Parameters
+    ----------
+    tdb_dir : str
+        Tiledb directory
+    start_time : datetime, optional
+        Start time range, by default None
+    end_time : datetime, optional
+        End time range, by default None
+    bounds : Bounds, optional
+        Bounds filter, by default None
+    name : Union[str, UUID], optional
+        Name of shatter process, by default None
+
+    Returns
+    -------
+    dict
+        Database information dictionary
+    """
     check_values(start_time, end_time, bounds, name)
 
     with Storage.from_db(tdb_dir) as tdb:

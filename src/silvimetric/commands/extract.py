@@ -4,7 +4,8 @@ from pathlib import Path
 import pandas as pd
 import dask
 import dask.dataframe as dd
-import dask.bag as db
+
+from typing import Dict
 
 from ..resources import Storage, ExtractConfig, Metric, Attribute
 from ..resources import Extents
@@ -23,7 +24,23 @@ np_to_gdal_types = {
 }
 
 def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
-              config: ExtractConfig):
+              config: ExtractConfig) -> None:
+    """
+    Write out a raster with GDAL
+
+    Parameters
+    ----------
+    xsize : int
+        Number of cells in X direction
+    ysize : int
+        Number of cells in Y direction
+    data : np.ndarray
+        Cell data
+    name : str
+        File name
+    config : ExtractConfig
+        ExtractConfig
+    """
     osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
     crs = config.crs
@@ -45,7 +62,23 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.FlushCache()
     tif = None
 
-def get_metrics(data_in, config: ExtractConfig):
+MetricDict = Dict[str, np.ndarray]
+def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
+    """
+    Reruns a metric over this cell. Only called if there is overlapping data.
+
+    Parameters
+    ----------
+    data_in : MetricDict
+        Non combined data
+    config : ExtractConfig
+        Extract Config
+
+    Returns
+    -------
+    MetricDict
+        Newly combined data and rerun metrics
+    """
     if data_in is None:
         return None
 
@@ -65,7 +98,24 @@ def get_metrics(data_in, config: ExtractConfig):
     data_out = data_in | metric_data
     return data_out
 
-def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray):
+def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray) -> pd.DataFrame:
+    """
+    Handle cells that have overlapping data. We have to re-run metrics over these
+    cells as there's no other accurate way to determined metric values. If there
+    are no overlaps, this will do nothing.
+
+    Parameters
+    ----------
+    config : ExtractConfig
+    storage : Storage
+    indices : np.ndarray
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame of metric data
+    """
+
     ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
         config.attrs ]
     att_list = [ a.name for a in config.attrs ] + [ 'count' ]
@@ -132,7 +182,15 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         ms = pd.DataFrame.from_dict(metrics)[out_list]
         return pd.concat((ms, leaves[out_list]))
 
-def extract(config: ExtractConfig):
+def extract(config: ExtractConfig) -> None:
+    """
+    Pull data from database for each desired metric and output them to rasters
+
+    Parameters
+    ----------
+    config : ExtractConfig
+        Extract process config
+    """
 
     dask.config.set({"dataframe.convert-string": False})
 
