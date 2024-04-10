@@ -4,6 +4,7 @@ from datetime import datetime
 import pathlib
 import contextlib
 import json
+import urllib
 from typing import Any
 
 from math import floor
@@ -368,5 +369,6 @@ class Storage:
     def consolidate_shatter(self, proc_num: int) -> None:
         # TODO move from timestamp to fragment_uris, timestamp is deprecated
         # this is currently failing, I believe from a bug in tiledb
-        # afs = self.get_fragments_by_time(proc_num)
-        tiledb.consolidate(self.config.tdb_dir, timestamp=(proc_num,proc_num))
+        afs = self.get_fragments_by_time(proc_num)
+        uris = [ urllib.parse.urlparse(f).path for f in afs.uri ]
+        tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)

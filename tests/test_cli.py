@@ -33,6 +33,10 @@ class TestCli(object):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
 
+    def test_cli_scan(self, tdb_filepath, runner, copc_filepath, storage):
+        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, 'scan', copc_filepath])
+        assert res.exit_code == 0
+
     def test_cli_info(self, tdb_filepath, runner, shatter_config):
         shatter.shatter(shatter_config)
         res = runner.invoke(cli.cli, args=['-d', tdb_filepath, 'info'])

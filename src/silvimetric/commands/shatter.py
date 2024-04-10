@@ -35,7 +35,7 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
 def cell_indices(xpoints, ypoints, x, y):
     return da.logical_and(xpoints == x, ypoints == y)
 
-def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]) -> list[np.ndarray[Any, np._dtype]]:
+def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]) -> list[np.ndarray[Any, np.dtype]]:
     """
     Filter point data to just attributes we want
 
@@ -64,24 +64,25 @@ def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]) -> list[np.nda
     l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
     return l
 
-ArrangeType = tuple[np.NDArray[Any], np.NDArray[Any], dict]
-def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs) -> Union[ArrangeType, None]:
+ArrangeType = tuple[np.ndarray, np.ndarray, dict]
+def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents,
+        attrs: list[str]) -> Union[ArrangeType, None]:
     """
     Arrange data to fit TileDB input format of
 
     Parameters
     ----------
     data : tuple[np.ndarray, np.ndarray, np.ndarray]
-        _description_
+        x indices, y indices, and numpy structured array from get_atts
     leaf : Extents
-        _description_
-    attrs : _type_
-        _description_
+        Current working extents leaf node
+    attrs : list[str]
+        Attributes
 
     Returns
     -------
     Union[ArrangeType, None]
-        Returns None if empty work order
+        Returns None if empty work order, otherwise ( x ind
     Raises
     ------
     Exception

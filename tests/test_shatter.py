@@ -119,6 +119,7 @@ class Test_Shatter(object):
         reason='Missing necessary AWS environment variables'
     )
     def test_remote_creation(self, s3_shatter_config, s3_storage):
+        # need processes scheduler to accurately test bug fix
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution
         maxy = s3_storage.config.root.maxy
