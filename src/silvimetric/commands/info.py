@@ -7,27 +7,17 @@ from ..resources import Storage, Bounds
 def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
         name: Union[UUID, str]):
     """
-    Validate arguments for info
+    Validate arguments for info command.
 
-    Parameters
-    ----------
-    start_time : datetime
-    end_time : datetime
-    bounds : Bounds
-    name : Union[UUID, str]
-
-    Raises
-    ------
-    TypeError
-        Incorrect start_time type
-    TypeError
-        Incorrect end_time type
-    TypeError
-        Incorrect bounds type
-    TypeError
-        Incorrect name type
-    TypeError
-        Incorrect name type
+    :param start_time: Starting datetime object.
+    :param end_time: Ending datetime object.
+    :param bounds: Bounds to query by.
+    :param name: Name to query by.
+    :raises TypeError: Incorrect type of start_time argument.
+    :raises TypeError: Incorrect type of end_time argument.
+    :raises TypeError: Incorrect type of bounds argument.
+    :raises TypeError: Incorrect type of name argument.
+    :raises TypeError: Incorrect type of name argument.
     """
     if start_time is not None and not isinstance(start_time, datetime):
         raise TypeError(f'Incorrect type of "start_time" argument.')
@@ -40,7 +30,7 @@ def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
             pass
         elif isinstance(name, str):
             try:
-                    UUID(name)
+                UUID(name)
             except:
                 raise TypeError(f'Incorrect type of "name" argument.')
         else:
@@ -51,23 +41,12 @@ def info(tdb_dir:str, start_time:datetime=None, end_time:datetime=None,
     """
     Collect information about database in current state
 
-    Parameters
-    ----------
-    tdb_dir : str
-        Tiledb directory
-    start_time : datetime, optional
-        Start time range, by default None
-    end_time : datetime, optional
-        End time range, by default None
-    bounds : Bounds, optional
-        Bounds filter, by default None
-    name : Union[str, UUID], optional
-        Name of shatter process, by default None
-
-    Returns
-    -------
-    dict
-        Database information dictionary
+    :param tdb_dir: TileDB database directory path.
+    :param start_time: Process starting time query, defaults to None
+    :param end_time: Process ending time query, defaults to None
+    :param bounds: Bounds query, defaults to None
+    :param name: Name query, defaults to None
+    :return: Returns json object containing information on database.
     """
     check_values(start_time, end_time, bounds, name)
 

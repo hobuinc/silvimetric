@@ -17,11 +17,22 @@ MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
+    """
+    A Metric is an Entry representing derived cell data. There is a base set of
+    metrics available through Silvimetric, or you can create your own. A Metric
+    object has all the information necessary to facilitate the derivation of
+    data as well as its insertion into the database.
+
+    :param name: The name of the Metric, eg. Mean, Max, Mode
+    :param dtype: Numpy data type for values in Metric
+    :param method: The function used to derive data for the Metric from Attributes
+    :param dependencies: Entry dependencies for this Metric, defaults to None
+    """
+    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, dependencies: list[Attribute]=None):
         super().__init__()
         self.name = name
         self.dtype = dtype
-        self.dependencies = deps
+        self.dependencies = dependencies
         self._method = method
 
     def schema(self, attr: Attribute):

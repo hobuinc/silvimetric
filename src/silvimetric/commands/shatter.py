@@ -16,16 +16,10 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
     Execute pipeline and retrieve point cloud data for this extent
 
-    Parameters
-    ----------
-    extents : Extents
-    filename : str
-    storage : Storage
-
-    Returns
-    -------
-    np.ndarray
-        Numpy structured array of point data from PDAL
+    :param extents: :class:`silvimetric.resources.extents.Extents` being operated on.
+    :param filename: Path to either PDAL pipeline or point cloud.
+    :param storage: :class:`silvimetric.resources.storage.Storage` database object.
+    :return: Point data array from PDAL.
     """
     #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
@@ -33,25 +27,17 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     return data.array
 
 def cell_indices(xpoints, ypoints, x, y):
+    """Return view of point data that fits in cell (x,y)"""
     return da.logical_and(xpoints == x, ypoints == y)
 
 def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]) -> list[np.ndarray[Any, np.dtype]]:
     """
     Filter point data to just attributes we want
 
-    Parameters
-    ----------
-    points : np.ndarray
-        Point data
-    leaf : Extents
-        Current extents
-    attrs : list[str]
-        List of attributes to select
-
-    Returns
-    -------
-    list[np.ndarray[Any, np._dtype]]
-        Attribute point data
+    :param points: Point data.
+    :param leaf: :class:`silvimetric.resources.extents.Extents` being operated on.
+    :param attrs: List of attribute names.
+    :return: Point data filtered to just the desired attributes.
     """
     if points.size == 0:
         return None
@@ -68,25 +54,13 @@ ArrangeType = tuple[np.ndarray, np.ndarray, dict]
 def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents,
         attrs: list[str]) -> Union[ArrangeType, None]:
     """
-    Arrange data to fit TileDB input format of
+    Arrange data to fit key-value TileDB input format.
 
-    Parameters
-    ----------
-    data : tuple[np.ndarray, np.ndarray, np.ndarray]
-        x indices, y indices, and numpy structured array from get_atts
-    leaf : Extents
-        Current working extents leaf node
-    attrs : list[str]
-        Attributes
-
-    Returns
-    -------
-    Union[ArrangeType, None]
-        Returns None if empty work order, otherwise ( x ind
-    Raises
-    ------
-    Exception
-        Missing attribute error
+    :param data: Tuple of indices and point data array (xis, yis, data).
+    :param leaf: :class:`silvimetric.resources.extents.Extent` being operated on.
+    :param attrs: List of attribute names.
+    :raises Exception: Missing attribute error.
+    :return: None if no work is done, or a tuple of indices and rearranged data.
     """
     if data is None:
         return None
@@ -115,21 +89,13 @@ def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents,
 
 def get_metrics(data_in: ArrangeType, attrs: list[str], storage: Storage) -> ArrangeType:
     """
-    Performs metric operations over point data
+    Performs metric operations over point data and combine it with the
+    attribute data that is coming in.
 
-    Parameters
-    ----------
-    data_in : ArrangeType
-        Data without metrics
-    attrs : list[str]
-        List of attributes
-    storage : Storage
-        Storage object
-
-    Returns
-    -------
-    ArrangeType
-        Point data combined with metric data and indices
+    :param data_in: Data to run metric methods over.
+    :param attrs: List of attributes in the incoming data.
+    :param storage: :class:`silvimetric.resources.storage.Storage`.
+    :return: Combined point data and metric data.
     """
 
     if data_in is None:
@@ -155,17 +121,9 @@ def write(data_in: ArrangeType, tdb: tiledb.Array) -> int:
     """
     Write cell data to database
 
-    Parameters
-    ----------
-    data_in : ArrangeType
-        Point data combined with indices
-    tdb : tiledb.Array
-        Tiledb array write stream
-
-    Returns
-    -------
-    int
-        Point count
+    :param data_in: Data to be written to database.
+    :param tdb: TileDB write stream.
+    :return: Number of points written.
     """
 
     if data_in is None:
@@ -181,21 +139,12 @@ def write(data_in: ArrangeType, tdb: tiledb.Array) -> int:
 
 def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
     """
-    Coordinate running of shatter process
+    Coordinate running of shatter process and handle any interruptions
 
-    Parameters
-    ----------
-    leaves : db.Bag
-        Dask bag of Extents to operate on
-    config : ShatterConfig
-        Shatter process config
-    storage : Storage
-        Storage object
-
-    Returns
-    -------
-    int
-        Point count
+    :param leaves: Dask bag of Extent leaf nodes.
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`
+    :param storage: :class:`silvimetric.resources.storage.Storage`
+    :return: Number of points processed.
     """
 
     # Process kill handler. Make sure we write out a config even if we fail.
@@ -264,17 +213,12 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
 
 def shatter(config: ShatterConfig) -> int:
     """
-    Handle setup and running of shatter process
+    Handle setup and running of shatter process.
+    Will look for a config that has already been run before and needs to be
+    resumed.
 
-    Parameters
-    ----------
-    config : ShatterConfig
-        Shatter process config
-
-    Returns
-    -------
-    int
-        Point count
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`.
+    :return: Number of points processed.
     """
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000

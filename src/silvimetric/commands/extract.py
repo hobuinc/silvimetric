@@ -28,18 +28,11 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     """
     Write out a raster with GDAL
 
-    Parameters
-    ----------
-    xsize : int
-        Number of cells in X direction
-    ysize : int
-        Number of cells in Y direction
-    data : np.ndarray
-        Cell data
-    name : str
-        File name
-    config : ExtractConfig
-        ExtractConfig
+    :param xsize: Length of X plane.
+    :param ysize: Length of Y plane.
+    :param data: Data to write to raster.
+    :param name: Name of raster to write.
+    :param config: ExtractConfig.
     """
     osr.UseExceptions()
     path = Path(config.out_dir) / f'{name}.tif'
@@ -67,17 +60,9 @@ def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
     """
     Reruns a metric over this cell. Only called if there is overlapping data.
 
-    Parameters
-    ----------
-    data_in : MetricDict
-        Non combined data
-    config : ExtractConfig
-        Extract Config
-
-    Returns
-    -------
-    MetricDict
-        Newly combined data and rerun metrics
+    :param data_in: Cell data to be rerun.
+    :param config: ExtractConfig.
+    :return: Combined dict of attribute and newly derived metric data.
     """
     if data_in is None:
         return None
@@ -104,16 +89,10 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     cells as there's no other accurate way to determined metric values. If there
     are no overlaps, this will do nothing.
 
-    Parameters
-    ----------
-    config : ExtractConfig
-    storage : Storage
-    indices : np.ndarray
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame of metric data
+    :param config: ExtractConfig.
+    :param storage: Database storage object.
+    :param indices: Indices with overlap.
+    :return: Dataframe of rerun data.
     """
 
     ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
@@ -186,10 +165,7 @@ def extract(config: ExtractConfig) -> None:
     """
     Pull data from database for each desired metric and output them to rasters
 
-    Parameters
-    ----------
-    config : ExtractConfig
-        Extract process config
+    :param config: ExtractConfig.
     """
 
     dask.config.set({"dataframe.convert-string": False})

@@ -2,7 +2,19 @@ import json
 import ast
 
 class Bounds(dict): #for JSON serializing
+    """Simple class to represent a 2 or 3-dimensional bounding box that can be
+    generated from both JSON or PDAL bounds form.
+
+    :param minx: minimum X plane
+    :param miny: minimum Y plane
+    :param maxx: maximum X plane
+    :param maxy: maximum Y plane
+    """
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
+        """
+        _summary_
+
+        """
         self.minx = float(minx)
         self.miny = float(miny)
         self.maxx = float(maxx)
@@ -22,15 +34,19 @@ class Bounds(dict): #for JSON serializing
 
     @staticmethod
     def from_string(bbox_str: str):
-        """
-        Accepts bounds from strings in the form:
+        """Create Bounds object from a PDAL bounds string in the form:
 
         "([1,101],[2,102],[3,103])"
         "{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}"
         "[1,2,101,102]"
         "[1,2,3,101,102,103]"
 
+        :param bbox_str: Bounds string
+        :raises Exception: Unable to load Bounds via json or PDAL bounds type
+        :raises Exception: Bounding boxes must have either 4 or 6 elements
+        :return: Bounds object
         """
+
         try:
             bbox = json.loads(bbox_str)
         except json.decoder.JSONDecodeError as e:
@@ -67,6 +83,10 @@ class Bounds(dict): #for JSON serializing
 
 
     def get(self) -> list[float]:
+        """Return Bounds as a list of floats
+
+        :return: list of floats in form [minx, miny, maxx, maxy]
+        """
         return [self.minx, self.miny, self.maxx, self.maxy]
 
 
@@ -75,12 +95,25 @@ class Bounds(dict): #for JSON serializing
 
 
     def to_string(self) -> str:
+        """Return string representation of Bounds
+
+        :return: string of a list of floats in form [minx, miny, maxx, maxy]
+        """
         return self.__repr__()
-    def to_json(self) -> str:
-        return json.dumps(self.get())
+
+    def to_json(self) -> list[float]:
+        """Return object as a json serializable list
+
+        :return: list of floats in form [minx, miny, maxx, maxy]
+        """
+        return self.get()
 
 
     def bisect(self):
+        """Bisects the current Bounds
+
+        :yield: 4 child bounds
+        """
         centerx = self.minx + ((self.maxx - self.minx)/ 2)
         centery = self.miny + ((self.maxy - self.miny)/ 2)
         yield from [
@@ -91,6 +124,11 @@ class Bounds(dict): #for JSON serializing
         ]
 
     def disjoint(self, other):
+        """Determine if two bounds are disjointed
+
+        :param other: Bounds this object is being compared to
+        :return: True if this box shares no point with the other box, otherwise False
+        """
         if other.minx > self.maxx or other.maxx < self.minx:
             return True
         if other.miny > self.maxy or other.maxy < self.miny:

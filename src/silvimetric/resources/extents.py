@@ -16,6 +16,13 @@ IndexDomain = tuple[np.ScalarType, np.ScalarType]
 IndexDomainList = tuple[IndexDomain, IndexDomain]
 
 class Extents(object):
+    """
+    Handles bounds operations for point cloud data.
+
+    :param bounds: Bounding box of this section of data.
+    :param resolution: Resolution of database.
+    :param root: Root bounding box of the database.
+    """
 
     def __init__(self,
                  bounds: Bounds,
@@ -39,6 +46,12 @@ class Extents(object):
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
 
     def get_indices(self):
+        """
+        Create indices for this section of the database relative to the root
+        bounds.
+
+        :return: Indices of this bounding box
+        """
         return np.array(
             [(i,j) for i in range(self.x1, self.x2)
             for j in range(self.y1, self.y2)],
@@ -46,6 +59,13 @@ class Extents(object):
         )
 
     def disjoint_by_mbr(self, mbr):
+        """
+        Determine if this Extents shares any points with a minimum bounding
+        rectangle.
+
+        :param mbr: Minimum bounding rectangle as defined by TileDB.
+        :return: True if no shared points, false otherwise.
+        """
         xs, ys = mbr
         x1, x2 = xs
         y1, y2 = ys
@@ -56,10 +76,26 @@ class Extents(object):
         return False
 
     def disjoint(self, other: Self):
+        """
+        Determined if this Extents shares any points with another Extents object.
+
+        :param other: Extents object to compare against.
+        :return: True if no shared points, false otherwise.
+        """
         return self.bounds.disjoint(other.bounds)
 
     def chunk(self, data: Data, res_threshold=100, pc_threshold=600000,
-            depth_threshold=6, scan=False):
+            depth_threshold=6):
+        """
+        Split up a dataset into tiles based on the given thresholds. Unlike Scan
+        this will filter out any tiles that contain no points.
+
+        :param data: Incoming Data object to oeprate on.
+        :param res_threshold: Resolution threshold., defaults to 100
+        :param pc_threshold: Point count threshold., defaults to 600000
+        :param depth_threshold: Tree depth threshold., defaults to 6
+        :return: Return list of Extents that fit the criteria
+        """
         if self.root is not None:
             bminx, bminy, bmaxx, bmaxy = self.root.get()
             r = self.root
@@ -98,6 +134,11 @@ class Extents(object):
 
 
     def split(self):
+        """
+        Split this extent into 4 children along the cell lines
+
+        :return: Returns 4 child extents
+        """
         minx, miny, maxx, maxy = self.bounds.get()
 
         x_adjusted = math.floor((maxx - minx) / 2 / self.resolution)
@@ -113,12 +154,20 @@ class Extents(object):
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution, self.root)  #top right
         ]
 
-    # create quad tree of chunks for this bounds, run pdal quickinfo over this
-    # chunk to determine if there are any points available in this
-    # set a bottom resolution of ~1km
     @dask.delayed
     def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0) -> Self:
+        """
+        Creates quad tree of chunks for this bounds, runs pdal quickinfo over
+        this to determine if there are any points available. Uses a bottom resolution
+        of 1km.
 
+        :param data: Data object containing point cloud details.
+        :param res_threshold: Resolution threshold., defaults to 100
+        :param pc_threshold: Point count threshold., defaults to 600000
+        :param depth_threshold: Tree depth threshold., defaults to 6
+        :param depth: Current tree depth., defaults to 0
+        :return: Returns a list of Extents.
+        """
 
         pc = data.estimate_count(self.bounds)
         target_pc = pc_threshold
@@ -150,6 +199,12 @@ class Extents(object):
 
 
     def _find_dims(self, tile_size):
+        """
+        Find most square-like Extents given the number of cells per tile.
+
+        :param tile_size: Number of cells per tile.
+        :return: Returns x and y coordinates in a list.
+        """
         s = math.sqrt(tile_size)
         if int(s) == s:
             return [s, s]
@@ -161,6 +216,12 @@ class Extents(object):
         return [x, y]
 
     def get_leaf_children(self, tile_size):
+        """
+        Get children Extents with given number of cells per tile.
+
+        :param tile_size: Cells per tile.
+        :yield: Yield from list of child extents.
+        """
         res = self.resolution
         xnum, ynum = self._find_dims(tile_size)
 
@@ -184,12 +245,25 @@ class Extents(object):
 
     @staticmethod
     def from_storage(tdb_dir: str):
+        """
+        Create Extents from information stored in database.
+
+        :param tdb_dir: TileDB database directory.
+        :return: Returns resulting Extents.
+        """
         storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
         return Extents(meta.root, meta.resolution, meta.root)
 
     @staticmethod
     def from_sub(tdb_dir: str, sub: Bounds):
+        """
+        Create an Extents that is less than the overall extents of the database.
+
+        :param tdb_dir: TileDB database directory.
+        :param sub: Desired bounding box.
+        :return: Returns resulting Extents.
+        """
         storage = Storage.from_db(tdb_dir)
 
         meta = storage.getConfig()

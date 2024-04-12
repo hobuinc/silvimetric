@@ -24,6 +24,11 @@ class SilviMetricJSONEncoder(json.JSONEncoder):
 
 @dataclass(kw_only=True)
 class Config(ABC):
+    """
+    Base config
+
+    :param tdb_dir: Path to TileDB directory to use.
+    """
     tdb_dir: str
     log: Log = field(default_factory = lambda: Log("INFO"))
     debug: bool = field(default=False)
@@ -50,6 +55,23 @@ class Config(ABC):
 
 @dataclass
 class StorageConfig(Config):
+    """
+    Config for constructing a Storage object
+
+    :param root: Root project bounding box
+    :param crs: Coordinate reference system, same for all data in a project
+    :param resolution: Resolution of cells, same for all data in a project,
+        defaults to 30.0
+    :param attrs: List of :class:`silvimetric.resources.entry.Attribute`
+        attributes that represent point data, defaults to Z, NumberOfReturns,
+        ReturnNumber, Intensity
+    :param metrics: List of :class:`silvimetric.resources.metric.Metric` Metrics
+        that represent derived data, defaults to values in Metrics object
+    :param version: Silvimetric version
+    :param capacity: TileDB Capacity, defaults to 1000000
+    :param next_time_slot: Next time slot to be allocated to a shatter process.
+        Increment after use., defaults to 1
+    """
     root: Bounds
     crs: pyproj.CRS
     resolution: float = 30.0
@@ -100,7 +122,7 @@ class StorageConfig(Config):
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
-        d['root'] = json.loads(self.root.to_json())
+        d['root'] = self.root.to_json()
         return d
 
     @classmethod
@@ -136,6 +158,13 @@ class StorageConfig(Config):
 
 @dataclass
 class ApplicationConfig(Config):
+    """
+    Base application config
+
+    :param debug: Debug mode, defaults to False
+    :param progress: Should processes display progress bars, defaults to False
+    :param scheduler: Dask scheduler, defaults to 'distributed'
+    """
     debug: bool = False,
     progress: bool = False,
     scheduler: str = 'distributed'
@@ -158,6 +187,29 @@ class ApplicationConfig(Config):
 Mbr = tuple[tuple[tuple[int,int], tuple[int,int]], ...]
 @dataclass
 class ShatterConfig(Config):
+    """Config for Shatter process
+    :param filename: Input filename referencing a PDAL pipeline or point cloud
+        file.
+    :param date: A date or date range representing data collection times.
+    :param attrs: List of attributes to use in shatter. If this is not set it
+        will be filled by the attributes in the database instance.
+    :param metrics: A list of metrics to use in shatter. If this is not set it
+        will be filled by the metrics in the database instance.
+    :param bounds: The bounding box of the shatter process., defaults to None
+    :param name: UUID representing this shatter process and will be generated
+        if not provided., defaults to uuid.uuid()
+    :param tile_size: The number of cells to include in a tile., defaults to None
+    :param start_time: The process starting time in seconds since Jan 1 1970
+    :param end_time: The process ending time in seconds since Jan 1 1970
+    :param point_count: The number of points that has been processed so far., defaults to 0
+    :param mbr: The minimum bounding rectangle derived from TileDB array
+        fragments. This will be used to for resuming shatter processes and
+        making sure it doesn't repeat work., defaults to tuple()
+    :param finished: Finished flag for shatter process., defaults to False
+    :param time_slot: The time slot that has been reserved for this shatter
+        process. Will be used as the timestamp in tiledb writes to better
+        organize and manage processes., defaults to 0
+    """
     filename: str
     date: Union[datetime, Tuple[datetime, datetime]]
     attrs: list[Attribute] = field(default_factory=list)
@@ -188,7 +240,7 @@ class ShatterConfig(Config):
 
         d['name'] = str(self.name)
         d['time_slot'] = self.time_slot
-        d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
+        d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['mbr'] = self.mbr
@@ -242,6 +294,15 @@ class ShatterConfig(Config):
 
 @dataclass
 class ExtractConfig(Config):
+    """Config for the Extract process.
+
+    :param out_dir: The directory where derived rasters should be written.
+    :param attrs: List of attributes to use in shatter. If this is not set it
+        will be filled by the attributes in the database instance.
+    :param metrics: A list of metrics to use in shatter. If this is not set it
+        will be filled by the metrics in the database instance.
+    :param bounds: The bounding box of the shatter process., defaults to None
+    """
     out_dir: str
     attrs: list[Attribute] = field(default_factory=list)
     metrics: list[Metric] = field(default_factory=list)
@@ -269,7 +330,7 @@ class ExtractConfig(Config):
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
-        d['bounds'] = json.loads(self.bounds.to_json())
+        d['bounds'] = self.bounds.to_json()
         return d
 
     @classmethod

@@ -9,30 +9,19 @@ from ..resources import Storage, Data, Extents, Bounds
 def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, resolution:float=100,
         depth:int=6, filter:bool=False):
     """
-    Scan pointcloud and determine appropriate tile sizes
+    Scan pointcloud and determine appropriate tile sizes.
 
-    Parameters
-    ----------
-    tdb_dir : str
-        TileDB directory path
-    pointcloud : str
-        Path to pointcloud
-    bounds : Bounds
-        Bounds filter
-    point_count : int, optional
-        Point count limit, by default 600000
-    resolution : float, optional
-        Resolution limit, by default 100
-    depth : int, optional
-        Tree depth limit, by default 6
-    filter : bool, optional
-        Remove empty extents, by default False
-
-    Returns
-    -------
-    int
-        Recommended tile size
+    :param tdb_dir: TileDB database directory.
+    :param pointcloud: Path to point cloud.
+    :param bounds: Bounding box to filter by.
+    :param point_count: Point count threshold., defaults to 600000
+    :param resolution: Resolution threshold., defaults to 100
+    :param depth: Tree depth threshold., defaults to 6
+    :param filter: Remove empty Extents. This takes longer, but is more accurage., defaults to False
+    :return: Returns list of point counts.
     """
+
+    # TODO Scan should output other information about a file like bounds
     logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
 
@@ -62,28 +51,18 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
 
 def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
         pc_threshold:int=600000, depth_threshold:int=6) -> list[int]:
-
     """
-    Iterate through quad tree of this Extents object with given threshold parameters
+    Recurisvely iterate through quad tree of this Extents object with given
+    threshold parameters.
 
-    Parameters
-    ----------
-    extent : Extents
-        Current extents
-    data : Data
-        Reference data object
-    res_threshold : int, optional
-        Resolution threshold, by default 100
-    pc_threshold : int, optional
-        Point count threshold, by default 600000
-    depth_threshold : int, optional
-        Tree depth threshold, by default 6
-
-    Returns
-    -------
-    list[int]
-        List of point counts
+    :param extent: Current Extent.
+    :param data: Data object created from point cloud file.
+    :param res_threshold: Resolution threshold., defaults to 100
+    :param pc_threshold: Point count threshold., defaults to 600000
+    :param depth_threshold: Tree depth threshold., defaults to 6
+    :return: Returns list of Extents that fit thresholds.
     """
+
 
     if extent.root is not None:
         bminx, bminy, bmaxx, bmaxy = extent.root.get()
@@ -130,25 +109,13 @@ def tile_info(extent: Extents, data: Data, res_threshold:int=100,
     Recursively explore current extents, use thresholds to determine when to
     stop searching.
 
-    Parameters
-    ----------
-    extent : Extents
-        Current extents
-    data : Data
-        _description_
-    res_threshold : int, optional
-        _description_, by default 100
-    pc_threshold : int, optional
-        _description_, by default 600000
-    depth_threshold : int, optional
-        _description_, by default 6
-    depth : int, optional
-        _description_, by default 0
-
-    Returns
-    -------
-    list[int]
-        List of point counts
+    :param extent: Current Extent.
+    :param data: Data object created from point cloud file.
+    :param res_threshold: Resolution threshold., defaults to 100
+    :param pc_threshold: Point count threshold., defaults to 600000
+    :param depth_threshold: Tree depth threshold., defaults to 6
+    :param depth: Current Tree depth., defaults to 0
+    :return: Returns list of Extents that fit thresholds.
     """
 
     pc = data.estimate_count(extent.bounds)
