@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python
   - tiledb-py
+  - pdal
   - python-pdal
   - numpy
   - shapely
