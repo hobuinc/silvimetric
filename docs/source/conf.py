@@ -7,6 +7,7 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 
+import silvimetric
 import sys, os, re
 import time
 import datetime
