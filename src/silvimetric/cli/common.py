@@ -119,3 +119,8 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
         dask_config['scheduler'] = scheduler
 
     dask.config.set(dask_config)
+
+def close_dask():
+    client = dask.config.get('distributed.client')
+    if isinstance(client, Client):
+        client.close()

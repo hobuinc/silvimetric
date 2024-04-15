@@ -4,7 +4,7 @@ from click.testing import CliRunner
 
 from silvimetric.commands import shatter
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def runner():
     return CliRunner()
 

@@ -1,3 +1,4 @@
+import os
 import tiledb
 import numpy as np
 from datetime import datetime
@@ -316,5 +317,5 @@ class Storage:
         # TODO move from timestamp to fragment_uris, timestamp is deprecated
         # this is currently failing, I believe from a bug in tiledb
         afs = self.get_fragments_by_time(proc_num)
-        uris = [ urllib.parse.urlparse(f).path for f in afs.uri ]
+        uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
         tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)

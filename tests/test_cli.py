@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
@@ -34,12 +35,12 @@ class TestCli(object):
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
 
     def test_cli_scan(self, tdb_filepath, runner, copc_filepath, storage):
-        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, 'scan', copc_filepath])
+        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'scan', copc_filepath])
         assert res.exit_code == 0
 
     def test_cli_info(self, tdb_filepath, runner, shatter_config):
         shatter.shatter(shatter_config)
-        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, 'info'])
+        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'info'])
         assert res.exit_code == 0
 
     def test_cli_extract(self, runner, extract_config):

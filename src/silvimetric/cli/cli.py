@@ -9,7 +9,7 @@ from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
-from .common import dask_handle
+from .common import dask_handle, close_dask
 
 @click.group()
 @click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
@@ -45,6 +45,7 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
             scheduler=scheduler)
     dask_handle(dasktype, scheduler, workers, threads, watch, app.log)
     ctx.obj = app
+    ctx.call_on_close(close_dask)
 
 
 @cli.command("info")
