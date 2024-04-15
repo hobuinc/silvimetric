@@ -24,14 +24,13 @@ class SilviMetricJSONEncoder(json.JSONEncoder):
 
 @dataclass(kw_only=True)
 class Config(ABC):
-    """
-    Base config
-
-    :param tdb_dir: Path to TileDB directory to use.
-    """
+    """Base config"""
     tdb_dir: str
+    """Path to TileDB directory to use."""
     log: Log = field(default_factory = lambda: Log("INFO"))
+    """Log object."""
     debug: bool = field(default=False)
+    """Debug flag."""
 
     def to_json(self):
         keys = self.__dataclass_fields__.keys()
@@ -55,35 +54,30 @@ class Config(ABC):
 
 @dataclass
 class StorageConfig(Config):
-    """
-    Config for constructing a Storage object
-
-    :param root: Root project bounding box
-    :param crs: Coordinate reference system, same for all data in a project
-    :param resolution: Resolution of cells, same for all data in a project,
-        defaults to 30.0
-    :param attrs: List of :class:`silvimetric.resources.entry.Attribute`
-        attributes that represent point data, defaults to Z, NumberOfReturns,
-        ReturnNumber, Intensity
-    :param metrics: List of :class:`silvimetric.resources.metric.Metric` Metrics
-        that represent derived data, defaults to values in Metrics object
-    :param version: Silvimetric version
-    :param capacity: TileDB Capacity, defaults to 1000000
-    :param next_time_slot: Next time slot to be allocated to a shatter process.
-        Increment after use., defaults to 1
-    """
+    """ Config for constructing a Storage object """
     root: Bounds
+    """Root project bounding box"""
     crs: pyproj.CRS
+    """Coordinate reference system, same for all data in a project"""
     resolution: float = 30.0
+    """Resolution of cells, same for all data in a project, defaults to 30.0"""
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
+    """List of :class:`silvimetric.resources.entry.Attribute` attributes that
+    represent point data, defaults to Z, NumberOfReturns, ReturnNumber, Intensity"""
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])
+    """List of :class:`silvimetric.resources.metric.Metric` Metrics that
+    represent derived data, defaults to values in Metrics object"""
     version: str = __version__
+    """Silvimetric version"""
     capacity: int = 1000000
+    """TileDB Capacity, defaults to 1000000"""
     next_time_slot: int = 1
+    """Next time slot to be allocated to a shatter process. Increment after
+    use., defaults to 1"""
 
 
     def __post_init__(self) -> None:
@@ -158,16 +152,14 @@ class StorageConfig(Config):
 
 @dataclass
 class ApplicationConfig(Config):
-    """
-    Base application config
+    """ Base application config """
 
-    :param debug: Debug mode, defaults to False
-    :param progress: Should processes display progress bars, defaults to False
-    :param scheduler: Dask scheduler, defaults to 'distributed'
-    """
     debug: bool = False,
+    """Debug mode, defaults to False"""
     progress: bool = False,
+    """Should processes display progress bars, defaults to False"""
     scheduler: str = 'distributed'
+    """Dask scheduler, defaults to 'distributed'"""
 
     def to_json(self):
         d = super().to_json()
@@ -187,42 +179,39 @@ class ApplicationConfig(Config):
 Mbr = tuple[tuple[tuple[int,int], tuple[int,int]], ...]
 @dataclass
 class ShatterConfig(Config):
-    """Config for Shatter process
-    :param filename: Input filename referencing a PDAL pipeline or point cloud
-        file.
-    :param date: A date or date range representing data collection times.
-    :param attrs: List of attributes to use in shatter. If this is not set it
-        will be filled by the attributes in the database instance.
-    :param metrics: A list of metrics to use in shatter. If this is not set it
-        will be filled by the metrics in the database instance.
-    :param bounds: The bounding box of the shatter process., defaults to None
-    :param name: UUID representing this shatter process and will be generated
-        if not provided., defaults to uuid.uuid()
-    :param tile_size: The number of cells to include in a tile., defaults to None
-    :param start_time: The process starting time in seconds since Jan 1 1970
-    :param end_time: The process ending time in seconds since Jan 1 1970
-    :param point_count: The number of points that has been processed so far., defaults to 0
-    :param mbr: The minimum bounding rectangle derived from TileDB array
-        fragments. This will be used to for resuming shatter processes and
-        making sure it doesn't repeat work., defaults to tuple()
-    :param finished: Finished flag for shatter process., defaults to False
-    :param time_slot: The time slot that has been reserved for this shatter
-        process. Will be used as the timestamp in tiledb writes to better
-        organize and manage processes., defaults to 0
-    """
+    """Config for Shatter process"""
     filename: str
+    """Input filename referencing a PDAL pipeline or point cloud file."""
     date: Union[datetime, Tuple[datetime, datetime]]
+    """A date or date range representing data collection times."""
     attrs: list[Attribute] = field(default_factory=list)
+    """List of attributes to use in shatter. If this is not set it will be
+    filled by the attributes in the database instance."""
     metrics: list[Metric] = field(default_factory=list)
+    """A list of metrics to use in shatter. If this is not set it will be filled by the metrics in the database instance."""
     bounds: Union[Bounds, None] = field(default=None)
+    """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
+    """UUID representing this shatter process and will be generated if not
+    provided., defaults to uuid.uuid()"""
     tile_size: Union[int, None] = field(default=None)
+    """The number of cells to include in a tile., defaults to None"""
     start_time:float = 0
+    """The process starting time in seconds since Jan 1 1970., defaults to 0"""
     end_time:float = 0
+    """The process ending time in seconds since Jan 1 1970., defaults to 0"""
     point_count: int = 0
+    """The number of points that has been processed so far., defaults to 0"""
     mbr: Mbr = field(default_factory=tuple)
+    """The minimum bounding rectangle derived from TileDB array fragments.
+    This will be used to for resuming shatter processes and making sure it
+    doesn't repeat work., defaults to tuple()"""
     finished: bool = False
+    """Finished flag for shatter process., defaults to False"""
     time_slot: int = 0
+    """The time slot that has been reserved for this shatter process. Will be
+    used as the timestamp in tiledb writes to better organize and manage
+    processes., defaults to 0"""
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -294,19 +283,17 @@ class ShatterConfig(Config):
 
 @dataclass
 class ExtractConfig(Config):
-    """Config for the Extract process.
-
-    :param out_dir: The directory where derived rasters should be written.
-    :param attrs: List of attributes to use in shatter. If this is not set it
-        will be filled by the attributes in the database instance.
-    :param metrics: A list of metrics to use in shatter. If this is not set it
-        will be filled by the metrics in the database instance.
-    :param bounds: The bounding box of the shatter process., defaults to None
-    """
+    """Config for the Extract process."""
     out_dir: str
+    """The directory where derived rasters should be written."""
     attrs: list[Attribute] = field(default_factory=list)
+    """List of attributes to use in shatter. If this is not set it
+    will be filled by the attributes in the database instance."""
     metrics: list[Metric] = field(default_factory=list)
+    """A list of metrics to use in shatter. If this is not set it
+    will be filled by the metrics in the database instance."""
     bounds: Bounds = field(default=None)
+    """The bounding box of the shatter process., defaults to None"""
 
     def __post_init__(self) -> None:
         from .storage import Storage

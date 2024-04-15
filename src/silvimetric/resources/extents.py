@@ -16,13 +16,7 @@ IndexDomain = tuple[np.ScalarType, np.ScalarType]
 IndexDomainList = tuple[IndexDomain, IndexDomain]
 
 class Extents(object):
-    """
-    Handles bounds operations for point cloud data.
-
-    :param bounds: Bounding box of this section of data.
-    :param resolution: Resolution of database.
-    :param root: Root bounding box of the database.
-    """
+    """Handles bounds operations for point cloud data."""
 
     def __init__(self,
                  bounds: Bounds,
@@ -30,20 +24,31 @@ class Extents(object):
                  root: Bounds):
 
         self.bounds = bounds
+        """Bounding box of this section of data."""
         self.root = root
+        """Root bounding box of the database."""
 
         minx, miny, maxx, maxy = self.bounds.get()
 
         self.rangex = maxx - minx
+        """Range of X Indices"""
         self.rangey = maxy - miny
+        """Range of Y indices"""
         self.resolution = resolution
+        """Resolution of database."""
         self.cell_count = int((self.rangex * self.rangey) / self.resolution ** 2)
+        """Number of cells in this Extents"""
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
+        """Minimum X index"""
         self.y1 = math.floor((self.root.maxy - maxy) / resolution)
+        """Minimum Y index"""
         self.x2 = math.ceil((maxx - self.root.minx) / resolution)
+        """Maximum X index"""
         self.y2 = math.ceil((self.root.maxy - miny) / resolution)
+        """Maximum Y index"""
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
+        """Minimum bounding rectangle of this Extents"""
 
     def get_indices(self):
         """

@@ -6,13 +6,8 @@ from abc import ABC, abstractmethod
 from tiledb import Attr
 
 class Entry(ABC):
-    """
-    Base class for Attribute and Metric. These represent entries into the
-    database.
-
-    :param dtype: Numpy data type for values in this entry.
-    :param dependencies: List of entries that this entry is dependent on.
-    """
+    """Base class for Attribute and Metric. These represent entries into the
+    database."""
 
     def __eq__(self, other: Self):
         return self.name == other.name and \
@@ -42,22 +37,20 @@ class Entry(ABC):
 
 
 class Attribute(Entry):
-    """
-    Represents point data from a PDAL execution that has been binned,
-    and provides the information necessary to transfer that data to the database.
-
-    :param name: Name of the attribute, eg. Intensity.
-    :param dtype: Numpy data type for values in this entry.
-    :param dependencies: List of entries that this entry is dependent on.
-    """
+    """Represents point data from a PDAL execution that has been binned, and
+    provides the information necessary to transfer that data to the database."""
 
     def __init__(self, name: str, dtype: np.dtype, deps: list[Self]=None):
         super().__init__()
         self.name = name
+        """Name of the attribute, eg. Intensity."""
         self.dtype = dtype
+        """Numpy data type."""
         self.dependencies = deps
+        """Attributes/Metrics this is dependent on."""
 
     def entry_name(self) -> str:
+        """Return TileDB attribute name."""
         return self.name
 
     def schema(self) -> Attr:

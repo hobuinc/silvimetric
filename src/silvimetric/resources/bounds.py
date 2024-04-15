@@ -1,24 +1,19 @@
 import json
 import ast
+from typing import Self
 
 class Bounds(dict): #for JSON serializing
     """Simple class to represent a 2 or 3-dimensional bounding box that can be
-    generated from both JSON or PDAL bounds form.
-
-    :param minx: minimum X plane
-    :param miny: minimum Y plane
-    :param maxx: maximum X plane
-    :param maxy: maximum Y plane
-    """
+    generated from both JSON or PDAL bounds form."""
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
-        """
-        _summary_
-
-        """
         self.minx = float(minx)
+        """minimum X Plane"""
         self.miny = float(miny)
+        """minimum Y plane"""
         self.maxx = float(maxx)
+        """maximum X plane"""
         self.maxy = float(maxy)
+        """maximum Y plane"""
 
     def __eq__(self, other):
         return  other.minx == self.minx and \
@@ -33,7 +28,7 @@ class Bounds(dict): #for JSON serializing
 
 
     @staticmethod
-    def from_string(bbox_str: str):
+    def from_string(bbox_str: str) -> Self:
         """Create Bounds object from a PDAL bounds string in the form:
 
         "([1,101],[2,102],[3,103])"

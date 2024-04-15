@@ -9,25 +9,26 @@ import json
 
 class Data:
     """Represents a point cloud or PDAL pipeline, and performs essential operations
-    necessary to understand and execute a Shatter process.
-
-    :param filename: Path to either PDAL pipeline or point cloud file
-    :param storageconfig: :class:`silvimetric.resources.StorageConfig`
-    :param bounds: _description_, defaults to None
-    """
+    necessary to understand and execute a Shatter process."""
 
     def __init__(self,
                  filename: str,
                  storageconfig: StorageConfig,
                  bounds: Bounds = None):
         self.filename = filename
+        """Path to either PDAL pipeline or point cloud file"""
         self.bounds = bounds
+        """Bounds of this section of data"""
 
         self.reader_thread_count = 2
+        """Thread count for PDAL reader. Keep to 2 so we don't hog threads"""
 
         self.storageconfig = storageconfig
+        """:class:`silvimetric.resources.StorageConfig`"""
         self.reader = self.get_reader()
+        """PDAL reader"""
         self.pipeline = self.get_pipeline()
+        """PDAL pipeline"""
         if self.bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 

@@ -18,6 +18,7 @@ def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
     :raises TypeError: Incorrect type of bounds argument.
     :raises TypeError: Incorrect type of name argument.
     :raises TypeError: Incorrect type of name argument.
+    :meta public:
     """
     if start_time is not None and not isinstance(start_time, datetime):
         raise TypeError(f'Incorrect type of "start_time" argument.')

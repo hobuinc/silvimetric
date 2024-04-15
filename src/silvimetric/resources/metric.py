@@ -22,25 +22,30 @@ class Metric(Entry):
     metrics available through Silvimetric, or you can create your own. A Metric
     object has all the information necessary to facilitate the derivation of
     data as well as its insertion into the database.
-
-    :param name: The name of the Metric, eg. Mean, Max, Mode
-    :param dtype: Numpy data type for values in Metric
-    :param method: The function used to derive data for the Metric from Attributes
-    :param dependencies: Entry dependencies for this Metric, defaults to None
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn, dependencies: list[Attribute]=None):
         super().__init__()
         self.name = name
+        """Metric name. eg. mean"""
         self.dtype = dtype
+        """Numpy data type."""
         self.dependencies = dependencies
+        """Attributes/Metrics this is dependent on."""
         self._method = method
+        """The method that processes this data."""
 
     def schema(self, attr: Attribute):
+        """
+        Create schema for TileDB creation.
+
+        :param attr: :class:`silvimetric.resources.entry.Atttribute`
+        :return: TileDB Attribute
+        """
         entry_name = self.entry_name(attr.name)
         return Attr(name=entry_name, dtype=self.dtype)
 
-    # common name, storage name
     def entry_name(self, attr: str) -> str:
+        """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
     @dask.delayed
