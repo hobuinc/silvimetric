@@ -13,10 +13,8 @@ build:
     pre_build:
       - pip install .
       - export PROJ_NETWORK=TRUE
-      - echo -e $(mamba env list)
-      - echo -e $(mamba list)
-      - echo ${CONDA_PREFIX}
       - export PROJ_DATA="${CONDA_PREFIX}/share/proj"
+      - echo -e $(ls -la ${PROJ_DATA})
 
 sphinx:
   builder: html
