@@ -13,6 +13,7 @@ build:
     pre_build:
       - PROJ_NETWORK=TRUE
       - echo -e "$(mamba env list)"
+      - echo -e "$(ls -la /home/docs/checkouts/readthedocs.org/user_builds/silvistat/conda/78/share/proj)"
 
 sphinx:
   builder: html
