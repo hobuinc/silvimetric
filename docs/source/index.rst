@@ -16,6 +16,7 @@ SilviMetric is also available on `Google Slides <https://docs.google.com/present
 
 .. toctree::
    :caption: Contents
+   :maxdepth: 2
 
    about
    cli/index
