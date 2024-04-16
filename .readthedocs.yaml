@@ -9,8 +9,9 @@ build:
   os: "ubuntu-22.04"
   tools:
     python: "mambaforge-22.9"
-  pre_build:
-    - pip install .
+  jobs:
+    pre_build:
+      - pip install .
 
 sphinx:
   builder: html
