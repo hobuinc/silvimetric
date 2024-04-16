@@ -14,7 +14,8 @@ build:
       - pip install .
       - export PROJ_NETWORK=TRUE
       - export PROJ_DATA="${CONDA_PREFIX}/share/proj"
-      - echo -e $(ls -la ${PROJ_DATA})
+      - echo "PROJ directory -> ${PROJ_DATA}"
+      - echo -e "$(ls -la ${PROJ_DATA})"
 
 sphinx:
   builder: html
