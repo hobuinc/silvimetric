@@ -15,9 +15,6 @@ build:
       - export PROJ_NETWORK=TRUE
       - echo -e $(mamba env list)
       - echo -e $(mamba list)
-      - mamba activate sm-docs
-      - echo -e $(mamba env list)
-      - echo -e $(mamba list)
       - echo ${CONDA_PREFIX}
       - export PROJ_DATA="${CONDA_PREFIX}/share/proj"
 
