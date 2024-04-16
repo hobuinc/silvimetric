@@ -20,8 +20,8 @@ sphinx:
 conda:
   environment: docs/environment.yml
 
-python:
-  install:
-    - requirements: docs/requirements.txt
+# python:
+#   install:
+#     - requirements: docs/requirements.txt
 
 formats: all
