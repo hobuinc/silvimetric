@@ -11,11 +11,8 @@ build:
     python: "mambaforge-22.9"
   jobs:
     pre_build:
-      - pip install .
-      - export PROJ_NETWORK=TRUE
-      - export PROJ_DATA="${CONDA_PREFIX}/share/proj"
-      - echo "PROJ directory -> ${PROJ_DATA}"
-      - echo -e "$(ls -la ${PROJ_DATA})"
+      - PROJ_NETWORK=TRUE
+      - echo -e "$(mamba env list)"
 
 sphinx:
   builder: html
@@ -25,8 +22,9 @@ sphinx:
 conda:
   environment: docs/environment.yml
 
-# python:
-#   install:
-#     - requirements: docs/requirements.txt
+python:
+  install:
+    - method: pip
+      path: .
 
 formats: all
