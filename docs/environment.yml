@@ -1,0 +1,23 @@
+name: sm-docs
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - tiledb-py
+  - pdal
+  - python-pdal
+  - numpy
+  - shapely
+  - dask
+  - pyproj
+  - gdal
+  - scipy
+  - websocket-client
+  - python-json-logger
+  - dill
+  - pip:
+    - sphinx
+    - sphinxcontrib-bibtex
+    - sphinx-rtd-theme
+    - sphinxcontrib-spelling
+    - sphinx-notfound-page
