@@ -12,6 +12,8 @@ build:
   jobs:
     pre_build:
       - pip install .
+      - export PROJ_NETWORK=TRUE
+      - export PROJ_DATA="${CONDAENV}/share/proj"
 
 sphinx:
   builder: html
