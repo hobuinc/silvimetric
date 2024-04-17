@@ -5,8 +5,13 @@ API
 ================================================================================
 
 .. toctree::
-    :caption: Api
+    :caption: Resources
     :maxdepth: 1
 
     resources/index
+
+.. toctree::
+    :caption: Commands
+    :maxdepth: 1
+
     commands/index

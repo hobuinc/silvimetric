@@ -1,6 +1,3 @@
-Commands
-============================
-
 .. toctree::
     :maxdepth: 1
 
