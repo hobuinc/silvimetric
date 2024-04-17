@@ -1,8 +1,7 @@
-Resources:
+Resources
 =============================
 
 .. toctree::
-    :caption: Resources
     :maxdepth: 1
 
     config

@@ -3,6 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - python
+  - pip
   - tiledb-py
   - pdal
   - python-pdal

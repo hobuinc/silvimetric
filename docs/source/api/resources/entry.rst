@@ -8,7 +8,7 @@ Attribute
 
 .. autoclass:: silvimetric.resources.entry.Attribute
 
-metric
+Metric
 ----------------------------------
 
 .. autoclass:: silvimetric.resources.metric.Metric

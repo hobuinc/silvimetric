@@ -1,4 +1,4 @@
-info
+Info
 ===========================
 
 .. automodule:: silvimetric.commands.info
