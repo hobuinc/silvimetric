@@ -4,14 +4,19 @@
 API
 ================================================================================
 
+
+Resources
+---------
+
 .. toctree::
-    :caption: Resources
     :maxdepth: 1
 
     resources/index
 
+Commands
+--------
+
 .. toctree::
-    :caption: Commands
     :maxdepth: 1
 
     commands/index
