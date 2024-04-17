@@ -3,4 +3,6 @@ sphinxcontrib-bibtex
 sphinx-rtd-theme
 sphinxcontrib-spelling
 sphinx-notfound-page
-.
+numpy
+tiledb
+dask

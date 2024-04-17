@@ -76,3 +76,16 @@ extensions = [
    'sphinx.ext.autodoc',
    'sphinx.ext.autosummary',
 ]
+
+autodoc_mock_imports = [
+    "pyproj",
+    "osgeo",
+    "distributed",
+    "dask.dataframe",
+    "scipy",
+    "dill",
+    "shapely",
+    "pdal",
+    "gdal",
+    "pandas"
+]

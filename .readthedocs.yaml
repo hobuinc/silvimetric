@@ -8,24 +8,17 @@ version: 2
 build:
   os: "ubuntu-22.04"
   tools:
-    python: "mambaforge-22.9"
-  jobs:
-    pre_build:
-      - PROJ_NETWORK=TRUE
-      - echo -e "$(mamba env list)"
-      - echo -e "$(ls -la /home/docs/checkouts/readthedocs.org/user_builds/silvistat/conda/78/share/proj)"
+    python: "3.11"
 
 sphinx:
   builder: html
   configuration: docs/source/conf.py
   fail_on_warning: false
 
-conda:
-  environment: docs/environment.yml
-
 python:
   install:
     - method: pip
       path: .
+      requirements: doc/requirements.txt
 
 formats: all

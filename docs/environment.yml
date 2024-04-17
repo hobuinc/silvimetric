@@ -2,19 +2,10 @@ name: sm-docs
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.11
+  - pip
   - tiledb-py
-  - pdal
-  - python-pdal
   - numpy
-  - shapely
-  - dask
-  - pyproj
-  - gdal
-  - scipy
-  - websocket-client
-  - python-json-logger
-  - dill
   - pip:
     - sphinx
     - sphinxcontrib-bibtex
