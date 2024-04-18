@@ -20,15 +20,26 @@ Synopsis
 
 .. code-block::
 
-    Usage: silvimetric DATABASE initialize [OPTIONS] BOUNDS CRS
+    Usage: silvimetric [OPTIONS] initialize [OPTIONS]
 
     Initialize silvimetrics DATABASE
 
     Options:
+    --bounds BOUNDS         Root bounds that encapsulates all data  [required]
+    --crs CRS               Coordinate system of data  [required]
     -a, --attributes ATTRS  List of attributes to include in Database
     -m, --metrics METRICS   List of metrics to include in Database
     --resolution FLOAT      Summary pixel resolution
     --help                  Show this message and exit.
+
+
+Example
+-------
+
+.. code-block::
+
+    silvimetric --database test.tdb initialize --crs "EPSG:3857" \
+        --bounds '[300, 300, 600, 600]'
 
 
 .. include:: ../substitutions.txt

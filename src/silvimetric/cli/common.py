@@ -33,10 +33,15 @@ class AttrParamType(click.ParamType):
     name="Attrs"
     #TODO add import similar to metrics
     def convert(self, value, param, ctx) -> list[Attribute]:
-        try:
-            return [Attributes[a] for a in value]
-        except Exception as e:
-            self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
+        if isinstance(value, list):
+            try:
+                return [Attributes[a] for a in value]
+            except Exception as e:
+                self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
+        elif isinstance(value, str):
+            return Attributes[value]
+        else:
+            self.fail(f"{value!r} is of an invalid type, {e}", param, ctx)
 
 class MetricParamType(click.ParamType):
     name="Metrics"
@@ -67,7 +72,7 @@ class MetricParamType(click.ParamType):
             return user_metrics.metrics()
 
         try:
-            return [ Metrics[value] ]
+            return Metrics[value]
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
@@ -114,3 +119,8 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
         dask_config['scheduler'] = scheduler
 
     dask.config.set(dask_config)
+
+def close_dask():
+    client = dask.config.get('distributed.client')
+    if isinstance(client, Client):
+        client.close()

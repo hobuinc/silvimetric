@@ -17,19 +17,35 @@ MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
+    """
+    A Metric is an Entry representing derived cell data. There is a base set of
+    metrics available through Silvimetric, or you can create your own. A Metric
+    object has all the information necessary to facilitate the derivation of
+    data as well as its insertion into the database.
+    """
+    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, dependencies: list[Attribute]=None):
         super().__init__()
         self.name = name
+        """Metric name. eg. mean"""
         self.dtype = dtype
-        self.dependencies = deps
+        """Numpy data type."""
+        self.dependencies = dependencies
+        """Attributes/Metrics this is dependent on."""
         self._method = method
+        """The method that processes this data."""
 
     def schema(self, attr: Attribute):
+        """
+        Create schema for TileDB creation.
+
+        :param attr: :class:`silvimetric.resources.entry.Atttribute`
+        :return: TileDB Attribute
+        """
         entry_name = self.entry_name(attr.name)
         return Attr(name=entry_name, dtype=self.dtype)
 
-    # common name, storage name
     def entry_name(self, attr: str) -> str:
+        """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
     @dask.delayed

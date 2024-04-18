@@ -7,9 +7,9 @@ import logging
 from ..resources import Bounds, Log
 from ..resources import Attribute, Metric
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
-from ..commands import shatter, extract, scan, info, initialize
+from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
-from .common import dask_handle
+from .common import dask_handle, close_dask
 
 @click.group()
 @click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
@@ -45,6 +45,7 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
             scheduler=scheduler)
     dask_handle(dasktype, scheduler, workers, threads, watch, app.log)
     ctx.obj = app
+    ctx.call_on_close(close_dask)
 
 
 @cli.command("info")
@@ -162,9 +163,9 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
 
 @cli.command('extract')
-@click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
+@click.option("--attributes", "-a", multiple=True, type=AttrParamType(), default=[],
         help="List of attributes to include output")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
+@click.option("--metrics", "-m", multiple=True, type=MetricParamType(), default=[],
         help="List of metrics to include in output")
 @click.option("--bounds", type=BoundsParamType(), default=None,
         help="Bounds for data to include in output")
@@ -185,6 +186,26 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
             bounds = bounds)
     extract.extract(config)
 
+@cli.command('delete')
+@click.option('--id', type=click.UUID, required=True,
+    help="Shatter Task UUID.")
+@click.pass_obj
+def delete_cmd(app, id):
+    manage.delete(app.tdb_dir, id)
+
+@cli.command('restart')
+@click.option('--id', type=click.UUID, required=True,
+    help="Shatter Task UUID.")
+@click.pass_obj
+def restart_cmd(app, id):
+    manage.restart(tdb_dir=app.tdb_dir, name=id)
+
+@cli.command('resume')
+@click.option('--id', type=click.UUID, required=True,
+    help="Shatter Task UUID.")
+@click.pass_obj
+def resume_cmd(app, id):
+    manage.resume(tdb_dir=app.tdb_dir, name=id)
 
 if __name__ == "__main__":
     cli()

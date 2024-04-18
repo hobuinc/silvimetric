@@ -2,15 +2,13 @@ from silvimetric.resources import Storage, StorageConfig
 
 def initialize(storage: StorageConfig):
     """
-    Initialize a Silvimetric TileDB instance for a given StorageConfig instance
+    Initialize a Silvimetric TileDB instance for a given StorageConfig instance.
 
-    Parameters
-    ----------
-    StorageConfig :  StorageConfig
-
+    :param storage: :class:`silvimetric.resources.config.StorageConfig`.
+    :return: :class:`silvimetric.resources.storage.Storage` database object.
     """
 
-    storage.log.debug(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
+    storage.log.info(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
 
     s = Storage.create(storage)
     return s

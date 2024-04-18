@@ -4,12 +4,11 @@ import numpy as np
 import dask
 import json
 import uuid
-import platform
-
 
 from silvimetric.commands.shatter import shatter
 from silvimetric.commands.info import info
 from silvimetric.resources import Storage, Extents, ShatterConfig, Log
+
 
 @dask.delayed
 def write(x,y,val, s:Storage, attrs, dims, metrics):
@@ -38,7 +37,11 @@ class Test_Shatter(object):
                     a[xi, yi]['Z'].size == 1
                     assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
 
+        # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
+        shatter_config.mbr = ()
+        shatter_config.time_slot = 2
+
         shatter(shatter_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
@@ -53,8 +56,8 @@ class Test_Shatter(object):
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
                     assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/storage.config.resolution)-yi)))
 
-            m = info(storage.config.tdb_dir)
-            assert len(m['history']) == 2
+        m = info(storage.config.tdb_dir)
+        assert len(m['history']) == 2
 
     def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
         # test that writing in parallel doesn't affect ordering of values
@@ -75,7 +78,7 @@ class Test_Shatter(object):
     def test_config(self, shatter_config, storage, test_point_count):
         shatter(shatter_config)
         try:
-            meta = storage.getMetadata('shatter')
+            meta = storage.getMetadata('shatter', shatter_config.time_slot)
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
         meta_j = json.loads(meta)
@@ -91,6 +94,7 @@ class Test_Shatter(object):
         pc = 0
         for b in e.split():
             log = Log(20)
+            time_slot = storage.reserve_time_slot()
             sc = ShatterConfig(tdb_dir = s.tdb_dir,
                                log = log,
                                filename = s.filename,
@@ -99,9 +103,11 @@ class Test_Shatter(object):
                                metrics = s.metrics,
                                debug = s.debug,
                                bounds = b.bounds,
-                               date=s.date)
+                               date=s.date,
+                               time_slot=time_slot)
             pc = pc + shatter(sc)
         history = info(s.tdb_dir)['history']
+        assert len(history) == 4
         assert isinstance(history, list)
         pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
@@ -113,6 +119,7 @@ class Test_Shatter(object):
         reason='Missing necessary AWS environment variables'
     )
     def test_remote_creation(self, s3_shatter_config, s3_storage):
+        # need processes scheduler to accurately test bug fix
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution
         maxy = s3_storage.config.root.maxy

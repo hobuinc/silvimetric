@@ -131,11 +131,25 @@ We can now insert data into the SMDB
 
    .. code-block:: shell-session
 
-     silvimetric autzen-smdb.tdb \
-        shatter \
-        https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz \
+     silvimetric -d autzen-smdb.tdb \
         --threads 10 \
-        --watch
+        --watch \
+        shatter \
+        https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz
+
+Info
+--------------------------------------------------------------------------------
+
+We can query past shatter processes and the schema for the database with the
+Info call.
+
+   .. code-block:: shell-session
+
+     silvimetric -d autzen-smdb.tdb info
+
+This will print out a JSON object containing.
+
+.. include:: ./substitutions.txt
 
 Extract
 --------------------------------------------------------------------------------

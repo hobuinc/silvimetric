@@ -10,6 +10,7 @@
 import sys, os, re
 import time
 import datetime
+
 if os.environ.get('SOURCE_DATE_EPOCH'):
     year  = datetime.datetime.utcfromtimestamp(int(os.environ.get('SOURCE_DATE_EPOCH', time.gmtime()))).year
     today = datetime.datetime.utcfromtimestamp(int(os.environ.get('SOURCE_DATE_EPOCH', time.gmtime()))).strftime('%B %d, %Y')
@@ -74,4 +75,17 @@ pygments_style = 'sphinx'
 extensions = [
    'sphinx.ext.autodoc',
    'sphinx.ext.autosummary',
+]
+
+autodoc_mock_imports = [
+    "pyproj",
+    "osgeo",
+    "distributed",
+    "dask.dataframe",
+    "scipy",
+    "dill",
+    "shapely",
+    "pdal",
+    "gdal",
+    "pandas"
 ]

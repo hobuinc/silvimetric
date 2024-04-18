@@ -8,25 +8,36 @@ import pathlib
 import json
 
 class Data:
+    """Represents a point cloud or PDAL pipeline, and performs essential operations
+    necessary to understand and execute a Shatter process."""
 
     def __init__(self,
                  filename: str,
                  storageconfig: StorageConfig,
                  bounds: Bounds = None):
         self.filename = filename
+        """Path to either PDAL pipeline or point cloud file"""
         self.bounds = bounds
+        """Bounds of this section of data"""
 
         self.reader_thread_count = 2
+        """Thread count for PDAL reader. Keep to 2 so we don't hog threads"""
 
         self.storageconfig = storageconfig
+        """:class:`silvimetric.resources.StorageConfig`"""
         self.reader = self.get_reader()
+        """PDAL reader"""
         self.pipeline = self.get_pipeline()
+        """PDAL pipeline"""
         if self.bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 
 
     def is_pipeline(self) -> bool:
-        """Does this instance represent a pdal.Pipeline or a simple filename"""
+        """Does this instance represent a pdal.Pipeline or a simple filename
+
+        :return: Return true if input is a pipeline
+        """
 
         p = pathlib.Path(self.filename)
         if p.suffix == '.json' and p.name != 'ept.json':
@@ -35,7 +46,10 @@ class Data:
 
 
     def make_pipeline(self) -> pdal.Pipeline:
-        """Take a COPC or EPT endpoint and generate a PDAL pipeline for it"""
+        """Take a COPC or EPT endpoint and generate a PDAL pipeline for it
+
+        :return: Return PDAL pipeline
+        """
 
         reader = pdal.Reader(self.filename, tag='reader')
         reader._options['threads'] = self.reader_thread_count
@@ -53,8 +67,13 @@ class Data:
 
         return reader | class_zero | rn | nor #| ferry | assign_x | assign_y #| smrf | hag
 
-    def get_pipeline(self):
-        """Fetch the pipeline for the instance"""
+    def get_pipeline(self) -> pdal.Pipeline:
+        """Fetch the pipeline for the instance
+
+        :raises Exception: File type isn't COPC or EPT
+        :raises Exception: More than one reader detected
+        :return: Return PDAL pipline
+        """
 
         # If we are a pipeline, read and parse it. If we
         # aren't, go make_pipeline using some options that
@@ -109,6 +128,10 @@ class Data:
         return pdal.Pipeline(stages)
 
     def execute(self):
+        """Execute PDAL pipeline
+
+        :raises Exception: PDAL error message passed from execution
+        """
         try:
             self.pipeline.execute()
             # self.storageconfig.log.debug(f"PDAL log: {self.pipeline.log}")
@@ -117,13 +140,19 @@ class Data:
             raise e
 
     def get_array(self) -> np.ndarray:
-        """Fetch the array from the execute()'d pipeline"""
+        """Fetch the array from the execute()'d pipeline
+
+        :return: get data as a numpy ndarray
+        """
         return self.pipeline.arrays[0]
     array = property(get_array)
 
     def get_reader(self) -> pdal.Reader:
-        """Grab or make the reader for this instance so we can use it to do things like
-        get the count()"""
+        """Grab or make the reader for this instance so we can use it to do things
+        like get the count()
+
+        :return: get PDAL reader for input
+        """
         if self.is_pipeline():
             p = pathlib.Path(self.filename)
             j = p.read_bytes().decode('utf-8')
@@ -140,12 +169,23 @@ class Data:
 
     @staticmethod
     def get_bounds(reader: pdal.Reader) -> Bounds:
+        """Get the bounding box of a point cloud from PDAL.
+
+        :param reader: PDAL Reader representing input data
+        :return: bounding box of point cloud
+        """
         p = reader.pipeline()
         qi = p.quickinfo[reader.type]
         return Bounds.from_string(json.dumps(qi['bounds']))
 
     def estimate_count(self, bounds: Bounds) -> int:
-        """For the provided bounds, estimate the maximum number of points that could be inside them for this instance."""
+        """For the provided bounds, estimate the maximum number of points that
+        could be inside them for this instance.
+
+        :param bounds: query bounding box
+        :return: estimated point count
+        """
+
         reader = self.get_reader()
         if bounds:
             reader._options['bounds'] = str(bounds)
@@ -156,7 +196,13 @@ class Data:
         return pc
 
     def count(self, bounds: Bounds) -> int:
-        """For the provided bounds, read and count the number of points that are inside them for this instance."""
+        """For the provided bounds, read and count the number of points that are
+        inside them for this instance.
+
+        :param bounds: query bounding box
+        :return: point count
+        """
+
         reader = self.get_reader()
         if bounds:
             reader._options['bounds'] = str(bounds)

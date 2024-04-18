@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from tiledb import Attr
 
 class Entry(ABC):
+    """Base class for Attribute and Metric. These represent entries into the
+    database."""
 
     def __eq__(self, other: Self):
         return self.name == other.name and \
@@ -35,17 +37,27 @@ class Entry(ABC):
 
 
 class Attribute(Entry):
+    """Represents point data from a PDAL execution that has been binned, and
+    provides the information necessary to transfer that data to the database."""
 
     def __init__(self, name: str, dtype: np.dtype, deps: list[Self]=None):
         super().__init__()
         self.name = name
+        """Name of the attribute, eg. Intensity."""
         self.dtype = dtype
+        """Numpy data type."""
         self.dependencies = deps
+        """Attributes/Metrics this is dependent on."""
 
     def entry_name(self) -> str:
+        """Return TileDB attribute name."""
         return self.name
 
     def schema(self) -> Attr:
+        """
+        Create the tiledb schema for this attribute.
+        :return: TileDB attribute schema
+        """
         return Attr(name=self.name, dtype=self.dtype, var=True)
 
     def to_json(self) -> object:
@@ -57,6 +69,13 @@ class Attribute(Entry):
 
     @staticmethod
     def from_string(data: Union[str, dict]) -> Self:
+        """
+        Create Attribute from string or dict version of it.
+
+        :param data: Stringified or json object of attribute
+        :raises TypeError: Incorrect type of incoming data, must be string or dict
+        :return: Return derived Attribute
+        """
         if isinstance(data, str):
             j = json.loads(data)
         elif isinstance(data, dict):
