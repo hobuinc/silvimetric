@@ -219,8 +219,6 @@ class Storage:
         """
         Retrieve history of the database at current point in time.
 
-        Parameters
-        ----------
         :param start_time: Query parameter, starting datetime of process.
         :param end_time: Query parameter, ending datetime of process.
         :param bounds: Query parameter, bounds to query by.
