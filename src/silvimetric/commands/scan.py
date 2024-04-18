@@ -21,11 +21,20 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
     :return: Returns list of point counts.
     """
 
-    # TODO Scan should output other information about a file like bounds
+    # TODO Scan should output other information about a file like bounds, pc, avg points per cell
     with Storage.from_db(tdb_dir) as tdb:
 
+        logger = logging.getLogger('silvimetric')
         data = Data(pointcloud, tdb.config, bounds)
-        extents = Extents.from_sub(tdb_dir, data.bounds)
+        shared_bounds = Bounds.shared_bounds(data.bounds, tdb.config.root)
+
+        if shared_bounds != data.bounds:
+            logger.warning('Incoming bounds does not fully overlap with storage'
+                f' bounds. Adjusting incoming from {str(data.bounds)} to'
+                f' {str(shared_bounds)}')
+            extents = Extents.from_sub(tdb_dir, shared_bounds)
+        else:
+            extents = Extents.from_sub(tdb_dir, data.bounds)
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
@@ -35,12 +44,20 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
             cell_counts = extent_handle(extents, data, resolution, point_count,
                 depth)
 
+        point_count = data.count(extents.bounds)
+
         std = np.std(cell_counts)
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
-        logger = logging.getLogger('silvimetric')
-        logger.info(f'Tiling information:')
+
+        logger.info('Pointcloud information:')
+        logger.info(f'  Storage Bounds: {str(tdb.config.root)}')
+        logger.info(f'  Pointcloud Bounds: {str(data.bounds)}')
+        if shared_bounds != data.bounds:
+            logger.info(f'  Overlapping Bounds: {str(extents.bounds)}')
+        logger.info(f'  Point Count: {point_count}')
+        logger.info('Tiling information:')
         logger.info(f'  Mean tile size: {mean}')
         logger.info(f'  Std deviation: {std}')
         logger.info(f'  Recommended split size: {rec}')
@@ -88,7 +105,7 @@ def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
     curr_depth = 0
     while curr.npartitions > 0:
         logger = logging.getLogger('silvimetric')
-        logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
+        logger.debug(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
         n = curr.compute()
         to_add = [ x for x in n if isinstance(x, int) ]
         a = a + to_add

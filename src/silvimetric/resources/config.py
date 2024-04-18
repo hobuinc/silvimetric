@@ -158,8 +158,19 @@ class ApplicationConfig(Config):
     """Debug mode, defaults to False"""
     progress: bool = False,
     """Should processes display progress bars, defaults to False"""
+
+    # Dask configuration
+    dasktype: str = 'processes'
+    """Dask parallelization type. For information see
+    https://docs.dask.org/en/stable/scheduling.html#local-threads """
     scheduler: str = 'distributed'
     """Dask scheduler, defaults to 'distributed'"""
+    workers: int = 12
+    """Number of dask workers"""
+    threads: int = 4
+    """Number of threads per dask worker"""
+    watch: bool = False
+    """Open dask diagnostic page in default web browser"""
 
     def to_json(self):
         d = super().to_json()
@@ -170,7 +181,12 @@ class ApplicationConfig(Config):
         x = json.loads(data)
         n = cls(tdb_dir = x['tdb_dir'],
                 debug = x['debug'],
-                progress = x['progress'])
+                progress = x['progress'],
+                dasktype = x['dasktype'],
+                scheduler = x['scheduler'],
+                workers = x['workers'],
+                threads = x['threads'],
+                watch = x['watch'])
         return n
 
     def __repr__(self):

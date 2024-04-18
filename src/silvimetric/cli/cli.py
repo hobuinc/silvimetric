@@ -46,8 +46,11 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
             log=log,
             debug=debug,
             progress=progress,
-            scheduler=scheduler)
-    dask_handle(dasktype, scheduler, workers, threads, watch, app.log)
+            scheduler=scheduler,
+            dasktype=dasktype,
+            workers=workers,
+            threads=threads,
+            watch=watch)
     ctx.obj = app
     ctx.call_on_close(close_dask)
 
@@ -67,7 +70,8 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
 def info_cmd(app, bounds, date, dates, name):
     import json
     if date is not None and dates is not None:
-        app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
+        app.log.warning("Both 'date' and 'dates' specified. Prioritizing"
+            "'dates'")
 
     start_date = dates[0] if dates else date
     end_date = dates[1] if dates else date
@@ -91,7 +95,10 @@ def info_cmd(app, bounds, date, dates, name):
         help="Bounds to scan.")
 @click.pass_obj
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
-    """Scan point cloud and determine the optimal tile size."""
+    """Scan point cloud, output information on it, and determine the optimal
+    tile size."""
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+            app.watch, app.log)
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
             depth, filter)
 
@@ -111,8 +118,8 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     import itertools
-    """Initialize silvimetrics DATABASE
-    """
+    """Initialize silvimetrics DATABASE"""
+
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
             log = app.log,
             root = bounds,
@@ -139,6 +146,10 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         help="Date range the data was produced during")
 @click.pass_obj
 def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
+    """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+            app.watch, app.log)
 
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
@@ -146,7 +157,6 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
     if date is None and dates is None:
         raise ValueError("One of '--date' or '--dates' must be provided.")
 
-    """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     config = ShatterConfig(tdb_dir = app.tdb_dir,
             date=dates if dates else tuple([date]),
             log = app.log,
