@@ -22,7 +22,6 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
     """
 
     # TODO Scan should output other information about a file like bounds
-    logger = logging.getLogger('silvimetric')
     with Storage.from_db(tdb_dir) as tdb:
 
         data = Data(pointcloud, tdb.config, bounds)
@@ -30,7 +29,6 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
-            breakpoint()
             cell_counts = [ch.cell_count for ch in chunks]
 
         else:
@@ -41,6 +39,7 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
+        logger = logging.getLogger('silvimetric')
         logger.info(f'Tiling information:')
         logger.info(f'  Mean tile size: {mean}')
         logger.info(f'  Std deviation: {std}')
@@ -84,11 +83,11 @@ def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
 
     curr = db.from_delayed(tile_info(chunk, data, res_threshold, pc_threshold,
             depth_threshold))
-    logger = logging.getLogger('silvimetric')
     a = [ ]
 
     curr_depth = 0
     while curr.npartitions > 0:
+        logger = logging.getLogger('silvimetric')
         logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
         n = curr.compute()
         to_add = [ x for x in n if isinstance(x, int) ]

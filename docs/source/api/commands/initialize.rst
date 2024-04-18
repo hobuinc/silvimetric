@@ -1,4 +1,4 @@
-initialize
+Initialize
 ========================
 
 .. automodule:: silvimetric.commands.initialize

@@ -13,8 +13,7 @@ from .common import dask_handle, close_dask
 
 @click.group()
 @click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
-@click.option("--debug", is_flag=True, default=False, help="Print debug messages?")
-@click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
+@click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", default=True, type=bool, help="Report progress")
 @click.option("--workers", type=int, default=12, help="Number of workers for Dask")
@@ -29,10 +28,15 @@ from .common import dask_handle, close_dask
         "local, but are run with different dask libraries. See more here "
         "https://docs.dask.org/en/stable/scheduling.html.")
 @click.pass_context
-def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
+def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
         workers, threads, watch):
 
     # Set up logging
+    if debug:
+        log_level = 'DEBUG'
+    else:
+        log_level = 'INFO'
+
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level}")

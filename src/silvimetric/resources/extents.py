@@ -12,7 +12,7 @@ from .bounds import Bounds
 from .storage import Storage
 from .data import Data
 
-IndexDomain = tuple[np.ScalarType, np.ScalarType]
+IndexDomain = tuple[float, float]
 IndexDomainList = tuple[IndexDomain, IndexDomain]
 
 class Extents(object):
@@ -123,7 +123,7 @@ class Extents(object):
         curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold, depth_threshold))
         curr_depth = 0
 
-        logger = logging.getLogger('silvimetric')
+        logger = logging.getLogger('silvimetric.extents')
         while curr.npartitions > 0:
 
             logger.info(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')

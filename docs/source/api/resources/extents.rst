@@ -1,4 +1,5 @@
 Extents
 ============================
 
-.. autoclass:: silvimetric.resources.extents
+.. autoclass:: silvimetric.resources.extents.Extents
+    :members:

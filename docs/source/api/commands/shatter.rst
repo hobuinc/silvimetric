@@ -1,4 +1,4 @@
-shatter
+Shatter
 ============================
 
 .. automodule:: silvimetric.commands.shatter

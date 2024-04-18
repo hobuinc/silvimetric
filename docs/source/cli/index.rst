@@ -16,8 +16,7 @@ Command Line Interface
 
     Options:
     -d, --database PATH             Database path
-    --debug                         Print debug messages?
-    --log-level TEXT                Log level (INFO/DEBUG)
+    --debug                         Changes logging level from INFO to DEBUG.
     --log-dir TEXT                  Directory for log output
     --progress BOOLEAN              Report progress
     --workers INTEGER               Number of workers for Dask

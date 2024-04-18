@@ -38,7 +38,7 @@ def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, N
 
 @pytest.fixture(scope='function')
 def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
-    log = Log(20)
+    log = Log('DEBUG')
     yield StorageConfig(tdb_dir = tdb_filepath,
                         log = log,
                         crs = crs,
