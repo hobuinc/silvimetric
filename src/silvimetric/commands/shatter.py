@@ -227,6 +227,10 @@ def shatter(config: ShatterConfig) -> int:
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
+    if dask.config.get('distributed.client') is None:
+        config.log.warning("Selected scheduler type does not support"
+                "continuously updated config information.")
+
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()
 

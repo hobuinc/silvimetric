@@ -15,7 +15,7 @@ from .common import dask_handle, close_dask
 @click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
 @click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
-@click.option("--progress", default=True, type=bool, help="Report progress")
+@click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
 @click.option("--workers", type=int, default=12, help="Number of workers for Dask")
 @click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
@@ -60,6 +60,12 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
         help="Bounds to filter by")
 @click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         help="Select processes with this date")
+@click.option("--history", type=bool, is_flag=True, default=False,
+        help="Show the history section of the output.")
+@click.option("--metadata", type=bool, is_flag=True, default=False,
+        help="Show the metadata section of the output.")
+@click.option("--attributes", type=bool, is_flag=True, default=False,
+        help="Show the attributes section of the output.")
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2,
@@ -67,7 +73,7 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
 @click.option("--name", type=str, default=None,
         help="Select processes with this name")
 @click.pass_obj
-def info_cmd(app, bounds, date, dates, name):
+def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
     import json
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing"
@@ -78,7 +84,23 @@ def info_cmd(app, bounds, date, dates, name):
 
     i = info.info(app.tdb_dir, bounds=bounds, start_time=start_date,
         end_time=end_date, name=name)
-    app.log.info(json.dumps(i, indent=2))
+
+    if any([history, metadata, attributes]):
+        filtered = { }
+        if history:
+            filtered['history'] = i['history']
+        if metadata:
+            filtered['metadata'] = i['metadata']
+        if attributes:
+            filtered['attributes'] = i['attributes']
+
+        app.log.info(json.dumps(filtered, indent=2))
+
+    else:
+        app.log.info(json.dumps(i, indent=2))
+        return
+
+
 
 
 @cli.command("scan")
@@ -100,7 +122,7 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
     dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
             app.watch, app.log)
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth, filter)
+            depth, filter, log=app.log)
 
 
 @cli.command('initialize')

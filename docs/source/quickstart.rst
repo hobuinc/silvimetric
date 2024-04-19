@@ -124,32 +124,64 @@ need a bounds and a coordinate reference system.
     Be careful with your shell's quote escaping rules!
 
 
+Scan
+--------------------------------------------------------------------------------
+
+The `scan` command will tell us information about the pointcloud with respect
+to the database we already created, including a best guess at the correct number
+of cells per tile, or `tile size`.
+
+    .. code-block:: shell-session
+
+        silvimetric -d ${db_name} scan ${pointcloud}
+
+
+We should see output like the output below, recommending we use a `tile size`
+of 185.
+
+::
+
+    silvimetric - INFO - info:156 - Pointcloud information:
+    silvimetric - INFO - info:156 -   Storage Bounds: [635579.2, 848884.83, 639003.73, 853536.21]
+    silvimetric - INFO - info:156 -   Pointcloud Bounds: [635577.79, 848882.15, 639003.73, 853537.66]
+    silvimetric - INFO - info:156 -   Point Count: 10653336
+    silvimetric - INFO - info:156 - Tiling information:
+    silvimetric - INFO - info:156 -   Mean tile size: 91.51758793969849
+    silvimetric - INFO - info:156 -   Std deviation: 94.31396536316173
+    silvimetric - INFO - info:156 -   Recommended split size: 185
+
 Shatter
 --------------------------------------------------------------------------------
 
-We can now insert data into the SMDB
+We can now insert data into the SMDB.
+
+If we run this command without the argument `--tilesize`, `Silvimetric` will
+determine a tile size for you. The method will be the same as the `Scan` method,
+but will filter out the tiles that have no data in them.
 
    .. code-block:: shell-session
 
      silvimetric -d autzen-smdb.tdb \
-        --threads 10 \
+        --threads 4 \
+        --workers 4 \
         --watch \
         shatter \
+        --date 2008-12-01 \
         https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz
 
-Info
---------------------------------------------------------------------------------
-
-We can query past shatter processes and the schema for the database with the
-Info call.
+If we grab the tile size from the `scan` that we ran earlier, we'll skip the
+filtering step.
 
    .. code-block:: shell-session
 
-     silvimetric -d autzen-smdb.tdb info
-
-This will print out a JSON object containing.
-
-.. include:: ./substitutions.txt
+     silvimetric -d autzen-smdb.tdb \
+        --threads 4 \
+        --workers 4 \
+        --watch \
+        shatter \
+        --tilesize 185 \
+        --date 2008-12-01 \
+        https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz
 
 Extract
 --------------------------------------------------------------------------------
@@ -158,6 +190,62 @@ After data is inserted, we can extract
 
    .. code-block:: shell-session
 
-     silvimetric autzen-smdb.tdb extract -o output-directory
+     silvimetric -d autzen-smdb.tdb extract -o output-directory
+
+.. include:: ./substitutions.txt
+
+Info
+--------------------------------------------------------------------------------
+
+We can query past shatter processes and the schema for the database with the
+Info call.
+
+    .. code-block:: shell-session
+
+        silvimetric -d autzen-smdb.tdb info --history
+
+This will print out a JSON object containing information about the current state
+of the database. We can find the `name` key here, which necessary for
+`Delete`, `Restart`, and `Resume`. For the following commands we will have
+copied the value of the `name` key in the variable `uuid`.
+
+.. include:: ./substitutions.txt
+
+Delete
+--------------------------------------------------------------------------------
+
+We can also remove a `shatter` process by using the `delete` command. This will
+remove all data associated with that shatter process from the database, but
+will leave an updated config of it in the database config should you want to
+reference it later.
+
+    .. code-block:: shell-session
+
+        silvimetric -d autzen-smdb.tdb delete --id $uuid
+
+.. include:: ./substitutions.txt
+
+Restart
+--------------------------------------------------------------------------------
+
+If you would like to rerun a `Shatter` process, whether or not it was previously
+finished, you can use the `restart` command. This will call the `delete` method
+and use the config from that to re-run the `shatter` process.
+
+    .. code-block:: shell-session
+
+        silvimetric -d autzen-smdb.tdb restart --id $uuid
+
+.. include:: ./substitutions.txt
+
+Resume
+--------------------------------------------------------------------------------
+
+If a `Shatter` process is cancelled partway through, we can pick up where we
+left off with the `Resume` command.
+
+   .. code-block:: shell-session
+
+        silvimetric -d autzen-smdb.tdb resume --id $uuid
 
 .. include:: ./substitutions.txt

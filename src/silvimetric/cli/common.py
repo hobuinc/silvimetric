@@ -113,9 +113,6 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
             webbrowser.open(client.cluster.dashboard_link)
 
     elif scheduler == 'single-threaded':
-        if scheduler != 'distributed':
-            log.warning("""Selected scheduler type does not support continuously\
-                            updated config information.""")
         dask_config['scheduler'] = scheduler
 
     dask.config.set(dask_config)

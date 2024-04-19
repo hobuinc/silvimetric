@@ -65,9 +65,8 @@ class Log:
         :param config: Application config representing the runtime config
         """
 
+        # need to be careful not to pull logging from previous runs
         self.logger = logging.getLogger("silvimetric")
-        self.log_level = log_level
-        self.logger.setLevel(log_level)
         self.logdir = logdir
         if logdir:
             self.logtype = 'file'
@@ -77,7 +76,11 @@ class Log:
 
         # do not recreate handlers if they're already present
         if self.logger.handlers:
+            self.log_level = self.logger.level
             return
+
+        self.log_level = log_level
+        self.logger.setLevel(log_level)
 
         # File Handler for Logging
         log_format = logging.Formatter(

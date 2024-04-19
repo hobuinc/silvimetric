@@ -4,10 +4,10 @@ import dask.bag as db
 import dask
 import math
 
-from ..resources import Storage, Data, Extents, Bounds
+from ..resources import Storage, Data, Extents, Bounds, Log
 
 def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, resolution:float=100,
-        depth:int=6, filter:bool=False):
+        depth:int=6, filter:bool=False, log: Log=None):
     """
     Scan pointcloud and determine appropriate tile sizes.
 
@@ -24,17 +24,25 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
     # TODO Scan should output other information about a file like bounds, pc, avg points per cell
     with Storage.from_db(tdb_dir) as tdb:
 
-        logger = logging.getLogger('silvimetric')
-        data = Data(pointcloud, tdb.config, bounds)
-        shared_bounds = Bounds.shared_bounds(data.bounds, tdb.config.root)
-
-        if shared_bounds != data.bounds:
-            logger.warning('Incoming bounds does not fully overlap with storage'
-                f' bounds. Adjusting incoming from {str(data.bounds)} to'
-                f' {str(shared_bounds)}')
-            extents = Extents.from_sub(tdb_dir, shared_bounds)
+        if log is None:
+            logger = logging.getLogger('silvimetric')
         else:
-            extents = Extents.from_sub(tdb_dir, data.bounds)
+            logger = log
+        data = Data(pointcloud, tdb.config, bounds)
+
+        #TODO add this section and print out information on only parts covered
+        # by the storage bounds
+
+        # shared_bounds = Bounds.shared_bounds(data.bounds, tdb.config.root)
+
+        # if shared_bounds != data.bounds:
+        #     logger.warning('Incoming bounds is not fully within the storage'
+        #         f' bounds. Adjusting incoming from {str(data.bounds)} to'
+        #         f' {str(shared_bounds)}')
+        #     extents = Extents.from_sub(tdb_dir, shared_bounds)
+        # else:
+
+        extents = Extents.from_sub(tdb_dir, data.bounds)
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
@@ -42,9 +50,9 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
 
         else:
             cell_counts = extent_handle(extents, data, resolution, point_count,
-                depth)
+                depth, log)
 
-        point_count = data.count(extents.bounds)
+        count = data.count(extents.bounds)
 
         std = np.std(cell_counts)
         mean = np.mean(cell_counts)
@@ -54,9 +62,13 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
         logger.info('Pointcloud information:')
         logger.info(f'  Storage Bounds: {str(tdb.config.root)}')
         logger.info(f'  Pointcloud Bounds: {str(data.bounds)}')
-        if shared_bounds != data.bounds:
-            logger.info(f'  Overlapping Bounds: {str(extents.bounds)}')
-        logger.info(f'  Point Count: {point_count}')
+        logger.info(f'  Point Count: {count}')
+
+        logger.debug('Scan thresholds:')
+        logger.debug(f'  Resolution: {resolution}')
+        logger.debug(f'  Point count: {point_count}')
+        logger.debug(f'  Tree depth: {depth}')
+
         logger.info('Tiling information:')
         logger.info(f'  Mean tile size: {mean}')
         logger.info(f'  Std deviation: {std}')
@@ -66,7 +78,7 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
 
 
 def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
-        pc_threshold:int=600000, depth_threshold:int=6) -> list[int]:
+        pc_threshold:int=600000, depth_threshold:int=6, log: Log = None) -> list[int]:
     """
     Recurisvely iterate through quad tree of this Extents object with given
     threshold parameters.
@@ -79,6 +91,10 @@ def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
     :return: Returns list of Extents that fit thresholds.
     """
 
+    if log is None:
+        logger = logging.getLogger('silvimetric')
+    else:
+        logger = log
 
     if extent.root is not None:
         bminx, bminy, bmaxx, bmaxy = extent.root.get()
