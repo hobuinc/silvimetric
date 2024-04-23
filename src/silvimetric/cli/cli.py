@@ -4,8 +4,7 @@ import pyproj
 import logging
 
 
-from ..resources import Bounds, Log
-from ..resources import Attribute, Metric
+from ..resources import Attribute, Metric, Bounds, Log, __version__
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
@@ -27,6 +26,7 @@ from .common import dask_handle, close_dask
         'local', 'single-threaded']), help="Type of dask scheduler. Both are "
         "local, but are run with different dask libraries. See more here "
         "https://docs.dask.org/en/stable/scheduling.html.")
+@click.version_option(__version__)
 @click.pass_context
 def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
         workers, threads, watch):
