@@ -67,7 +67,7 @@ need a bounds and a coordinate reference system.
     .. code-block:: shell-session
 
         pdal info https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz  \
-            --readers.copc.resolution=10 | jq -c '.stats.bbox.native.bbox'
+            --readers.copc.resolution=1 | jq -c '.stats.bbox.native.bbox'
 
     Our boundary is emitted in expanded form.
 
@@ -186,7 +186,12 @@ filtering step.
 Extract
 --------------------------------------------------------------------------------
 
-After data is inserted, we can extract
+After data is inserted, we can extract it into different rasters. When we created
+the database we gave it a list of `Attributes` and `Metrics`. When we ran
+`Shatter`, we filled in the values for those in each cell. If we have a database
+with the `Attributes` Intensity and Z, in combination with the `Metrics` min and
+max, each cell will contain values for `min_Intensity`, `max_Intensity`,
+`min_Z`, and `max_Z`. This is also the list of available rasters we can extract.
 
    .. code-block:: shell-session
 
