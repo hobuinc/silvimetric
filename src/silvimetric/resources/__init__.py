@@ -1,5 +1,3 @@
-__version__ = '1.1.0'
-
 from .bounds import Bounds
 from .extents import Extents
 from .storage import Storage
