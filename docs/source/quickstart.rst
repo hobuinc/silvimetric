@@ -197,8 +197,6 @@ max, each cell will contain values for `min_Intensity`, `max_Intensity`,
 
      silvimetric -d autzen-smdb.tdb extract -o output-directory
 
-.. include:: ./substitutions.txt
-
 Info
 --------------------------------------------------------------------------------
 
@@ -214,8 +212,6 @@ of the database. We can find the `name` key here, which necessary for
 `Delete`, `Restart`, and `Resume`. For the following commands we will have
 copied the value of the `name` key in the variable `uuid`.
 
-.. include:: ./substitutions.txt
-
 Delete
 --------------------------------------------------------------------------------
 
@@ -228,8 +224,6 @@ reference it later.
 
         silvimetric -d autzen-smdb.tdb delete --id $uuid
 
-.. include:: ./substitutions.txt
-
 Restart
 --------------------------------------------------------------------------------
 
@@ -240,8 +234,6 @@ and use the config from that to re-run the `shatter` process.
     .. code-block:: shell-session
 
         silvimetric -d autzen-smdb.tdb restart --id $uuid
-
-.. include:: ./substitutions.txt
 
 Resume
 --------------------------------------------------------------------------------
