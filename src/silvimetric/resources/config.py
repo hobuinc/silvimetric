@@ -248,7 +248,7 @@ class ShatterConfig(Config):
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['mbr'] = self.mbr
+        d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]

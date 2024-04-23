@@ -66,6 +66,10 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
         help="Show the metadata section of the output.")
 @click.option("--attributes", type=bool, is_flag=True, default=False,
         help="Show the attributes section of the output.")
+@click.option("--metrics", type=bool, is_flag=True, default=False,
+        help="Show the metrics section.")
+@click.option("--bands", type=bool, is_flag=True, default=False,
+        help="Show the available raster bands.")
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2,
@@ -73,7 +77,7 @@ def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
 @click.option("--name", type=str, default=None,
         help="Select processes with this name")
 @click.pass_obj
-def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
+def info_cmd(app, bounds, date, dates, name, history, metadata, attributes, metrics, bands):
     import json
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing"
