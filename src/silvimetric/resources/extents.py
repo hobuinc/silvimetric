@@ -8,11 +8,12 @@ import dask.bag as db
 from typing import Self
 from math import ceil
 
+from .log import Log
 from .bounds import Bounds
 from .storage import Storage
 from .data import Data
 
-IndexDomain = tuple[np.ScalarType, np.ScalarType]
+IndexDomain = tuple[float, float]
 IndexDomainList = tuple[IndexDomain, IndexDomain]
 
 class Extents(object):
@@ -124,9 +125,11 @@ class Extents(object):
         curr_depth = 0
 
         logger = logging.getLogger('silvimetric')
+        if not logger.handlers:
+            logger = Log('INFO')
         while curr.npartitions > 0:
 
-            logger.info(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')
+            logger.debug(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')
             n = curr.compute()
             to_add = [ne for ne in n if isinstance(ne, Extents)]
             if to_add:

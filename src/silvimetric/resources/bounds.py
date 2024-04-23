@@ -129,3 +129,22 @@ class Bounds(dict): #for JSON serializing
         if other.miny > self.maxy or other.maxy < self.miny:
             return True
         return False
+
+    @staticmethod
+    def shared_bounds(first: Self, second: Self) -> Self | None:
+        """Find the Bounds that is shared between two Bounds.
+
+        :param first: First Bounds object for comparison.
+        :param second: Second Bounds object for comparison.
+        :returns: None if there is no overlap, otherwise the shared Bounds
+        """
+
+        if first.disjoint(second):
+            return None
+
+        minx = max(first.minx, second.minx)
+        maxx = min(first.maxx, second.maxx)
+        miny = max(first.miny, second.miny)
+        maxy = min(first.maxy, second.maxy)
+
+        return Bounds(minx, miny, maxx, maxy)

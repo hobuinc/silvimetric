@@ -6,4 +6,6 @@
     shatter
     info
     extract
-    manage
+    delete
+    resume
+    restart

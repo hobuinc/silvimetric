@@ -4,8 +4,7 @@ import pyproj
 import logging
 
 
-from ..resources import Bounds, Log
-from ..resources import Attribute, Metric
+from ..resources import Attribute, Metric, Bounds, Log, __version__
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
@@ -13,10 +12,9 @@ from .common import dask_handle, close_dask
 
 @click.group()
 @click.option("--database", '-d', type=click.Path(exists=False), help="Database path")
-@click.option("--debug", is_flag=True, default=False, help="Print debug messages?")
-@click.option("--log-level", default="INFO", help="Log level (INFO/DEBUG)")
+@click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
-@click.option("--progress", default=True, type=bool, help="Report progress")
+@click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
 @click.option("--workers", type=int, default=12, help="Number of workers for Dask")
 @click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
@@ -28,11 +26,17 @@ from .common import dask_handle, close_dask
         'local', 'single-threaded']), help="Type of dask scheduler. Both are "
         "local, but are run with different dask libraries. See more here "
         "https://docs.dask.org/en/stable/scheduling.html.")
+@click.version_option(__version__)
 @click.pass_context
-def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
+def cli(ctx, database, debug, log_dir, progress, dasktype, scheduler,
         workers, threads, watch):
 
     # Set up logging
+    if debug:
+        log_level = 'DEBUG'
+    else:
+        log_level = 'INFO'
+
     numeric_level = getattr(logging, log_level.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {log_level}")
@@ -42,8 +46,11 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
             log=log,
             debug=debug,
             progress=progress,
-            scheduler=scheduler)
-    dask_handle(dasktype, scheduler, workers, threads, watch, app.log)
+            scheduler=scheduler,
+            dasktype=dasktype,
+            workers=workers,
+            threads=threads,
+            watch=watch)
     ctx.obj = app
     ctx.call_on_close(close_dask)
 
@@ -53,6 +60,12 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
         help="Bounds to filter by")
 @click.option("--date", type=click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         help="Select processes with this date")
+@click.option("--history", type=bool, is_flag=True, default=False,
+        help="Show the history section of the output.")
+@click.option("--metadata", type=bool, is_flag=True, default=False,
+        help="Show the metadata section of the output.")
+@click.option("--attributes", type=bool, is_flag=True, default=False,
+        help="Show the attributes section of the output.")
 @click.option("--dates", type=click.Tuple([
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ']),
         click.DateTime(['%Y-%m-%d','%Y-%m-%dT%H:%M:%SZ'])]), nargs=2,
@@ -60,17 +73,34 @@ def cli(ctx, database, debug, log_level, log_dir, progress, dasktype, scheduler,
 @click.option("--name", type=str, default=None,
         help="Select processes with this name")
 @click.pass_obj
-def info_cmd(app, bounds, date, dates, name):
+def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
     import json
     if date is not None and dates is not None:
-        app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
+        app.log.warning("Both 'date' and 'dates' specified. Prioritizing"
+            "'dates'")
 
     start_date = dates[0] if dates else date
     end_date = dates[1] if dates else date
 
     i = info.info(app.tdb_dir, bounds=bounds, start_time=start_date,
         end_time=end_date, name=name)
-    app.log.info(json.dumps(i, indent=2))
+
+    if any([history, metadata, attributes]):
+        filtered = { }
+        if history:
+            filtered['history'] = i['history']
+        if metadata:
+            filtered['metadata'] = i['metadata']
+        if attributes:
+            filtered['attributes'] = i['attributes']
+
+        app.log.info(json.dumps(filtered, indent=2))
+
+    else:
+        app.log.info(json.dumps(i, indent=2))
+        return
+
+
 
 
 @cli.command("scan")
@@ -87,9 +117,12 @@ def info_cmd(app, bounds, date, dates, name):
         help="Bounds to scan.")
 @click.pass_obj
 def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
-    """Scan point cloud and determine the optimal tile size."""
+    """Scan point cloud, output information on it, and determine the optimal
+    tile size."""
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+            app.watch, app.log)
     return scan.scan(app.tdb_dir, pointcloud, bounds, point_count, resolution,
-            depth, filter)
+            depth, filter, log=app.log)
 
 
 @cli.command('initialize')
@@ -107,8 +140,8 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
     import itertools
-    """Initialize silvimetrics DATABASE
-    """
+    """Initialize silvimetrics DATABASE"""
+
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
             log = app.log,
             root = bounds,
@@ -135,6 +168,10 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         help="Date range the data was produced during")
 @click.pass_obj
 def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
+    """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
+
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+            app.watch, app.log)
 
     if date is not None and dates is not None:
         app.log.warning("Both 'date' and 'dates' specified. Prioritizing 'dates'")
@@ -142,7 +179,6 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
     if date is None and dates is None:
         raise ValueError("One of '--date' or '--dates' must be provided.")
 
-    """Insert data provided by POINTCLOUD into the silvimetric DATABASE"""
     config = ShatterConfig(tdb_dir = app.tdb_dir,
             date=dates if dates else tuple([date]),
             log = app.log,

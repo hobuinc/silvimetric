@@ -1,4 +1,6 @@
 Storage
 ------------------------------------
 
-.. autoclass:: silvimetric.resources.storage.Storage
+.. automodule:: silvimetric.resources.storage
+    :members:
+    :undoc-members:

@@ -1,4 +1,4 @@
-scan
+Scan
 ===========================
 
 .. automodule:: silvimetric.commands.scan

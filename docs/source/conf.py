@@ -77,6 +77,10 @@ extensions = [
    'sphinx.ext.autosummary',
 ]
 
+autodoc_default_options = {
+    'member-order': 'groupwise'
+}
+
 autodoc_mock_imports = [
     "pyproj",
     "osgeo",

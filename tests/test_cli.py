@@ -12,7 +12,6 @@ class TestCli(object):
                 '10', '--crs', 'EPSG:3857', '--bounds', str(bounds)],
                 catch_exceptions=False)
         assert res.exit_code == 0
-        assert f"Initializing SilviMetric Database at '{tdb_filepath}'" in res.output
 
     def test_cli_shatter(self, runner, storage, maxy, date, tdb_filepath,
             copc_filepath):

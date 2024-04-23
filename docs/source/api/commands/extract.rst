@@ -1,4 +1,4 @@
-extract
+Extract
 =============================
 
 .. automodule:: silvimetric.commands.extract
