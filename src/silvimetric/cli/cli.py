@@ -4,7 +4,8 @@ import pyproj
 import logging
 
 
-from ..resources import Attribute, Metric, Bounds, Log, __version__
+from .. import __version__
+from ..resources import Attribute, Metric, Bounds, Log
 from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
