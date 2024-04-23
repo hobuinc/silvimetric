@@ -15,7 +15,7 @@ from .log import Log
 from .extents import Bounds
 from .metric import Metric, Metrics
 from .entry import Attribute, Attributes
-from . import __version__
+from .. import __version__
 
 
 class SilviMetricJSONEncoder(json.JSONEncoder):
