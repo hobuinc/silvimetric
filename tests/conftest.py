@@ -6,9 +6,9 @@ import pdal
 from datetime import datetime
 from typing import Generator
 
-from silvimetric.resources import Extents, Bounds, Metrics, Attribute, Storage
-from silvimetric.resources import Log, Metric, ShatterConfig, StorageConfig
-from silvimetric.resources import ApplicationConfig, ExtractConfig
+from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
+from silvimetric import Log, Metric, ShatterConfig, StorageConfig
+from silvimetric import ApplicationConfig, ExtractConfig
 from silvimetric import __version__ as svversion
 
 # pull together fixtures

@@ -1,7 +1,7 @@
 import json
 
 from silvimetric.commands import scan, info, shatter, manage
-from silvimetric.resources import ShatterConfig, Storage
+from silvimetric import ShatterConfig, Storage
 
 class TestCommands(object):
 

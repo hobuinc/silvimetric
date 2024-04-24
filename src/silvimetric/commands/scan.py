@@ -3,8 +3,9 @@ import logging
 import dask.bag as db
 import dask
 import math
+import json
 
-from ..resources import Storage, Data, Extents, Bounds, Log
+from .. import Storage, Data, Extents, Bounds, Log
 
 def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, resolution:float=100,
         depth:int=6, filter:bool=False, log: Log=None):
@@ -24,25 +25,22 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
     # TODO Scan should output other information about a file like bounds, pc, avg points per cell
     with Storage.from_db(tdb_dir) as tdb:
 
+
         if log is None:
             logger = logging.getLogger('silvimetric')
         else:
             logger = log
         data = Data(pointcloud, tdb.config, bounds)
 
-        #TODO add this section and print out information on only parts covered
-        # by the storage bounds
-
-        # shared_bounds = Bounds.shared_bounds(data.bounds, tdb.config.root)
-
-        # if shared_bounds != data.bounds:
-        #     logger.warning('Incoming bounds is not fully within the storage'
-        #         f' bounds. Adjusting incoming from {str(data.bounds)} to'
-        #         f' {str(shared_bounds)}')
-        #     extents = Extents.from_sub(tdb_dir, shared_bounds)
-        # else:
+        thresholds = dict(thresholds=dict(resolution=resolution, point_count=point_count, depth=depth))
+        logger.debug(json.dumps(thresholds, indent=2))
 
         extents = Extents.from_sub(tdb_dir, data.bounds)
+        count = data.estimate_count(extents.bounds)
+
+        pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
+                data_bounds=data.bounds.to_json(), count=count))
+        logger.info(json.dumps(pc_info, indent=2))
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
@@ -52,29 +50,16 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
             cell_counts = extent_handle(extents, data, resolution, point_count,
                 depth, log)
 
-        count = data.count(extents.bounds)
 
         std = np.std(cell_counts)
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
+        tiling_info = dict(tile_info=dict(num_cells=len(cell_counts), mean=mean,
+                std_dev=std, recommended=rec))
+        logger.info(json.dumps(tiling_info, indent=2))
 
-        logger.info('Pointcloud information:')
-        logger.info(f'  Storage Bounds: {str(tdb.config.root)}')
-        logger.info(f'  Pointcloud Bounds: {str(data.bounds)}')
-        logger.info(f'  Point Count: {count}')
-
-        logger.debug('Scan thresholds:')
-        logger.debug(f'  Resolution: {resolution}')
-        logger.debug(f'  Point count: {point_count}')
-        logger.debug(f'  Tree depth: {depth}')
-
-        logger.info('Tiling information:')
-        logger.info(f'  Mean tile size: {mean}')
-        logger.info(f'  Std deviation: {std}')
-        logger.info(f'  Recommended split size: {rec}')
-
-        return rec
+        return pc_info | tiling_info
 
 
 def extent_handle(extent: Extents, data: Data, res_threshold:int=100,

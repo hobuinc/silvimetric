@@ -5,8 +5,8 @@ import logging
 
 
 from .. import __version__
-from ..resources import Attribute, Metric, Bounds, Log
-from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from .. import Attribute, Metric, Bounds, Log
+from .. import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
 from .common import dask_handle, close_dask

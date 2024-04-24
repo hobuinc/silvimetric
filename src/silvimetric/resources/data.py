@@ -1,4 +1,4 @@
-from . import Bounds
+from .bounds import Bounds
 from .config import StorageConfig
 import numpy as np
 
@@ -29,9 +29,11 @@ class Data:
         """PDAL reader"""
         self.pipeline = self.get_pipeline()
         """PDAL pipeline"""
+
         if self.bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 
+        self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
 
     def is_pipeline(self) -> bool:
         """Does this instance represent a pdal.Pipeline or a simple filename

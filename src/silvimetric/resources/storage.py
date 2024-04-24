@@ -12,7 +12,7 @@ from math import floor
 
 from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
-from ..resources import Bounds
+from .bounds import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -76,7 +76,8 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
+            capacity=100000)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)

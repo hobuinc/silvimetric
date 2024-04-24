@@ -7,8 +7,7 @@ import dask.dataframe as dd
 
 from typing import Dict
 
-from ..resources import Storage, ExtractConfig, Metric, Attribute
-from ..resources import Extents
+from .. import Storage, Extents, ExtractConfig
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,

@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 from typing import Union
 
-from ..resources import Storage, Bounds
+from .. import Storage, Bounds
 
 def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
         name: Union[UUID, str]):

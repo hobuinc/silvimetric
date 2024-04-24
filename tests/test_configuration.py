@@ -1,4 +1,4 @@
-from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig
+from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 
 class Test_Configuration(object):
 

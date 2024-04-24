@@ -233,6 +233,10 @@ class ShatterConfig(Config):
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
 
+        if isinstance(self.tile_size, float):
+            self.tile_size = int(self.tile_size)
+            self.log.warning(f'Truncating tile size to integer({self.tile_size})')
+            pass
         if not self.attrs:
             self.attrs = s.getAttributes()
         if not self.metrics:
