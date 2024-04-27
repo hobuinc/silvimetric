@@ -36,11 +36,8 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
         logger.debug(json.dumps(thresholds, indent=2))
 
         extents = Extents.from_sub(tdb_dir, data.bounds)
-        count = data.estimate_count(extents.bounds)
+        count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
-        pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
-                data_bounds=data.bounds.to_json(), count=count))
-        logger.info(json.dumps(pc_info, indent=2))
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
@@ -55,11 +52,15 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
+        pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
+                data_bounds=data.bounds.to_json(), count=dask.compute(count)))
         tiling_info = dict(tile_info=dict(num_cells=len(cell_counts), mean=mean,
                 std_dev=std, recommended=rec))
-        logger.info(json.dumps(tiling_info, indent=2))
 
-        return pc_info | tiling_info
+        final_info = pc_info | tiling_info
+        logger.info(json.dumps(final_info, indent=2))
+
+        return final_info
 
 
 def extent_handle(extent: Extents, data: Data, res_threshold:int=100,

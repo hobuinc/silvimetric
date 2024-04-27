@@ -184,7 +184,8 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
         writes: db.Bag = metrics.map(write, tdb)
 
         ## If dask is distributed, use the futures feature
-        if dask.config.get('scheduler') == 'distributed':
+        dc = dask.config.get('distributed.client')
+        if isinstance(dc, dask.distributed.Client):
             pc_futures = futures_of(writes.persist())
             for batch in as_completed(pc_futures, with_results=True).batches():
                 for future, pack in batch:

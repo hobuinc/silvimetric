@@ -5,7 +5,6 @@ import logging
 import dask
 import dask.bag as db
 
-from typing import Self
 from math import ceil
 
 from .log import Log
@@ -81,7 +80,7 @@ class Extents(object):
             return True
         return False
 
-    def disjoint(self, other: Self):
+    def disjoint(self, other):
         """
         Determined if this Extents shares any points with another Extents object.
 
@@ -121,12 +120,11 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold, depth_threshold))
-        curr_depth = 0
+        curr = db.from_delayed([ch.filter(data, res_threshold, pc_threshold,
+            depth_threshold, 1) for ch in chunk.split()])
+        curr_depth = 1
 
-        logger = logging.getLogger('silvimetric')
-        if not logger.handlers:
-            logger = Log('INFO')
+        logger = data.storageconfig.log
         while curr.npartitions > 0:
 
             logger.debug(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')
@@ -163,7 +161,7 @@ class Extents(object):
         ]
 
     @dask.delayed
-    def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0) -> Self:
+    def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0):
         """
         Creates quad tree of chunks for this bounds, runs pdal quickinfo over
         this to determine if there are any points available. Uses a bottom resolution

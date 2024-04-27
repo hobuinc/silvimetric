@@ -1,6 +1,5 @@
 import json
 import ast
-from typing import Self
 
 class Bounds(dict): #for JSON serializing
     """Simple class to represent a 2 or 3-dimensional bounding box that can be
@@ -28,7 +27,7 @@ class Bounds(dict): #for JSON serializing
 
 
     @staticmethod
-    def from_string(bbox_str: str) -> Self:
+    def from_string(bbox_str: str):
         """Create Bounds object from a PDAL bounds string in the form:
 
         "([1,101],[2,102],[3,103])"
@@ -131,7 +130,7 @@ class Bounds(dict): #for JSON serializing
         return False
 
     @staticmethod
-    def shared_bounds(first: Self, second: Self) -> Self | None:
+    def shared_bounds(first, second):
         """Find the Bounds that is shared between two Bounds.
 
         :param first: First Bounds object for comparison.

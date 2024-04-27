@@ -295,12 +295,17 @@ class Storage:
         :param proc_num: Shatter process time slot
         :return: Config of deleted Shatter process
         """
+
+        self.config.log.debug(f'Deleting time slot {proc_num}...')
         with self.open('r', (proc_num, proc_num)) as r:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
+
+        self.config.log.debug('Deleting fragments...')
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
+        self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
         return sh_cfg

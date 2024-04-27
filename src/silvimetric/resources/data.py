@@ -34,6 +34,7 @@ class Data:
             self.bounds = Data.get_bounds(self.reader)
 
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
+        self.log = storageconfig.log
 
     def is_pipeline(self) -> bool:
         """Does this instance represent a pdal.Pipeline or a simple filename
@@ -136,8 +137,9 @@ class Data:
         """
         try:
             self.pipeline.execute()
-            # self.storageconfig.log.debug(f"PDAL log: {self.pipeline.log}")
+            self.log.debug(f"PDAL log: {self.pipeline.log}")
         except Exception as e:
+            self.log.debug(f"PDAL log: {self.pipeline.log}")
             print(self.pipeline.pipeline, e)
             raise e
 
