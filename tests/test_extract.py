@@ -1,55 +1,8 @@
-import pytest
-import os
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
-import copy
-import uuid
 
-from silvimetric.commands.shatter import shatter
-from silvimetric.commands.extract import extract
-from silvimetric.resources import Metrics, Attribute, ExtractConfig, Extents, Storage, Log
-
-@pytest.fixture(scope='function')
-def tif_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tifs")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope='function')
-def extract_attrs(dims)->list[str]:
-    yield [Attribute('Z', dtype=dims['Z']), Attribute('Intensity', dtype=dims['Intensity'])]
-
-@pytest.fixture(scope='function')
-def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
-    shatter(shatter_config)
-    log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
-                       log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
-    yield c
-
-@pytest.fixture(scope='function')
-def multivalue_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
-
-    shatter(shatter_config)
-    e = Extents.from_storage(shatter_config.tdb_dir)
-    b: Extents = e.split()[0]
-
-    second_config = copy.deepcopy(shatter_config)
-    second_config.bounds = b.bounds
-    second_config.name = uuid.uuid4()
-    second_config.point_count = 0
-
-    shatter(second_config)
-    log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
-                       log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
-    yield c
+from silvimetric import Metrics, ExtractConfig, Extents, Log, extract
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()

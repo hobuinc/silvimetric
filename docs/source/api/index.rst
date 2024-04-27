@@ -4,7 +4,19 @@
 API
 ================================================================================
 
-.. autosummary::
-   :toctree: generated
 
-   silvimetric
+Resources
+---------
+
+.. toctree::
+    :maxdepth: 1
+
+    resources/index
+
+Commands
+--------
+
+.. toctree::
+    :maxdepth: 1
+
+    commands/index

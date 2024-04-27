@@ -15,7 +15,7 @@ from .log import Log
 from .extents import Bounds
 from .metric import Metric, Metrics
 from .entry import Attribute, Attributes
-from . import __version__
+from .. import __version__
 
 
 class SilviMetricJSONEncoder(json.JSONEncoder):
@@ -24,9 +24,13 @@ class SilviMetricJSONEncoder(json.JSONEncoder):
 
 @dataclass(kw_only=True)
 class Config(ABC):
+    """Base config"""
     tdb_dir: str
+    """Path to TileDB directory to use."""
     log: Log = field(default_factory = lambda: Log("INFO"))
+    """Log object."""
     debug: bool = field(default=False)
+    """Debug flag."""
 
     def to_json(self):
         keys = self.__dataclass_fields__.keys()
@@ -36,6 +40,10 @@ class Config(ABC):
         if not isinstance(d['log'], dict):
             d['log'] = d['log'].to_json()
         return d
+
+    @classmethod
+    def from_json(self, data: str):
+        return self.from_string(json.dumps(data))
 
     @classmethod
     @abstractmethod
@@ -50,17 +58,30 @@ class Config(ABC):
 
 @dataclass
 class StorageConfig(Config):
+    """ Config for constructing a Storage object """
     root: Bounds
+    """Root project bounding box"""
     crs: pyproj.CRS
+    """Coordinate reference system, same for all data in a project"""
     resolution: float = 30.0
+    """Resolution of cells, same for all data in a project, defaults to 30.0"""
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
+    """List of :class:`silvimetric.resources.entry.Attribute` attributes that
+    represent point data, defaults to Z, NumberOfReturns, ReturnNumber, Intensity"""
     metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
                                   for m in Metrics.keys() ])
+    """List of :class:`silvimetric.resources.metric.Metric` Metrics that
+    represent derived data, defaults to values in Metrics object"""
     version: str = __version__
+    """Silvimetric version"""
     capacity: int = 1000000
+    """TileDB Capacity, defaults to 1000000"""
+    next_time_slot: int = 1
+    """Next time slot to be allocated to a shatter process. Increment after
+    use., defaults to 1"""
 
 
     def __post_init__(self) -> None:
@@ -99,7 +120,7 @@ class StorageConfig(Config):
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
-        d['root'] = json.loads(self.root.to_json())
+        d['root'] = self.root.to_json()
         return d
 
     @classmethod
@@ -107,11 +128,11 @@ class StorageConfig(Config):
         x = json.loads(data)
         root = Bounds(*x['root'])
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         else:
             ms = None
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         else:
             attrs = None
         if 'crs' in x:
@@ -125,7 +146,8 @@ class StorageConfig(Config):
                 attrs = attrs,
                 crs = crs,
                 metrics = ms,
-                capacity = x['capacity'])
+                capacity = x['capacity'],
+                version = x['version'])
 
         return n
 
@@ -134,9 +156,25 @@ class StorageConfig(Config):
 
 @dataclass
 class ApplicationConfig(Config):
+    """ Base application config """
+
     debug: bool = False,
+    """Debug mode, defaults to False"""
     progress: bool = False,
+    """Should processes display progress bars, defaults to False"""
+
+    # Dask configuration
+    dasktype: str = 'processes'
+    """Dask parallelization type. For information see
+    https://docs.dask.org/en/stable/scheduling.html#local-threads """
     scheduler: str = 'distributed'
+    """Dask scheduler, defaults to 'distributed'"""
+    workers: int = 12
+    """Number of dask workers"""
+    threads: int = 4
+    """Number of threads per dask worker"""
+    watch: bool = False
+    """Open dask diagnostic page in default web browser"""
 
     def to_json(self):
         d = super().to_json()
@@ -147,31 +185,62 @@ class ApplicationConfig(Config):
         x = json.loads(data)
         n = cls(tdb_dir = x['tdb_dir'],
                 debug = x['debug'],
-                progress = x['progress'])
+                progress = x['progress'],
+                dasktype = x['dasktype'],
+                scheduler = x['scheduler'],
+                workers = x['workers'],
+                threads = x['threads'],
+                watch = x['watch'])
         return n
 
     def __repr__(self):
         return json.dumps(self.to_json())
 
+Mbr = tuple[tuple[tuple[int,int], tuple[int,int]], ...]
 @dataclass
 class ShatterConfig(Config):
+    """Config for Shatter process"""
     filename: str
+    """Input filename referencing a PDAL pipeline or point cloud file."""
     date: Union[datetime, Tuple[datetime, datetime]]
+    """A date or date range representing data collection times."""
     attrs: list[Attribute] = field(default_factory=list)
+    """List of attributes to use in shatter. If this is not set it will be
+    filled by the attributes in the database instance."""
     metrics: list[Metric] = field(default_factory=list)
+    """A list of metrics to use in shatter. If this is not set it will be filled by the metrics in the database instance."""
     bounds: Union[Bounds, None] = field(default=None)
+    """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
+    """UUID representing this shatter process and will be generated if not
+    provided., defaults to uuid.uuid()"""
     tile_size: Union[int, None] = field(default=None)
+    """The number of cells to include in a tile., defaults to None"""
     start_time:float = 0
+    """The process starting time in seconds since Jan 1 1970., defaults to 0"""
     end_time:float = 0
+    """The process ending time in seconds since Jan 1 1970., defaults to 0"""
     point_count: int = 0
-    nonempty_domain: tuple[tuple[int, int], ...] = ()
+    """The number of points that has been processed so far., defaults to 0"""
+    mbr: Mbr = field(default_factory=tuple)
+    """The minimum bounding rectangle derived from TileDB array fragments.
+    This will be used to for resuming shatter processes and making sure it
+    doesn't repeat work., defaults to tuple()"""
     finished: bool = False
+    """Finished flag for shatter process., defaults to False"""
+    time_slot: int = 0
+    """The time slot that has been reserved for this shatter process. Will be
+    used as the timestamp in tiledb writes to better organize and manage
+    processes., defaults to 0"""
 
     def __post_init__(self) -> None:
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
 
+        if isinstance(self.tile_size, float):
+            self.tile_size = int(self.tile_size)
+            self.log.warning(f'Truncating tile size to integer({self.tile_size})')
+            pass
         if not self.attrs:
             self.attrs = s.getAttributes()
         if not self.metrics:
@@ -183,10 +252,11 @@ class ShatterConfig(Config):
         d = super().to_json()
 
         d['name'] = str(self.name)
-        d['bounds'] = json.loads(self.bounds.to_json()) if self.bounds is not None else None
+        d['time_slot'] = self.time_slot
+        d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['nonempty_domain'] = [ list(a) for a in self.nonempty_domain]
+        d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
@@ -197,26 +267,37 @@ class ShatterConfig(Config):
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
+        return cls.from_dict(x)
 
-        ms = list([ Metric.from_string(m) for m in x['metrics']])
-        attrs = list([ Attribute.from_string(a) for a in x['attrs']])
+    @classmethod
+    def from_dict(cls, data: dict):
+        x = data
+
+        ms = list([ Metric.from_dict(m) for m in x['metrics']])
+        attrs = list([ Attribute.from_dict(a) for a in x['attrs']])
         if isinstance(x['date'], list):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
             date = datetime.strptime(x['date'], '%Y-%m-%dT%H:%M:%SZ')
-        nonempty_domains = tuple(tuple(ned) for ned in x['nonempty_domain'])
+        mbr = tuple(tuple(tuple(mb) for mb in m) for m in x['mbr'])
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
-        n = cls(tdb_dir = x['tdb_dir'],
-                filename = x['filename'],
-                attrs = attrs,
-                metrics = ms,
-                debug = x['debug'],
-                name = uuid.UUID(x['name']),
+        n = cls(tdb_dir=x['tdb_dir'],
+                filename=x['filename'],
+                attrs=attrs,
+                metrics=ms,
+                debug=x['debug'],
+                name=uuid.UUID(x['name']),
                 bounds=Bounds(*x['bounds']),
-                nonempty_domain=nonempty_domains,
-                date= date)
+                tile_size=x['tile_size'],
+                start_time=x['start_time'],
+                end_time=x['end_time'],
+                point_count=x['point_count'],
+                mbr=mbr,
+                date=date,
+                time_slot=x['time_slot'],
+                finished=x['finished'])
 
         return n
 
@@ -226,10 +307,17 @@ class ShatterConfig(Config):
 
 @dataclass
 class ExtractConfig(Config):
+    """Config for the Extract process."""
     out_dir: str
+    """The directory where derived rasters should be written."""
     attrs: list[Attribute] = field(default_factory=list)
+    """List of attributes to use in shatter. If this is not set it
+    will be filled by the attributes in the database instance."""
     metrics: list[Metric] = field(default_factory=list)
+    """A list of metrics to use in shatter. If this is not set it
+    will be filled by the metrics in the database instance."""
     bounds: Bounds = field(default=None)
+    """The bounding box of the shatter process., defaults to None"""
 
     def __post_init__(self) -> None:
         from .storage import Storage
@@ -250,20 +338,28 @@ class ExtractConfig(Config):
     def to_json(self):
         d = super().to_json()
 
-        d['metrics'] = [a.to_json() for a in self.attrs]
+        d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
-        d['bounds'] = json.loads(self.bounds.to_json())
+        d['bounds'] = self.bounds.to_json()
         return d
 
     @classmethod
     def from_string(cls, data: str):
         x = json.loads(data)
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
-        n = cls(x['out_dir'], attrs, ms, x['debug'])
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
+        if 'bounds' in x:
+            bounds = Bounds(*x['bounds'])
+        if 'log' in x:
+            l = x['log']
+            log = Log(l['log_level'], l['logdir'], l['logtype'], l['logfilename'])
+        else:
+            log = Log("INFO")
+        n = cls(tdb_dir=x['tdb_dir'], out_dir=x['out_dir'], attrs=attrs,
+                metrics=ms, debug=x['debug'], bounds=bounds, log=log)
 
         return n
 

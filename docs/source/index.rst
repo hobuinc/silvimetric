@@ -15,12 +15,12 @@ Find out more about SilviMetric by visiting :ref:`about`. A slide deck about
 SilviMetric is also available on `Google Slides <https://docs.google.com/presentation/d/1E561EgWwLgN5R9P0LBxuI1r7kG155u8E6-MOWpkycSM/edit?usp=sharing>`__.
 
 .. toctree::
-   :maxdepth: 2
    :caption: Contents
+   :maxdepth: 2
 
    about
    cli/index
-   api
+   api/index
    QuickStart <quickstart>
    development
    tutorial

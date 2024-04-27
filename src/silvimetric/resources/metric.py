@@ -17,19 +17,35 @@ MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, deps: list[Attribute]=None):
+    """
+    A Metric is an Entry representing derived cell data. There is a base set of
+    metrics available through Silvimetric, or you can create your own. A Metric
+    object has all the information necessary to facilitate the derivation of
+    data as well as its insertion into the database.
+    """
+    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, dependencies: list[Attribute]=None):
         super().__init__()
         self.name = name
+        """Metric name. eg. mean"""
         self.dtype = dtype
-        self.dependencies = deps
+        """Numpy data type."""
+        self.dependencies = dependencies
+        """Attributes/Metrics this is dependent on."""
         self._method = method
+        """The method that processes this data."""
 
     def schema(self, attr: Attribute):
+        """
+        Create schema for TileDB creation.
+
+        :param attr: :class:`silvimetric.resources.entry.Atttribute`
+        :return: TileDB Attribute
+        """
         entry_name = self.entry_name(attr.name)
         return Attr(name=entry_name, dtype=self.dtype)
 
-    # common name, storage name
     def entry_name(self, attr: str) -> str:
+        """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
     @dask.delayed
@@ -45,17 +61,17 @@ class Metric(Entry):
             'method': base64.b64encode(dill.dumps(self._method)).decode()
         }
 
-    def from_string(data: Union[str, dict]):
-        if isinstance(data, str):
-            j = json.loads(data)
-        elif isinstance(data, dict):
-            j = data
-        name = j['name']
-        dtype = np.dtype(j['dtype'])
-        dependencies = j['dependencies']
-        method = dill.loads(base64.b64decode(j['method'].encode()))
+    def from_dict(data: dict):
+        name = data['name']
+        dtype = np.dtype(data['dtype'])
+        dependencies = data['dependencies']
+        method = dill.loads(base64.b64decode(data['method'].encode()))
 
         return Metric(name, dtype, method, dependencies)
+
+    def from_string(data: str):
+        j = json.loads(data)
+        return Metric.from_dict(j)
 
     def __eq__(self, other):
         return (self.name == other.name and
@@ -72,7 +88,7 @@ class Metric(Entry):
 #TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
 
 def m_mean(data):
-    return data.mean()
+    return np.mean(data)
 
 def m_mode(data):
     u, c = np.unique(data, return_counts=True)
@@ -85,13 +101,13 @@ def m_median(data):
     return np.median(data)
 
 def m_min(data):
-    return data.min()
+    return np.min(data)
 
 def m_max(data):
-    return data.max()
+    return np.max(data)
 
 def m_stddev(data):
-    return data.std()
+    return np.std(data)
 
 #TODO change to correct dtype
 Metrics = {

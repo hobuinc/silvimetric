@@ -1,7 +1,8 @@
 import tiledb
 import numpy as np
 
-from silvimetric.resources import Storage, Metrics, Attribute
+from silvimetric import Storage, Metrics, Attribute
+from silvimetric.commands import info
 from silvimetric import __version__ as svversion
 
 class Test_Storage(object):
@@ -15,6 +16,11 @@ class Test_Storage(object):
             for a in attrs:
                 assert s.has_attr(a.name)
                 # assert s.attr(a.name) == a.schema()
+
+    def test_time_reserve(self, storage):
+        for x in range(5):
+            time_slot = storage.reserve_time_slot()
+            assert time_slot == x + 1
 
     def test_local(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:

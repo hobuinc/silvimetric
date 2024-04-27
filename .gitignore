@@ -4,8 +4,11 @@ __pycache__/
 build/
 dist/
 stats/
-*.html
 .env
+
+*.html
+**/html/**
+**/_build/**
 
 #tiledb
 **/__fragments/**

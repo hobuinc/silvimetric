@@ -1,25 +1,23 @@
+import os
 import tiledb
 import numpy as np
 from datetime import datetime
 import pathlib
 import contextlib
 import json
+import urllib
 from typing import Any
 
 from math import floor
 
-from .config import StorageConfig
+from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
-from ..resources import Bounds
+from .bounds import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
 
     def __init__(self, config: StorageConfig, ctx:tiledb.Ctx=None):
-        # if not ctx:
-        #     self.ctx = tiledb.default_ctx()
-        # else:
-        #     self.ctx = ctx
 
         if not tiledb.object_type(config.tdb_dir) == "array":
             raise Exception(f"Given database directory '{config.tdb_dir}' does not exist")
@@ -78,7 +76,8 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
+            capacity=100000)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -87,23 +86,17 @@ class Storage:
             a.meta['config'] = meta
 
         s = Storage(config, ctx)
+        s.saveConfig()
 
         return s
 
     @staticmethod
     def from_db(tdb_dir: str):
         """
-        Create Storage class from previously created storage path
+        Create Storage object from information stored in a database.
 
-        Parameters
-        ----------
-        tdb_dir : str
-            Path to storage directory
-
-        Returns
-        -------
-        Storage
-            Return the generated storage
+        :param tdb_dir: TileDB database directory.
+        :return: Returns the derived storage.
         """
         with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
@@ -114,19 +107,15 @@ class Storage:
     def saveConfig(self) -> None:
         """
         Save StorageConfig to the Database
-
         """
-        with self.open('w') as a:
-            a.meta['config'] = str(self.config)
+        with self.open('w') as w:
+            w.meta['config'] = str(self.config)
 
     def getConfig(self) -> StorageConfig:
         """
-        Get the StorageConfig currently in use by the Storage
+        Get the StorageConfig currently in use by the Storage.
 
-        Returns
-        -------
-        StorageConfig
-            StorageConfig object
+        :return: StorageConfig representing this object.
         """
         with self.open('r') as a:
             s = a.meta['config']
@@ -134,90 +123,64 @@ class Storage:
 
         return config
 
-    def getMetadata(self, key: str, default=None) -> str:
+    def getMetadata(self, key: str, timestamp: int) -> str:
         """
-        Return metadata at given key
+        Return metadata at given key.
 
-        Parameters
-        ----------
-        key : str
-            Metadata key
-
-        Returns
-        -------
-        str
-            Metadata value found in storage
+        :param key: Key to look for in metadata.
+        :param timestamp: Time stamp for querying database.
+        :return: Metadata value found in storage.
         """
-        with self.open('r') as r:
-            try:
-                val = r.meta[key]
-            except KeyError as e:
-                if default is not None:
-                    return default
-                raise(e)
+
+        with self.open('r', (timestamp, timestamp)) as r:
+            val = r.meta[f'{key}']
 
         return val
 
-    def saveMetadata(self, key: str, data: Any) -> None:
-        """
-        Save metadata to storage
 
-        Parameters
-        ----------
-        key : str
-            Metadata key
-        data : any
-            Metadata value. Must be translatable to and from string.
+    def saveMetadata(self, key: str, data: str, timestamp: int) -> None:
         """
-        with self.open('w') as w:
-            w.meta[key] = data
+        Save metadata to storage.
+
+        :param key: Metadata key to save to.
+        :param data: Data to save to metadata.
+        """
+        with self.open('w', (timestamp, timestamp)) as w:
+            w.meta[f'{key}'] = data
+        return
 
     def getAttributes(self) -> list[Attribute]:
         """
-        Return list of attribute names from storage config
+        Find list of attribute names from storage config.
 
-        Returns
-        -------
-        list[str]
-            List of attribute names
+        :return: List of attribute names.
         """
         return self.getConfig().attrs
 
     def getMetrics(self) -> list[Metric]:
         """
-        Return List of metric names from storage config
+        Find List of metric names from storage config
 
-        Returns
-        -------
-        list[str]
-            List of metric names
+        :return: List of metric names.
         """
         return self.getConfig().metrics
 
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
         """
-        Open either a read or write stream for TileDB database
+        Open stream for TileDB database in given mode and at given timestamp.
 
-        Parameters
-        ----------
-        mode : str, optional
-            Stream mode. Valid options are 'r' and 'w', by default 'r'
-
-        Raises
-        ------
-        Exception
-            Incorrect Mode was given, only valid modes are 'w' and 'r'
-        Exception
-            Path exists and is not a TileDB array
-        Exception
-            Path does not exist
+        :param mode: Mode to open TileDB stream in. Valid options are
+            'w', 'r', 'm', 'd'., defaults to 'r'.
+        :param timestamp: Timestamp to open database at., defaults to None.
+        :raises Exception: Incorrect Mode was given, only valid modes are 'w' and 'r'.
+        :raises Exception: Path exists and is not a TileDB array.
+        :raises Exception: Path does not exist.
+        :yield: TileDB array context manager.
         """
         if tiledb.object_type(self.config.tdb_dir) == "array":
-            if mode == 'w':
-                tdb = tiledb.open(self.config.tdb_dir, 'w', timestamp=timestamp)
-            elif mode == 'r':
-                tdb = tiledb.open(self.config.tdb_dir, 'r', timestamp=timestamp)
+            if mode in ['w', 'r', 'd', 'm']:
+                tdb = tiledb.open(self.config.tdb_dir, mode, timestamp=timestamp)
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
@@ -231,99 +194,132 @@ class Storage:
         finally:
             tdb.close()
 
+    def reserve_time_slot(self) -> int:
+        """
+        Increment time slot in database and reserve that spot for a new
+        shatter process.
+
+        :param config: Shatter config will be written as metadata to reserve
+            time slot.
+
+        :return: Time slot.
+        """
+        with tiledb.open(self.config.tdb_dir, 'r') as r:
+            latest = json.loads(r.meta['config'])
+
+        time = latest['next_time_slot']
+        latest['next_time_slot'] = time + 1
+
+        with tiledb.open(self.config.tdb_dir, 'w') as w:
+            w.meta['config'] = json.dumps(latest)
+
+        return time
+
     def get_history(self, start_time: datetime, end_time: datetime,
                     bounds: Bounds, name:str=None):
+        """
+        Retrieve history of the database at current point in time.
 
-        from ..resources import ShatterConfig
+        :param start_time: Query parameter, starting datetime of process.
+        :param end_time: Query parameter, ending datetime of process.
+        :param bounds: Query parameter, bounds to query by.
+        :param name: Query paramter, shatter process uuid., by default None
+        :return: Returns list of array fragments that meet query parameters.
+        """
 
         af = tiledb.array_fragments(self.config.tdb_dir, True)
         m = [ ]
         for idx in range(len(af)):
 
-            # if processes are too short, begin and end times can be the same
-            # so it's necessary to adjust time bounds so we can grab information
+            time_range =  af[idx].timestamp_range
+            # all shatter processes should be input as a point in time, eg (1,1)
+            if isinstance(time_range, tuple):
+                time_range = time_range[0]
 
-            if idx == 0:
-                begin = 0
-            else:
-                begin = af[idx-1].timestamp_range[1]
+            try:
+                s_str = self.getMetadata('shatter', time_range)
+            except KeyError:
+                continue
+            s = ShatterConfig.from_string(s_str)
+            if s.bounds.disjoint(bounds):
+                continue
 
-            end = af[idx].timestamp_range[1]
+            # filter name
+            if name is not None and name != s.name:
+                continue
 
-            with self.open('r', (begin, end)) as r:
-                try:
-                    if not bool(r.meta['shatter']):
-                        continue
-
-                    s = ShatterConfig.from_string(r.meta['shatter'])
-
-                    # filter bounds
-                    if s.bounds.disjoint(bounds):
-                        continue
-
-                    # filter name
-                    if name is not None and name != s.name:
-                        continue
-
-                    # filter dates
-                    if isinstance(s.date, tuple) and len(s.date) == 2:
-                        if s.date[1] < start_time or s.date[0] > end_time:
-                            continue
-                    elif isinstance(s.date, tuple) and len(s.date) == 1:
-                        if s.date[0] < start_time or s.date[0] > end_time:
-                            continue
-                    else:
-                        if s.date < start_time or s.date > end_time:
-                            continue
-
-                    m.append(json.loads(r.meta['shatter']))
-                except KeyError:
+            # filter dates
+            if isinstance(s.date, tuple) and len(s.date) == 2:
+                if s.date[1] < start_time or s.date[0] > end_time:
                     continue
+            elif isinstance(s.date, tuple) and len(s.date) == 1:
+                if s.date[0] < start_time or s.date[0] > end_time:
+                    continue
+            else:
+                if s.date < start_time or s.date > end_time:
+                    continue
+
+            m.append(s.to_json())
 
         return m
 
-    #TODO what are we reading? queries are probably going to be specific
-    def read(self, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+    def mbrs(self, proc_num: int):
         """
-        Read from the Database
-        Parameters
-        ----------
-        xs : np.ndarray
-            X index
-        ys : np.ndarray
-            Y index
+        Get minimum bounding rectangle of a given shatter process. If this process
+        has been finished and consolidated the mbr will be much less granulated
+        than if the fragments are still intact. Mbrs are represented as tuples
+        in the form of ((minx, maxx), (miny, maxy))
 
-        Returns
-        -------
-        np.ndarray
-            Items found at the indicated cell
+        :param proc_num: Process number or time slot of the shatter process.
+        :return: Returns mbrs that match the given process number.
         """
-        with self.open('r') as tdb:
-            data = tdb[xs, ys]
-        return data
+        af_all = self.get_fragments_by_time(proc_num)
+        mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
+        mbrs = tuple(tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list)
+        return mbrs
 
-    def write(self, xs: np.ndarray, ys: np.ndarray, data: np.ndarray) -> None:
+    def get_fragments_by_time(self, proc_num: int) -> list[tiledb.FragmentInfo]:
         """
-        Write data to TileDB database
+        Get TileDB array fragments from the time slot specified.
 
-        Parameters
-        ----------
-        xs : np.ndarray
-            X cell indices
-        ys : np.ndarray
-            Y cell indices
-        data : np.ndarray
-            Numpy object of data values for attributes in each index pairing
+        :param proc_num: Requested time slot.
+        :return: Array fragments from time slot.
+        """
+        af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
+        return [a for a in af if a.timestamp_range == (proc_num, proc_num)]
+
+    def delete(self, proc_num: int) -> ShatterConfig:
+        """
+        Delete Shatter process and all associated data from database.
+
+        :param proc_num: Shatter process time slot
+        :return: Config of deleted Shatter process
         """
 
-        with self.open('w') as tdb:
-            # data = {k: v.astype(np.dtype(v.dtype)) for k,v in data.items()}
+        self.config.log.debug(f'Deleting time slot {proc_num}...')
+        with self.open('r', (proc_num, proc_num)) as r:
+            sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
+            sh_cfg.mbr = ()
+            sh_cfg.finished = False
 
-            # if self.config.app.debug:
-            #     tiledb.stats_reset()
-            #     tiledb.stats_enable()
-            tdb[xs, ys] = data
+        self.config.log.debug('Deleting fragments...')
+        with self.open('m', (proc_num, proc_num)) as m:
+            m.delete_fragments(proc_num, proc_num)
+        self.config.log.debug('Rewriting config.')
+        with self.open('w', (proc_num, proc_num)) as w:
+            w.meta['shatter'] = json.dumps(sh_cfg.to_json())
+        return sh_cfg
 
-            # if self.config.app.debug:
-            #     tiledb.stats_dump()
-            #     tiledb.stats_reset()
+    def consolidate_shatter(self, proc_num: int) -> None:
+        """
+        Consolidate the fragments from a shatter process into one fragment.
+        This makes the database perform better, but reduces the granularity of
+        time traveling.
+
+        :param proc_num: Time slot associated with shatter process.
+        """
+        # TODO move from timestamp to fragment_uris, timestamp is deprecated
+        # this is currently failing, I believe from a bug in tiledb
+        afs = self.get_fragments_by_time(proc_num)
+        uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
+        tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)

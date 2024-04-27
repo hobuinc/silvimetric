@@ -1,26 +1,42 @@
 import numpy as np
 import signal
 import datetime
+import copy
+from typing import Generator
 import pandas as pd
-from line_profiler import profile
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
 
-from tiledb import SparseArray
+from .. import Extents, Storage, Data, ShatterConfig
 
-from ..resources import Extents, Storage, ShatterConfig, Data
+def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
+    """
+    Execute pipeline and retrieve point cloud data for this extent
 
-def get_data(extents: Extents, filename: str, storage: Storage):
+    :param extents: :class:`silvimetric.resources.extents.Extents` being operated on.
+    :param filename: Path to either PDAL pipeline or point cloud.
+    :param storage: :class:`silvimetric.resources.storage.Storage` database object.
+    :return: Point data array from PDAL.
+    """
+    #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
     p = data.pipeline
     data.execute()
     return p.get_dataframe(0)
 
-@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
+    """
+    Arrange data to fit key-value TileDB input format.
+
+    :param data: Tuple of indices and point data array (xis, yis, data).
+    :param leaf: :class:`silvimetric.resources.extents.Extent` being operated on.
+    :param attrs: List of attribute names.
+    :raises Exception: Missing attribute error.
+    :return: None if no work is done, or a tuple of indices and rearranged data.
+    """
     if points is None:
         return None
     if points.size == 0:
@@ -31,37 +47,38 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     points.loc[:, 'xi'] = da.floor(points.xi)
     points.loc[:, 'yi'] = da.floor(points.yi)
-    points = points.assign(count=lambda x: points.Z.count())
-    grouped = points.groupby(['xi','yi'])#.agg(list)
-    # grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    # points = points.assign(count=lambda x: points.Z.count())
+    grouped = points.groupby(['xi','yi']).agg(list)
+    grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
     return grouped
 
-@profile
 def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    # import pickle
-    # f = open('./before', 'wb')
-    # pickle.dump(data_in, f)
-    # f.close()
+    # ms = [m._method for m in storage.config.metrics]
+    # cols = {col: m.entry_name(col) for col in data_in.columns for m in storage.config.metrics}
+    # dfs.append(data_in.agg(ms).rename(columns=cols))
+    # data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+    # TODO how do we limit the number of passes here?
+    attrs = storage.config.attrs
+    for m in storage.config.metrics:
+        data_in = data_in.assign(
+            **{f'{m.entry_name(attr.name)}': lambda val: [
+                    m._method(v) for v in data_in[attr.name]
+                ] for attr in attrs})
 
-    dfs = []
-    ms = [m._method for m in storage.config.metrics]
-    cols = {col: m.entry_name(col) for col in data_in.columns}
-    dfs.append(data_in.agg(ms).rename(columns=cols))
-        # data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+    return data_in
 
+def write(data_in, tdb):
+    """
+    Write cell data to database
 
-    # f = open('./after', 'wb')
-    # pickle.dump(data_in, f)
-    # f.close()
-
-    return dfs
-
-@profile
-def write(metrics, data_in, tdb):
+    :param data_in: Data to be written to database.
+    :param tdb: TileDB write stream.
+    :return: Number of points written.
+    """
     if data_in is None:
         return 0
 
@@ -79,69 +96,95 @@ def write(metrics, data_in, tdb):
     dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
 
     tdb[dx,dy] = dd
-    return data_in['count'].sum().item()
+    pc = data_in['count'].sum().item()
+    p = copy.deepcopy(pc)
+    del pc, data_in
+    return p
 
-def run(leaves: list[Extents], config: ShatterConfig, storage: Storage,
-        tdb: SparseArray):
+Leaves = Generator[Extents, None, None]
+def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
+    """
+    Coordinate running of shatter process and handle any interruptions
 
-    start_time = config.start_time
-    ## Handle a kill signal
+    :param leaves: Generator of Leaf nodes.
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`
+    :param storage: :class:`silvimetric.resources.storage.Storage`
+    :return: Number of points processed.
+    """
+
+    # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
         client = dask.config.get('distributed.client')
         if client is not None:
             client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        with storage.open(timestamp=(start_time, end_time)) as a:
-            config.nonempty_domain = a.nonempty_domain()
-            config.finished=False
 
-            config.log.info('Saving config before quitting...')
-            tdb.meta['shatter'] = str(config)
-            config.log.info('Quitting.')
+        storage.consolidate_shatter(config.time_slot)
+        config.end_time = end_time
+        config.mbrs = storage.mbrs(config.time_slot)
+        config.finished=False
+        config.log.info('Saving config before quitting...')
+
+        storage.saveMetadata('shatter', str(config), config.time_slot)
+        config.log.info('Quitting.')
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
+
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in config.attrs]
+    timestamp = (config.time_slot, config.time_slot)
 
-    leaf_bag: db.Bag = db.from_sequence(leaves)
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, storage)
-    writes: db.Bag = metrics.map(write, arranged, tdb)
+    with storage.open('w', timestamp=timestamp) as tdb:
+        leaf_bag: db.Bag = db.from_sequence(leaves)
+        if config.mbr:
+            def mbr_filter(one: Extents):
+                return all(one.disjoint_by_mbr(m) for m in config.mbr)
+            leaf_bag = leaf_bag.filter(mbr_filter)
 
-    ## If dask is distributed, use the futures feature
-    if dask.config.get('scheduler') == 'distributed':
-        pc_futures = futures_of(writes.persist())
-        for batch in as_completed(pc_futures, with_results=True).batches():
-            for future, pack in batch:
-                if isinstance(pack, CancelledError):
-                    continue
-                for pc in pack:
-                    config.point_count = config.point_count + pc
+        points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+        arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
+        metrics: db.Bag = arranged.map(get_metrics, storage)
+        writes: db.Bag = metrics.map(write, tdb)
 
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        config.finished = True
-        a = storage.open(timestamp=(start_time, end_time))
-        return config.point_count
+        ## If dask is distributed, use the futures feature
+        dc = dask.config.get('distributed.client')
+        if isinstance(dc, dask.distributed.Client):
+            pc_futures = futures_of(writes.persist())
+            for batch in as_completed(pc_futures, with_results=True).batches():
+                for future, pack in batch:
+                    if isinstance(pack, CancelledError):
+                        continue
+                    for pc in pack:
+                        config.point_count = config.point_count + pc
 
-    ## Handle non-distributed dask scenarios
-    pc = sum(writes)
-    end_time = datetime.datetime.now().timestamp() * 1000
-    with storage.open(timestamp=(start_time, end_time)) as a:
+            end_time = datetime.datetime.now().timestamp() * 1000
+            config.end_time = end_time
+            config.finished = True
 
-        config.end_time = end_time
-        config.finished=True
-        config.point_count = pc
-        config.nonempty_domain = a.nonempty_domain()
-        tdb.meta['shatter'] = str(config)
+        ## Handle non-distributed dask scenarios
+        else:
+            config.point_count = sum(writes)
 
-    return pc
+    # modify config to reflect result of shattter process
+    config.mbr = storage.mbrs(config.time_slot)
+    config.log.debug('Saving shatter metadata')
+    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.finished = True
+
+    storage.saveMetadata('shatter', str(config), config.time_slot)
+    return config.point_count
 
 
-def shatter(config: ShatterConfig):
+def shatter(config: ShatterConfig) -> int:
+    """
+    Handle setup and running of shatter process.
+    Will look for a config that has already been run before and needs to be
+    resumed.
+
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`.
+    :return: Number of points processed.
+    """
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb
@@ -149,27 +192,24 @@ def shatter(config: ShatterConfig):
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
+    if dask.config.get('distributed.client') is None:
+        config.log.warning("Selected scheduler type does not support"
+                "continuously updated config information.")
 
-    with storage.open('w') as tdb:
+    if not config.time_slot: # defaults to 0, which is reserved for storage cfg
+        config.time_slot = storage.reserve_time_slot()
 
-        ## shatter should still output a config if it's interrupted
-        # TODO add slices yet to be finished so we can pick up this process
-        # in the future
+    if config.bounds is None:
+        config.bounds = extents.bounds
 
-        if config.bounds is None:
-            config.bounds = extents.bounds
+    config.log.debug('Grabbing leaf nodes...')
+    if config.tile_size is not None:
+        leaves = extents.get_leaf_children(config.tile_size)
+    else:
+        leaves = extents.chunk(data, 100)
 
-        config.log.debug('Grabbing leaf nodes...')
-        if config.tile_size is not None:
-            leaves = extents.get_leaf_children(config.tile_size)
-        else:
-            leaves = extents.chunk(data, 100)
-
-        # Begin main operations
-        config.log.debug('Fetching and arranging data...')
-        pc = run(leaves, config, storage, tdb)
-        config.point_count = int(pc)
-
-        config.log.debug('Saving shatter metadata')
-        tdb.meta['shatter'] = str(config)
-        return config.point_count
+    # Begin main operations
+    config.log.debug('Fetching and arranging data...')
+    pc = run(leaves, config, storage)
+    storage.consolidate_shatter(config.time_slot)
+    return pc
