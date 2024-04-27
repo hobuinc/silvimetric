@@ -14,8 +14,4 @@ from .commands.extract import extract
 from .commands.info import info
 from .commands.scan import scan
 from .commands.initialize import initialize
-<<<<<<< HEAD
 from .commands.manage import delete, resume, restart
-=======
-from .commands.manage import delete, resume, restart
->>>>>>> kmann/imports
