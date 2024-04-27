@@ -5,9 +5,8 @@ import dask
 import json
 import uuid
 
-from silvimetric.commands.shatter import shatter
-from silvimetric.commands.info import info
-from silvimetric.resources import Storage, Extents, ShatterConfig, Log
+from silvimetric import Extents, Log, info, shatter, Bounds, Storage
+from silvimetric import StorageConfig, ShatterConfig
 
 
 @dask.delayed
@@ -112,6 +111,10 @@ class Test_Shatter(object):
         pcs = [ h['point_count'] for h in history ]
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
+
+    def test_partial_overlap(self, partial_shatter_config, test_point_count):
+        pc = shatter(partial_shatter_config)
+        assert pc == 23100
 
     @pytest.mark.skipif(
         os.environ.get('AWS_SECRET_ACCESS_KEY') is None or

@@ -1,6 +1,6 @@
 import tiledb
 import numpy as np
-from silvimetric.resources import Storage
+from silvimetric import Storage
 
 class Test_Western(object):
 

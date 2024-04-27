@@ -42,6 +42,10 @@ class Config(ABC):
         return d
 
     @classmethod
+    def from_json(self, data: str):
+        return self.from_string(json.dumps(data))
+
+    @classmethod
     @abstractmethod
     def from_string(self, data: str):
         raise NotImplementedError
@@ -124,11 +128,11 @@ class StorageConfig(Config):
         x = json.loads(data)
         root = Bounds(*x['root'])
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         else:
             ms = None
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         else:
             attrs = None
         if 'crs' in x:
@@ -233,6 +237,10 @@ class ShatterConfig(Config):
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
 
+        if isinstance(self.tile_size, float):
+            self.tile_size = int(self.tile_size)
+            self.log.warning(f'Truncating tile size to integer({self.tile_size})')
+            pass
         if not self.attrs:
             self.attrs = s.getAttributes()
         if not self.metrics:
@@ -265,8 +273,8 @@ class ShatterConfig(Config):
     def from_dict(cls, data: dict):
         x = data
 
-        ms = list([ Metric.from_string(m) for m in x['metrics']])
-        attrs = list([ Attribute.from_string(a) for a in x['attrs']])
+        ms = list([ Metric.from_dict(m) for m in x['metrics']])
+        attrs = list([ Attribute.from_dict(a) for a in x['attrs']])
         if isinstance(x['date'], list):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
@@ -340,9 +348,9 @@ class ExtractConfig(Config):
     def from_string(cls, data: str):
         x = json.loads(data)
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         if 'bounds' in x:
             bounds = Bounds(*x['bounds'])
         if 'log' in x:

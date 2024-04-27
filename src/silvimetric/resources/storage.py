@@ -12,7 +12,7 @@ from math import floor
 
 from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
-from ..resources import Bounds
+from .bounds import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -76,7 +76,8 @@ class Storage:
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
+            capacity=100000)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -294,12 +295,17 @@ class Storage:
         :param proc_num: Shatter process time slot
         :return: Config of deleted Shatter process
         """
+
+        self.config.log.debug(f'Deleting time slot {proc_num}...')
         with self.open('r', (proc_num, proc_num)) as r:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
+
+        self.config.log.debug('Deleting fragments...')
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
+        self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
         return sh_cfg

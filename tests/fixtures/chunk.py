@@ -3,7 +3,7 @@ import pytest
 
 from typing import Generator, List
 
-from silvimetric.resources import Extents, Data
+from silvimetric import Extents, Data
 
 @pytest.fixture(scope='function', autouse=True)
 def filtered(copc_data, extents: Extents) -> Generator[List[Extents], None, None]:

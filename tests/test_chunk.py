@@ -1,7 +1,7 @@
 import numpy as np
 import datetime
 
-from silvimetric.resources import Extents
+from silvimetric import Extents
 from silvimetric.commands.shatter import run
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):

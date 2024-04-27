@@ -5,7 +5,7 @@ import uuid
 from typing import Generator
 
 from silvimetric.commands.shatter import shatter
-from silvimetric.resources import Attribute, ExtractConfig, Extents, Log
+from silvimetric import Attribute, ExtractConfig, Extents, Log
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> Generator[str, None, None]:
