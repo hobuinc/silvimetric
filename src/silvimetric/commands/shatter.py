@@ -42,7 +42,7 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     if points.size == 0:
         return None
 
-    points = points.loc[points.Y > leaf.bounds.miny]
+    points = points.loc[points.Y < leaf.bounds.maxy]
     points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
     points.loc[:, 'xi'] = da.floor(points.xi)

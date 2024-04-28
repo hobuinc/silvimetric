@@ -41,11 +41,11 @@ class Extents(object):
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         """Minimum X index"""
-        self.y1 = math.floor((self.root.maxy - maxy) / resolution)
+        self.y1 = math.floor((miny - self.root.miny) / resolution)
         """Minimum Y index"""
         self.x2 = math.ceil((maxx - self.root.minx) / resolution)
         """Maximum X index"""
-        self.y2 = math.ceil((self.root.maxy - miny) / resolution)
+        self.y2 = math.ceil((maxy - self.root.miny) / resolution)
         """Maximum Y index"""
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
         """Minimum bounding rectangle of this Extents"""
@@ -111,8 +111,9 @@ class Extents(object):
         # make bounds in scale with the desired resolution
         minx = bminx + (self.x1 * self.resolution)
         maxx = bminx + (self.x2 * self.resolution)
-        miny = bmaxy - (self.y2 * self.resolution)
-        maxy = bmaxy - (self.y1 * self.resolution)
+
+        miny = bminy + (self.y1 * self.resolution)
+        maxy = bminy + (self.y2 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r)
 
@@ -151,7 +152,7 @@ class Extents(object):
         y_adjusted = math.floor((maxy - miny) / 2 / self.resolution)
 
         midx = minx + (x_adjusted * self.resolution)
-        midy = maxy - (y_adjusted * self.resolution)
+        midy = miny + (y_adjusted * self.resolution)
 
         return [
             Extents(Bounds(minx, miny, midx, midy), self.resolution, self.root), #lower left
@@ -237,11 +238,17 @@ class Extents(object):
             ], dtype=np.float64)
         dx = (res * local_xs) + self.root.minx
 
+        # local_ys = np.array([
+        #         [min(y+ynum, self.y2), y]
+        #         for y in range(self.y1, self.y2, int(ynum))
+        #     ], dtype=np.float64)
+        # dy = (res * local_ys) + self.root.miny
+
         local_ys = np.array([
-                [min(y+ynum, self.y2), y]
+                [y, min(y+ynum, self.y2)]
                 for y in range(self.y1, self.y2, int(ynum))
             ], dtype=np.float64)
-        dy = self.root.maxy - (res * local_ys)
+        dy = (res * local_ys) + self.root.miny
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
