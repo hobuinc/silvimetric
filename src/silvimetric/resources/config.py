@@ -152,7 +152,8 @@ class StorageConfig(Config):
         return n
 
     def __repr__(self):
-        return json.dumps(self.to_json())
+        j = self.to_json()
+        return json.dumps(j)
 
 @dataclass
 class ApplicationConfig(Config):

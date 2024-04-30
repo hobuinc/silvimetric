@@ -9,9 +9,11 @@ import dask
 from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
+from line_profiler import profile
 
 from .. import Extents, Storage, Data, ShatterConfig
 
+@profile
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
     Execute pipeline and retrieve point cloud data for this extent
@@ -27,6 +29,7 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     data.execute()
     return p.get_dataframe(0)
 
+@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     """
     Arrange data to fit key-value TileDB input format.
@@ -48,11 +51,13 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     points.loc[:, 'xi'] = da.floor(points.xi)
     points.loc[:, 'yi'] = da.floor(points.yi)
     # points = points.assign(count=lambda x: points.Z.count())
-    grouped = points.groupby(['xi','yi']).agg(list)
-    grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    grouped = points.groupby(['xi','yi'])#.agg(list)
+    # grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    # grouped = points.set_index(['xi', 'yi'])
 
     return grouped
 
+@profile
 def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
@@ -61,16 +66,52 @@ def get_metrics(data_in, storage: Storage):
     # cols = {col: m.entry_name(col) for col in data_in.columns for m in storage.config.metrics}
     # dfs.append(data_in.agg(ms).rename(columns=cols))
     # data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+
     # TODO how do we limit the number of passes here?
-    attrs = storage.config.attrs
-    for m in storage.config.metrics:
-        data_in = data_in.assign(
-            **{f'{m.entry_name(attr.name)}': lambda val: [
-                    m._method(v) for v in data_in[attr.name]
-                ] for attr in attrs})
+    # TODO group attributes together for one run per metric
+    # attrs = storage.config.attrs
+    # anames = [a.name for a in storage.config.attrs]
+    # ms = [m._method for m in storage.config.metrics]
+    # names = {m.entry_name(a):  for m in storage.config.metrics for a in storage.config.attrs}
+    # ms = [ (m.entry_name(a.name), m._method) for m in storage.config.metrics for
+            # a in storage.config.attrs]
+    ms = {
+        a.name:
+        [
+            (m.entry_name(a.name), m._method)
+            for m in storage.config.metrics
+        ]
+        for a in storage.config.attrs
+    }
 
-    return data_in
+    # apply metric methods across attributes
+    metric_data = data_in.agg(ms)
+    metric_data.columns = metric_data.columns.droplevel(0)
+    # pull all values together into lists based on cell
+    att_data = data_in.agg(list)
+    # join the two together
+    joined_data = att_data.join(metric_data)
+    joined_data = joined_data.assign(count=lambda x: [len(z) for z in joined_data.Z])
 
+    # d = data_in.loc[:,anames]
+
+    # for m in storage.config.metrics:
+    #     data_in = data_in.assign(
+    #         **{f'{m.entry_name(attr.name)}': lambda val: [
+    #                 m._method(v) for v in data_in[attr.name]
+    #             ] for attr in attrs})
+    idf = joined_data.index.to_frame()
+
+    dx = idf['xi'].to_list()
+    dy = idf['yi'].to_list()
+    with storage.open('r') as tdb:
+        dt = lambda a: tdb.schema.attr(a).dtype
+        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in joined_data[d]], None], object)[:-1] for d in joined_data }
+        # dd = joined_data.to_dict('list')
+
+    return ( dx, dy, dd )
+
+@profile
 def write(data_in, tdb):
     """
     Write cell data to database
@@ -81,10 +122,7 @@ def write(data_in, tdb):
     """
     if data_in is None:
         return 0
-
-    idf = data_in.index.to_frame()
-    dx = idf['xi'].to_list()
-    dy = idf['yi'].to_list()
+    dx, dy, dd = data_in
 
     # TODO get this working at some point. Look at pandas extensions
     # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
@@ -92,11 +130,9 @@ def write(data_in, tdb):
     # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
     #         column_types=dict(data_in.dtypes),
     #         varlen_types=[np.dtype('O')])
-    dt = lambda a: tdb.schema.attr(a).dtype
-    dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
 
     tdb[dx,dy] = dd
-    pc = data_in['count'].sum().item()
+    pc = dd['count'].sum().item()
     p = copy.deepcopy(pc)
     del pc, data_in
     return p
@@ -157,6 +193,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                         continue
                     for pc in pack:
                         config.point_count = config.point_count + pc
+                        del pc
 
             end_time = datetime.datetime.now().timestamp() * 1000
             config.end_time = end_time

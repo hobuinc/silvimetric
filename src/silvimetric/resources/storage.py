@@ -6,7 +6,7 @@ import pathlib
 import contextlib
 import json
 import urllib
-from typing import Any
+from typing import Generator
 
 from math import floor
 
@@ -71,6 +71,14 @@ class Storage:
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
+
+        # Check that all attributes required for metric usage are available
+        att_list = [a.name for a in config.attrs]
+        required_atts = [d.name for m in config.metrics for d in m.dependencies
+                if isinstance(d, Attribute)]
+        for ra in required_atts:
+            if ra not in att_list:
+                raise ValueError(f'Missing required dependency, {ra}.')
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
@@ -166,7 +174,7 @@ class Storage:
         return self.getConfig().metrics
 
     @contextlib.contextmanager
-    def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
+    def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
         """
         Open stream for TileDB database in given mode and at given timestamp.
 

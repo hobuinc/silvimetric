@@ -12,8 +12,11 @@ from silvimetric import ApplicationConfig, ExtractConfig
 from silvimetric import __version__ as svversion
 
 # pull together fixtures
-pytest_plugins=['fixtures.shatter', 'fixtures.extract', 'fixtures.commands',
-        'fixtures.chunk', 'fixtures.western', 'fixtures.data', 'fixtures.cli']
+pytest_plugins=[
+    'fixtures.shatter_fixtures', 'fixtures.extract_fixtures',
+    'fixtures.command_fixtures', 'fixtures.chunk_fixtures',
+    'fixtures.western_fixtures', 'fixtures.data_fixtures',
+    'fixtures.cli_fixtures', 'fixtures.fusion_fixtures']
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask() -> None:

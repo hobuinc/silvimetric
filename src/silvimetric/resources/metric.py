@@ -1,20 +1,19 @@
 import json
 import numpy as np
-from typing import Callable, Optional, Any, Union
-from scipy import stats
+from typing import Callable, Optional, Any, Union, List
 from inspect import getsource
 from tiledb import Attr
 import dask
 import base64
-import pickle
 import dill
+import pandas as pd
 
-from .entry import Attribute, Entry
+from .entry import Attribute, Entry, Attributes
 
-MetricFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
+MetricFn = Callable[[np.ndarray], np.ndarray]
+FilterFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
 
 # Derived information about a cell of points
-
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric(Entry):
     """
@@ -23,7 +22,10 @@ class Metric(Entry):
     object has all the information necessary to facilitate the derivation of
     data as well as its insertion into the database.
     """
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn, dependencies: list[Attribute]=None):
+    def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
+            dependencies: list[Entry]=[], filters: List[FilterFn]=[],
+            attributes: List[Attribute]=[]):
+
         super().__init__()
         self.name = name
         """Metric name. eg. mean"""
@@ -33,6 +35,11 @@ class Metric(Entry):
         """Attributes/Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
+        self.filters = filters
+        """List of user-defined filters to perform before performing method."""
+        self.attributes = attributes
+        """List of Attributes this Metric applies to. If empty it's used for all
+        Attributes"""
 
     def schema(self, attr: Attribute):
         """
@@ -48,27 +55,48 @@ class Metric(Entry):
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    @dask.delayed
-    def delayed(self, data: np.ndarray) -> np.ndarray:
+    def do(self, data: pd.DataFrame) -> pd.DataFrame:
+        """Run metric and filters."""
+        for fn in self.filters:
+            data = fn(data)
         return self._method(data)
+
+    @dask.delayed
+    def do_delayed(self, data: pd.DataFrame) -> np.ndarray:
+        """Run metric as a dask delayed method"""
+        self.do(data)
+
+    #TODO make dict with key for each Attribute effected? {att: [fn]}
+    # for now these filters apply to all Attributes
+    def add_filter(self, fn: FilterFn):
+        """
+        Add filter method to list of filters to run before calling main method.
+        """
+        self.filters.append(fn)
 
     def to_json(self) -> dict[str, any]:
         return {
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
-            'dependencies': self.dependencies,
+            'dependencies': [d.to_json() for d in self.dependencies],
             'method_str': getsource(self._method),
-            'method': base64.b64encode(dill.dumps(self._method)).decode()
+            'method': base64.b64encode(dill.dumps(self._method)).decode(),
+            'filters': [base64.b64encode(dill.dumps(f)).decode() for f in self.filters],
+            'attributes': [a.to_json() for a in self.attributes]
         }
 
+    @staticmethod
     def from_dict(data: dict):
         name = data['name']
         dtype = np.dtype(data['dtype'])
         dependencies = data['dependencies']
         method = dill.loads(base64.b64decode(data['method'].encode()))
+        attributes = [ Attribute.from_dict(a) for a in data['attributes']]
+        filters = dill.loads(base64.b64decode(data['filters']).encode())
 
-        return Metric(name, dtype, method, dependencies)
+        return Metric(name, dtype, method, dependencies, filters, attributes)
 
+    @staticmethod
     def from_string(data: str):
         j = json.loads(data)
         return Metric.from_dict(j)
@@ -77,10 +105,12 @@ class Metric(Entry):
         return (self.name == other.name and
                 self.dtype == other.dtype and
                 self.dependencies == other.dependencies and
-                self._method == other._method)
+                self._method == other._method,
+                self.attributes == other.attributes,
+                self.filters == other.filters)
 
-    def __call__(self, data: np.ndarray) -> np.ndarray:
-        return self._method(data)
+    def __call__(self, data: pd.DataFrame) -> pd.DataFrame:
+        return self.do(data)
 
     def __repr__(self) -> str:
         return json.dumps(self.to_json())
@@ -96,7 +126,6 @@ def m_mode(data):
     v = u[i[0][0]]
     return v
 
-
 def m_median(data):
     return np.median(data)
 
@@ -109,12 +138,16 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
+def f_numret2(data):
+    return np.where(data['NumberOfReturns']) > 2
+
 #TODO change to correct dtype
 Metrics = {
     'mean' : Metric('mean', np.float32, m_mean),
     'mode' : Metric('mode', np.float32, m_mode),
     'median' : Metric('median', np.float32, m_median),
     'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max),
+    'max' : Metric('max', np.float32, m_max, [Attributes['NumberOfReturns']],
+        filters=[f_numret2]),
     'stddev' : Metric('stddev', np.float32, m_stddev),
 }

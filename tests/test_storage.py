@@ -1,7 +1,8 @@
 import tiledb
 import numpy as np
+import pytest
 
-from silvimetric import Storage, Metrics, Attribute
+from silvimetric import Storage, Metrics, Attribute, Attributes
 from silvimetric.commands import info
 from silvimetric import __version__ as svversion
 
@@ -41,6 +42,17 @@ class Test_Storage(object):
         assert config.root == storage.config.root
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
+
+    def test_metric_dependencies(self, storage_config):
+        ms = storage_config.metrics
+        ms[0].dependencies = [Attributes['HeightAboveGround']]
+        with pytest.raises(ValueError) as e:
+            Storage.create(storage_config)
+        assert str(e.value) == 'Missing required dependency, HeightAboveGround.'
+
+        ms[0].dependencies = [Attributes['NumberOfReturns']]
+        s = Storage.create(storage_config)
+        assert isinstance(s, Storage)
 
     def test_metrics(self, storage: Storage):
         m_list = storage.getMetrics()
