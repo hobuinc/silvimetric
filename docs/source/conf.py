@@ -10,6 +10,7 @@
 import sys, os, re
 import time
 import datetime
+import silvimetric
 
 if os.environ.get('SOURCE_DATE_EPOCH'):
     year  = datetime.datetime.utcfromtimestamp(int(os.environ.get('SOURCE_DATE_EPOCH', time.gmtime()))).year
@@ -50,23 +51,24 @@ html_context = {
 
 
 
-def read_version(filename):
-    #
-    # project(PDAL VERSION 0.9.8 LANGUAGES CXX C)
-    data = open(filename).readlines()
+# TODO remove this
+# def read_version(filename):
+#     #
+#     # project(PDAL VERSION 0.9.8 LANGUAGES CXX C)
+#     data = open(filename).readlines()
 
-    token = '__version__'
+#     token = '__version__'
 
-    version = None
-    for line in data:
-        if str(token) in line:
-            match = re.search(r'\d.\d.\d', line)
-            if match is not None:
-                version = match.group(0)
-                break
-    return version
+#     version = None
+#     for line in data:
+#         if str(token) in line:
+#             match = re.search(r'\d.\d.\d', line)
+#             if match is not None:
+#                 version = match.group(0)
+#                 break
+#     return version
 
-release = read_version('../../src/silvimetric/__init__.py')
+release = silvimetric.__version__
 version = release
 
 
