@@ -3,7 +3,7 @@ from typing import Generator
 from uuid import uuid4
 
 from silvimetric import __version__ as svversion
-from silvimetric.resources import StorageConfig, ShatterConfig, Storage, Log
+from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
 
 @pytest.fixture(scope="function")
 def s3_bucket() -> Generator[str, None, None]:
@@ -46,10 +46,6 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics) -> Generato
     yield sc
 
 @pytest.fixture(scope='function')
-def uneven_storage(tdb_filepath) -> Generator[Storage, None, None]:
-    yield Storage.from_db(tdb_filepath)
-
-@pytest.fixture(scope='function')
 def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, date) -> Generator[ShatterConfig, None, None]:
     log = Log('INFO') # INFO
     s = ShatterConfig(tdb_dir = tdb_filepath,
@@ -60,3 +56,30 @@ def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, da
                       debug = True,
                       date=date)
     yield s
+
+@pytest.fixture(scope='function')
+def partial_storage_config(tdb_filepath, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
+    log = Log('INFO')
+    bounds = Bounds(300,300,450,450)
+    sc = StorageConfig(tdb_dir = tdb_filepath,
+                        log = log,
+                        crs = crs,
+                        root = bounds,
+                        resolution = 7,
+                        attrs = attrs,
+                        metrics = metrics,
+                        version = svversion)
+    Storage.create(sc)
+    yield sc
+
+@pytest.fixture(scope='function')
+def partial_shatter_config(tdb_filepath, copc_filepath, date, partial_storage_config) -> Generator[ShatterConfig, None, None]:
+    psc: StorageConfig = partial_storage_config
+    log = Log('INFO') # INFO
+    yield ShatterConfig(tdb_dir = tdb_filepath,
+                      log = log,
+                      attrs=psc.attrs,
+                      metrics=psc.metrics,
+                      filename = copc_filepath,
+                      debug = True,
+                      date=date)

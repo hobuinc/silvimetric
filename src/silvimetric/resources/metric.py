@@ -61,17 +61,17 @@ class Metric(Entry):
             'method': base64.b64encode(dill.dumps(self._method)).decode()
         }
 
-    def from_string(data: Union[str, dict]):
-        if isinstance(data, str):
-            j = json.loads(data)
-        elif isinstance(data, dict):
-            j = data
-        name = j['name']
-        dtype = np.dtype(j['dtype'])
-        dependencies = j['dependencies']
-        method = dill.loads(base64.b64decode(j['method'].encode()))
+    def from_dict(data: dict):
+        name = data['name']
+        dtype = np.dtype(data['dtype'])
+        dependencies = data['dependencies']
+        method = dill.loads(base64.b64decode(data['method'].encode()))
 
         return Metric(name, dtype, method, dependencies)
+
+    def from_string(data: str):
+        j = json.loads(data)
+        return Metric.from_dict(j)
 
     def __eq__(self, other):
         return (self.name == other.name and

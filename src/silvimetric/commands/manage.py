@@ -1,4 +1,4 @@
-from ..resources import Storage, ShatterConfig
+from .. import Storage, ShatterConfig
 from .info import info
 from .shatter import shatter
 

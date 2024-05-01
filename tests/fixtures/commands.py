@@ -6,7 +6,7 @@ from typing import List, Generator
 from datetime import datetime
 
 from silvimetric.commands import shatter
-from silvimetric.resources import ShatterConfig
+from silvimetric import ShatterConfig
 
 @pytest.fixture(scope='function')
 def config_split(shatter_config: ShatterConfig) -> Generator[List[ShatterConfig], None, None]:

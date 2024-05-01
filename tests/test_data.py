@@ -1,5 +1,4 @@
-from silvimetric.resources import Data
-from silvimetric.resources import Storage
+from silvimetric import Data, Storage
 
 class Test_Data(object):
 

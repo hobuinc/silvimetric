@@ -3,7 +3,7 @@ import pytest
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
-from silvimetric.resources import ShatterConfig
+from silvimetric import ShatterConfig
 
 class TestCli(object):
     def test_cli_init(self, tdb_filepath, runner, bounds):

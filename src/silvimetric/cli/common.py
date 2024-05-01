@@ -6,7 +6,7 @@ import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
 
-from ..resources import Bounds, Attribute, Metric, Attributes, Metrics, Log
+from .. import Bounds, Attribute, Metric, Attributes, Metrics, Log
 
 
 class BoundsParamType(click.ParamType):

@@ -10,7 +10,7 @@ from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
 
-from ..resources import Extents, Storage, ShatterConfig, Data
+from .. import Extents, Storage, Data, ShatterConfig
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
@@ -173,9 +173,9 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
     with storage.open('w', timestamp=timestamp) as tdb:
         leaf_bag: db.Bag = db.from_sequence(leaves)
         if config.mbr:
-            def f(one: Extents):
+            def mbr_filter(one: Extents):
                 return all(one.disjoint_by_mbr(m) for m in config.mbr)
-            leaf_bag = leaf_bag.filter(f)
+            leaf_bag = leaf_bag.filter(mbr_filter)
 
         points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
         att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
@@ -184,7 +184,8 @@ def run(leaves: db.Bag, config: ShatterConfig, storage: Storage) -> int:
         writes: db.Bag = metrics.map(write, tdb)
 
         ## If dask is distributed, use the futures feature
-        if dask.config.get('scheduler') == 'distributed':
+        dc = dask.config.get('distributed.client')
+        if isinstance(dc, dask.distributed.Client):
             pc_futures = futures_of(writes.persist())
             for batch in as_completed(pc_futures, with_results=True).batches():
                 for future, pack in batch:

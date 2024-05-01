@@ -1,7 +1,7 @@
 import tempfile
 from typing import Generator
 
-from silvimetric.resources import Storage, ShatterConfig, Log, Bounds, StorageConfig
+from silvimetric import Storage, ShatterConfig, Log, Bounds, StorageConfig
 from silvimetric import __version__ as svversion
 import os, shutil
 import pytest

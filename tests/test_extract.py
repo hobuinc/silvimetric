@@ -2,8 +2,7 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric.commands.extract import extract
-from silvimetric.resources import Metrics, ExtractConfig, Extents, Log
+from silvimetric import Metrics, ExtractConfig, Extents, Log, extract
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
