@@ -68,11 +68,20 @@ class Metric(Entry):
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
-    def add_filter(self, fn: FilterFn):
+    def add_filter(self, fn: FilterFn, desc: str):
         """
         Add filter method to list of filters to run before calling main method.
         """
         self.filters.append(fn)
+
+    def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
+        if not isinstance(data, pd.DataFrame):
+            raise ValueError('Data into filter must be a DataFrame.'
+                f' Type found: {type(data)}')
+        for f in self.filters:
+            data = f(data)
+        return data
+
 
     def to_json(self) -> dict[str, any]:
         return {
@@ -89,10 +98,22 @@ class Metric(Entry):
     def from_dict(data: dict):
         name = data['name']
         dtype = np.dtype(data['dtype'])
-        dependencies = data['dependencies']
         method = dill.loads(base64.b64decode(data['method'].encode()))
-        attributes = [ Attribute.from_dict(a) for a in data['attributes']]
-        filters = dill.loads(base64.b64decode(data['filters']).encode())
+
+        if 'dependencies' in data.keys() and data['dependencies'] is not None:
+            dependencies = data['dependencies']
+        else:
+            dependencies = [ ]
+
+        if 'attributes' in data.keys() and data['attributes'] is not None:
+            attributes = [ Attribute.from_dict(a) for a in data['attributes']]
+        else:
+            attributes = [ ]
+
+        if 'filters' in data.keys():
+            filters = dill.loads(base64.b64decode(data['filters']).encode())
+        else:
+            filters = [ ]
 
         return Metric(name, dtype, method, dependencies, filters, attributes)
 
@@ -139,7 +160,7 @@ def m_stddev(data):
     return np.std(data)
 
 def f_numret2(data):
-    return np.where(data['NumberOfReturns']) > 2
+    return data.where(data.NumberOfReturns > 2)
 
 #TODO change to correct dtype
 Metrics = {

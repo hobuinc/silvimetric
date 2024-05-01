@@ -130,11 +130,11 @@ class StorageConfig(Config):
         if 'metrics' in x:
             ms = [ Metric.from_dict(m) for m in x['metrics']]
         else:
-            ms = None
+            ms = [ ]
         if 'attrs' in x:
             attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         else:
-            attrs = None
+            attrs = [ ]
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:

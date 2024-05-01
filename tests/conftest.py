@@ -71,7 +71,7 @@ def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
     yield s
 
 @pytest.fixture(scope='function')
-def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
+def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs, storage):
     from silvimetric.commands import shatter
     shatter.shatter(shatter_config)
     log = Log(20)
