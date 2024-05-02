@@ -148,7 +148,7 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
             root = bounds,
             crs = crs,
             attrs = attributes,
-            metrics = list(itertools.chain(*metrics)),
+            metrics = metrics,
             resolution = resolution)
     return initialize.initialize(storageconfig)
 

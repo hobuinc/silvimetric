@@ -57,14 +57,28 @@ class Metric(Entry):
 
     def do(self, data: pd.DataFrame) -> pd.DataFrame:
         """Run metric and filters."""
-        for fn in self.filters:
-            data = fn(data)
-        return self._method(data)
+        if self.attributes:
+            attrs = [*[a.name for a in self.attributes],'xi','yi']
+            data = data[attrs]
+
+        data = self.run_filters(data)
+        idx = ['xi','yi']
+        gb = data.groupby(idx)
+        cols = data.columns
+        new_cols = {
+            c: [(self.entry_name(c), self._method)]
+            for c in cols if c not in idx
+        }
+
+        val= gb.agg(new_cols)
+        #remove hierarchical columns
+        val.columns = val.columns.droplevel(0)
+        return val
 
     @dask.delayed
-    def do_delayed(self, data: pd.DataFrame) -> np.ndarray:
+    def do_delayed(self, data: pd.DataFrame) -> pd.DataFrame:
         """Run metric as a dask delayed method"""
-        self.do(data)
+        return self.do(data)
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
@@ -75,11 +89,12 @@ class Metric(Entry):
         self.filters.append(fn)
 
     def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError('Data into filter must be a DataFrame.'
-                f' Type found: {type(data)}')
         for f in self.filters:
-            data = f(data)
+            ndf = f(data)
+            if not isinstance(ndf, pd.DataFrame):
+                raise TypeError('Filter outputs must be a DataFrame. '
+                        f'Type detected: {type(ndf)}')
+            data = ndf
         return data
 
 
@@ -100,18 +115,24 @@ class Metric(Entry):
         dtype = np.dtype(data['dtype'])
         method = dill.loads(base64.b64decode(data['method'].encode()))
 
-        if 'dependencies' in data.keys() and data['dependencies'] is not None:
-            dependencies = data['dependencies']
+        if 'dependencies' in data.keys() and \
+                data['dependencies'] and \
+                data['dependencies'] is not None:
+            dependencies = [ Entry.from_dict(d) for d in data['dependencies'] ]
         else:
             dependencies = [ ]
 
-        if 'attributes' in data.keys() and data['attributes'] is not None:
+        if 'attributes' in data.keys() and \
+                data['attributes'] and \
+                data['attributes'] is not None:
             attributes = [ Attribute.from_dict(a) for a in data['attributes']]
         else:
             attributes = [ ]
 
-        if 'filters' in data.keys():
-            filters = dill.loads(base64.b64decode(data['filters']).encode())
+        if 'filters' in data.keys() and \
+                data['filters'] and \
+                data['filters'] is not None:
+            filters = [ dill.loads(base64.b64decode(f)) for f in data['filters'] ]
         else:
             filters = [ ]
 
@@ -159,8 +180,8 @@ def m_max(data):
 def m_stddev(data):
     return np.std(data)
 
-def f_numret2(data):
-    return data.where(data.NumberOfReturns > 2)
+def f_2plus(data):
+    return data[data['Z'] > 2]
 
 #TODO change to correct dtype
 Metrics = {
@@ -168,7 +189,6 @@ Metrics = {
     'mode' : Metric('mode', np.float32, m_mode),
     'median' : Metric('median', np.float32, m_median),
     'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max, [Attributes['NumberOfReturns']],
-        filters=[f_numret2]),
+    'max' : Metric('max', np.float32, m_max, filters=[f_2plus]),
     'stddev' : Metric('stddev', np.float32, m_stddev),
 }

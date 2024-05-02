@@ -50,66 +50,31 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     points.loc[:, 'xi'] = da.floor(points.xi)
     points.loc[:, 'yi'] = da.floor(points.yi)
-    # points = points.assign(count=lambda x: points.Z.count())
-    grouped = points.groupby(['xi','yi'])#.agg(list)
-    # grouped = grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
-    # grouped = points.set_index(['xi', 'yi'])
 
-    return grouped
+    return points
+
 
 @profile
 def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    # ms = [m._method for m in storage.config.metrics]
-    # cols = {col: m.entry_name(col) for col in data_in.columns for m in storage.config.metrics}
-    # dfs.append(data_in.agg(ms).rename(columns=cols))
-    # data_in = data_in.assign(**{f'{m.entry_name(attr)}': lambda val: [m._method(v) for v in data_in[attr]] for attr in attrs})
+    metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
+    return metric_data
 
-    # TODO how do we limit the number of passes here?
-    # TODO group attributes together for one run per metric
-    # attrs = storage.config.attrs
-    # anames = [a.name for a in storage.config.attrs]
-    # ms = [m._method for m in storage.config.metrics]
-    # names = {m.entry_name(a):  for m in storage.config.metrics for a in storage.config.attrs}
-    # ms = [ (m.entry_name(a.name), m._method) for m in storage.config.metrics for
-            # a in storage.config.attrs]
-    ms = {
-        a.name:
-        [
-            (m.entry_name(a.name), m._method)
-            for m in storage.config.metrics
-        ]
-        for a in storage.config.attrs
-    }
+@profile
+def agg_list(df: pd.DataFrame):
+    if df is None:
+        return None
+    grouped = df.groupby(['xi','yi'])
+    grouped = grouped.agg(list)
+    return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
-    # apply metric methods across attributes
-    metric_data = data_in.agg(ms)
-    metric_data.columns = metric_data.columns.droplevel(0)
-    # pull all values together into lists based on cell
-    att_data = data_in.agg(list)
-    # join the two together
-    joined_data = att_data.join(metric_data)
-    joined_data = joined_data.assign(count=lambda x: [len(z) for z in joined_data.Z])
-
-    # d = data_in.loc[:,anames]
-
-    # for m in storage.config.metrics:
-    #     data_in = data_in.assign(
-    #         **{f'{m.entry_name(attr.name)}': lambda val: [
-    #                 m._method(v) for v in data_in[attr.name]
-    #             ] for attr in attrs})
-    idf = joined_data.index.to_frame()
-
-    dx = idf['xi'].to_list()
-    dy = idf['yi'].to_list()
-    with storage.open('r') as tdb:
-        dt = lambda a: tdb.schema.attr(a).dtype
-        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in joined_data[d]], None], object)[:-1] for d in joined_data }
-        # dd = joined_data.to_dict('list')
-
-    return ( dx, dy, dd )
+@profile
+def join(list_data, metric_data):
+    if list_data is None or metric_data is None:
+        return None
+    return list_data.join([m for m in metric_data])
 
 @profile
 def write(data_in, tdb):
@@ -122,7 +87,6 @@ def write(data_in, tdb):
     """
     if data_in is None:
         return 0
-    dx, dy, dd = data_in
 
     # TODO get this working at some point. Look at pandas extensions
     # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
@@ -130,6 +94,13 @@ def write(data_in, tdb):
     # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
     #         column_types=dict(data_in.dtypes),
     #         varlen_types=[np.dtype('O')])
+
+    idf = data_in.index.to_frame()
+
+    dx = idf['xi'].to_list()
+    dy = idf['yi'].to_list()
+    dt = lambda a: tdb.schema.attr(a).dtype
+    dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
 
     tdb[dx,dy] = dd
     pc = dd['count'].sum().item()
@@ -181,7 +152,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
         arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
         metrics: db.Bag = arranged.map(get_metrics, storage)
-        writes: db.Bag = metrics.map(write, tdb)
+        lists: db.Bag = arranged.map(agg_list)
+        joined: db.Bag = lists.map(join, metrics)
+        writes: db.Bag = joined.map(write, tdb)
 
         ## If dask is distributed, use the futures feature
         dc = dask.config.get('distributed.client')
