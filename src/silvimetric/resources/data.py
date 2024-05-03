@@ -118,9 +118,12 @@ class Data:
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
         assign_x = pdal.Filter.assign(value=f"xi = (X - {self.storageconfig.root.minx}) / {resolution}")
         assign_y = pdal.Filter.assign(value=f"yi = (Y - {self.storageconfig.root.miny}) / {resolution}")
+        # hag = pdal.Filter.hag_nn()
+
         stages.append(ferry)
         stages.append(assign_x)
         stages.append(assign_y)
+        # stages.append(hag)
 
         # return our pipeline
         return pdal.Pipeline(stages)

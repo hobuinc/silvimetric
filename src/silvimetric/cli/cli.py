@@ -16,7 +16,7 @@ from .common import dask_handle, close_dask
 @click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=12, help="Number of workers for Dask")
+@click.option("--workers", type=int, default=10, help="Number of workers for Dask")
 @click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
         help="Open dask diagnostic page in default web browser.")
@@ -189,12 +189,15 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
     if report:
         if app.scheduler != 'distributed':
+            from dask.diagnostics import ProgressBar
             app.log.warning('Report option is incompatible with scheduler'
                             '{scheduler}, skipping.')
-        report_path = f'reports/{config.name}.html'
-        with performance_report(report_path) as pr:
             shatter.shatter(config)
-        print(f'Writing report to {report_path}.')
+        else:
+            report_path = f'reports/{config.name}.html'
+            with performance_report(report_path) as pr:
+                shatter.shatter(config)
+            print(f'Writing report to {report_path}.')
     else:
         shatter.shatter(config)
 

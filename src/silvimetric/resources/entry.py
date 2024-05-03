@@ -24,9 +24,6 @@ class Entry(ABC):
     def to_json(self) -> object:
         raise NotImplementedError
 
-    def toJSON(self) -> object:
-        return self.to_json()
-
     @staticmethod
     @abstractmethod
     def from_dict(data: dict):

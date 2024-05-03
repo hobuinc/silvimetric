@@ -70,7 +70,8 @@ class Metric(Entry):
             for c in cols if c not in idx
         }
 
-        val= gb.agg(new_cols)
+        val = gb.agg(new_cols)
+
         #remove hierarchical columns
         val.columns = val.columns.droplevel(0)
         return val
@@ -181,7 +182,7 @@ def m_stddev(data):
     return np.std(data)
 
 def f_2plus(data):
-    return data[data['Z'] > 2]
+    return data[data['HeightAboveGround'] > 2]
 
 #TODO change to correct dtype
 Metrics = {

@@ -7,6 +7,7 @@ import pandas as pd
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
+from dask.diagnostics import ProgressBar
 import dask.array as da
 import dask.bag as db
 from line_profiler import profile
@@ -56,14 +57,25 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
 @profile
 def get_metrics(data_in, storage: Storage):
+    """
+    Run DataFrames through
+    """
     if data_in is None:
         return None
+
+    # - Iterate through metrics and figure out which ones are being used as
+    #   dependencies
+    # - Remove those from the list and run them first
+    # - Then pass them to the metrics that require them as we get there?
 
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
 @profile
 def agg_list(df: pd.DataFrame):
+    """
+    Make variable-length point data attributes into lists
+    """
     if df is None:
         return None
     grouped = df.groupby(['xi','yi'])
@@ -72,6 +84,9 @@ def agg_list(df: pd.DataFrame):
 
 @profile
 def join(list_data, metric_data):
+    """
+    Join the list data and metric DataFrames together
+    """
     if list_data is None or metric_data is None:
         return None
     return list_data.join([m for m in metric_data])
@@ -174,7 +189,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
         ## Handle non-distributed dask scenarios
         else:
-            config.point_count = sum(writes)
+            with ProgressBar():
+                config.point_count = sum(writes)
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)
@@ -221,5 +237,7 @@ def shatter(config: ShatterConfig) -> int:
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
     pc = run(leaves, config, storage)
+
+    #consolidate the fragments in this time slot down to just one
     storage.consolidate_shatter(config.time_slot)
     return pc

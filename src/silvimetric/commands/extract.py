@@ -112,7 +112,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         att_meta[a.name] =  a.dtype
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, coords=True).df[minx:maxx,
+        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
                 miny:maxy]
         data['X'] = data['X'] - data['X'].min()
         data['Y'] = data['Y'] - data['Y'].min()
@@ -135,6 +135,8 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         rys = list(ridx['Y'])
         if np.any(rxs):
             redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
+            if redo.empty:
+                return data
             redo['X'] = redo['X'] - minx
             redo['Y'] = redo['Y'] - miny
 
