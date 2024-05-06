@@ -59,6 +59,9 @@ class Storage:
         if not ctx:
             ctx = tiledb.default_ctx()
 
+        # adjust cell bounds if necessary
+        config.root.adjust_to_cell_lines(config.resolution)
+
         # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor((config.root.maxx - config.root.minx) / float(config.resolution))
         yi = floor((config.root.maxy - config.root.miny) / float(config.resolution))
@@ -70,7 +73,7 @@ class Storage:
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
+        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs if a in m.attributes or not m.attributes]
 
         # Check that all attributes required for metric usage are available
         att_list = [a.name for a in config.attrs]
@@ -173,6 +176,10 @@ class Storage:
         """
         return self.getConfig().metrics
 
+    def getDerivedNames(self) -> list[str]:
+        # if no attributes are set in the metric, use all
+        return [m.entry_name(a.name) for m in self.config.metrics
+                for a in self.config.attrs if not m.attributes or a in m.attributes]
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
         """
@@ -318,7 +325,7 @@ class Storage:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
         return sh_cfg
 
-    def consolidate_shatter(self, proc_num: int) -> None:
+    def consolidate_shatter(self, proc_num: int, retries=0) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
@@ -328,6 +335,17 @@ class Storage:
         """
         # TODO move from timestamp to fragment_uris, timestamp is deprecated
         # this is currently failing, I believe from a bug in tiledb
-        afs = self.get_fragments_by_time(proc_num)
-        uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
-        tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+        try:
+            afs = self.get_fragments_by_time(proc_num)
+            uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
+            tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+            self.config.log.info(f"Consolidated time slot {proc_num}.")
+        except Exception as e:
+            if retries >= 3:
+                self.config.log.warning("Failed to consolidate time slot "
+                        f"{proc_num} {retries} time(s). Stopping.")
+                raise e
+            self.config.log.warning("Failed to consolidate time slot "
+                    f"{proc_num} {retries+1} time. Retrying...")
+            self.consolidate_shatter(proc_num, retries+1)
+

@@ -10,7 +10,7 @@ from silvimetric import StorageConfig, ShatterConfig
 
 
 @dask.delayed
-def write(x,y,val, s:Storage, attrs, dims, metrics):
+def write(x, y, val, s:Storage, attrs, dims, metrics):
     m_list = [m.entry_name(a.name) for m in metrics for a in attrs]
     data = { a.name: np.array([np.array([val], dims[a.name]), None], object)[:-1]
                 for a in attrs }
@@ -24,17 +24,22 @@ def write(x,y,val, s:Storage, attrs, dims, metrics):
 
 class Test_Shatter(object):
 
-    def test_shatter(self, shatter_config, storage: Storage, miny):
+    def test_shatter(self, shatter_config, storage: Storage, maxy):
         shatter(shatter_config)
         with storage.open('r') as a:
-            y = a[:,0]['Z'].shape[0]
-            x = a[0,:]['Z'].shape[0]
-            assert y == 10
-            assert x == 10
-            for xi in range(x):
-                for yi in range(y):
+            assert a[:,:]['Z'].shape[0] == 100
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+            assert xdom == 10
+            assert ydom == 10
+
+            for xi in range(xdom):
+                for yi in range(ydom):
                     a[xi, yi]['Z'].size == 1
-                    assert bool(np.all( a[xi, yi]['Z'][0] == ((miny/storage.config.resolution) + yi) ))
+                    a[xi, yi]['Z'][0].size == 900
+                    # this should have all indices from 0 to 9 filled.
+                    # if oob error, it's not this test's fault
+                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
 
         # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
@@ -44,16 +49,19 @@ class Test_Shatter(object):
         shatter(shatter_config)
         with storage.open('r') as a:
             # querying flattens to 20, there will 10 pairs of values
+            assert a[:,:]['Z'].shape[0] == 200
             assert a[:,0]['Z'].shape[0] == 20
             assert a[0,:]['Z'].shape[0] == 20
             # now test that the second set is the same as the first set
             # and test that this value is still the same as the original
             # which was set at ((maxy/resolution)-yindex)
-            for xi in range(x):
-                for yi in range(y):
+            for xi in range(xdom):
+                for yi in range(ydom):
                     a[xi, yi]['Z'].size == 2
+                    a[xi, yi]['Z'][0].size == 900
+                    a[xi, yi]['Z'][1].size == 900
                     assert bool(np.all(a[xi, yi]['Z'][1] == a[xi,yi]['Z'][0]))
-                    assert bool(np.all(a[xi, yi]['Z'][1] == ((miny/storage.config.resolution) + yi)))
+                    assert bool(np.all(a[xi, yi]['Z'][1] == ((maxy/storage.config.resolution) - (yi + 1))))
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
@@ -114,7 +122,7 @@ class Test_Shatter(object):
 
     def test_partial_overlap(self, partial_shatter_config, test_point_count):
         pc = shatter(partial_shatter_config)
-        assert pc == 23716
+        assert pc == test_point_count / 4
 
     @pytest.mark.skipif(
         os.environ.get('AWS_SECRET_ACCESS_KEY') is None or
@@ -125,14 +133,19 @@ class Test_Shatter(object):
         # need processes scheduler to accurately test bug fix
         dask.config.set(scheduler="processes")
         resolution = s3_storage.config.resolution
-        miny = s3_storage.config.root.miny
+        maxy = s3_storage.config.root.maxy
         shatter(s3_shatter_config)
         with s3_storage.open('r') as a:
-            y = a[:,0]['Z'].shape[0]
-            x = a[0,:]['Z'].shape[0]
-            assert y == 10
-            assert x == 10
-            for xi in range(x):
-                for yi in range(y):
+            assert a[:,:]['Z'].shape[0] == 100
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+            assert xdom == 10
+            assert ydom == 10
+
+            for xi in range(xdom):
+                for yi in range(ydom):
                     a[xi, yi]['Z'].size == 1
-                    assert bool(np.all( a[xi, yi]['Z'][0] == ((miny/resolution) + yi) ))
+                    a[xi, yi]['Z'][0].size == 900
+                    # this should have all indices from 0 to 9 filled.
+                    # if oob error, it's not this test's fault
+                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/resolution) - (yi + 1)) ))

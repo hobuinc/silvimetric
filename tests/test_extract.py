@@ -27,7 +27,7 @@ def tif_test(extract_config):
         assert raster.RasterYSize == ysize
 
         r = raster.ReadAsArray()
-        assert all([ r[y,x] == ((miny/resolution)+(y+yimin))  for y in range(ysize) for x in range(xsize)])
+        assert all([ r[y,x] == ((maxy/resolution)-y-1)  for y in range(ysize) for x in range(xsize)])
 
 class Test_Extract(object):
 

@@ -180,11 +180,11 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
     if date is None and dates is None:
         raise ValueError("One of '--date' or '--dates' must be provided.")
 
-    config = ShatterConfig(tdb_dir = app.tdb_dir,
+    config = ShatterConfig(tdb_dir=app.tdb_dir,
             date=dates if dates else tuple([date]),
-            log = app.log,
-            filename = pointcloud,
-            bounds = bounds,
+            log=app.log,
+            filename=pointcloud,
+            bounds=bounds,
             tile_size=tilesize)
 
     if report:

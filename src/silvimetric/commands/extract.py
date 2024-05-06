@@ -94,8 +94,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     :return: Dataframe of rerun data.
     """
 
-    ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
-        config.attrs ]
+    ma_list = storage.getDerivedNames()
     att_list = [ a.name for a in config.attrs ] + [ 'count' ]
     out_list = [ *ma_list, 'X', 'Y' ]
 
@@ -171,11 +170,9 @@ def extract(config: ExtractConfig) -> None:
 
     dask.config.set({"dataframe.convert-string": False})
 
-    ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
-        config.attrs ]
-
-
     storage = Storage.from_db(config.tdb_dir)
+    ma_list = storage.getDerivedNames()
+    config.log.debug(f'Extracting metrics {[m for m in ma_list]}')
     root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)

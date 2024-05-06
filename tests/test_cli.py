@@ -12,7 +12,7 @@ class TestCli(object):
                 catch_exceptions=False)
         assert res.exit_code == 0
 
-    def test_cli_shatter(self, runner, storage, miny, date, tdb_filepath,
+    def test_cli_shatter(self, runner, storage, maxy, date, tdb_filepath,
             copc_filepath):
 
         res = runner.invoke(cli.cli, args=["-d", tdb_filepath,
@@ -23,17 +23,23 @@ class TestCli(object):
         assert res.exit_code == 0
 
         with storage.open('r') as a:
-            y = a[:,0]['Z'].shape[0]
-            x = a[0,:]['Z'].shape[0]
-            assert y == 10
-            assert x == 10
-            for xi in range(x):
-                for yi in range(y):
+            assert a[:,:]['Z'].shape[0] == 100
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+            assert xdom == 10
+            assert ydom == 10
+
+            for xi in range(xdom):
+                for yi in range(ydom):
                     a[xi, yi]['Z'].size == 1
-                    assert bool(np.all( a[xi, yi]['Z'][0] == ((miny/storage.config.resolution) + yi) ))
+                    a[xi, yi]['Z'][0].size == 900
+                    # this should have all indices from 0 to 9 filled.
+                    # if oob error, it's not this test's fault
+                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
 
     def test_cli_scan(self, tdb_filepath, runner, copc_filepath, storage):
         res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'scan', copc_filepath])
+        print(res.output)
         assert res.exit_code == 0
 
     def test_cli_info(self, tdb_filepath, runner, shatter_config):

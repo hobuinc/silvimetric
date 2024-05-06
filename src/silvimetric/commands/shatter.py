@@ -47,10 +47,13 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
         return None
 
     points = points.loc[points.Y < leaf.bounds.maxy]
+    points = points.loc[points.Y >= leaf.bounds.miny]
+    points = points.loc[points.X >= leaf.bounds.minx]
     points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
     points.loc[:, 'xi'] = da.floor(points.xi)
-    points.loc[:, 'yi'] = da.floor(points.yi)
+    # ceil for y because origin is at top left
+    points.loc[:, 'yi'] = da.ceil(points.yi)
 
     return points
 
@@ -100,7 +103,7 @@ def write(data_in, tdb):
     :param tdb: TileDB write stream.
     :return: Number of points written.
     """
-    if data_in is None:
+    if data_in is None or data_in.empty:
         return 0
 
     # TODO get this working at some point. Look at pandas extensions
@@ -189,7 +192,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
         ## Handle non-distributed dask scenarios
         else:
-            with ProgressBar():
+            # with ProgressBar():
                 config.point_count = sum(writes)
 
     # modify config to reflect result of shattter process
@@ -217,6 +220,11 @@ def shatter(config: ShatterConfig) -> int:
     storage = Storage.from_db(config.tdb_dir)
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
+
+    config.log.info('Beginning shatter process...')
+    config.log.debug(f'Shatter Config: {config}')
+    config.log.debug(f'Data: {str(data)}')
+    config.log.debug(f'Extents: {str(extents)}')
 
     if dask.config.get('distributed.client') is None:
         config.log.warning("Selected scheduler type does not support"

@@ -28,7 +28,10 @@ class Extents(object):
         self.root = root
         """Root bounding box of the database."""
 
+        # adjust bounds so they're matching up with cell lines
+        self.bounds.adjust_to_cell_lines(resolution)
         minx, miny, maxx, maxy = self.bounds.get()
+
 
         self.rangex = maxx - minx
         """Range of X Indices"""
@@ -41,12 +44,13 @@ class Extents(object):
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         """Minimum X index"""
-        self.y1 = math.floor((miny - self.root.miny) / resolution)
-        """Minimum Y index"""
         self.x2 = math.ceil((maxx - self.root.minx) / resolution)
         """Maximum X index"""
-        self.y2 = math.ceil((maxy - self.root.miny) / resolution)
-        """Maximum Y index"""
+
+        self.y1 = math.ceil((self.root.maxy - maxy) / resolution)
+        """Minimum Y index, or maximum Y value in point cloud"""
+        self.y2 = math.ceil((self.root.maxy - miny) / resolution)
+        """Maximum Y index, or minimum Y value in point cloud"""
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
         """Minimum bounding rectangle of this Extents"""
 
@@ -112,8 +116,8 @@ class Extents(object):
         minx = bminx + (self.x1 * self.resolution)
         maxx = bminx + (self.x2 * self.resolution)
 
-        miny = bminy + (self.y1 * self.resolution)
-        maxy = bminy + (self.y2 * self.resolution)
+        miny = bmaxy - (self.y2 * self.resolution)
+        maxy = bmaxy - (self.y1 * self.resolution)
 
         chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r)
 
@@ -149,17 +153,18 @@ class Extents(object):
         minx, miny, maxx, maxy = self.bounds.get()
 
         x_adjusted = math.floor((maxx - minx) / 2 / self.resolution)
-        y_adjusted = math.floor((maxy - miny) / 2 / self.resolution)
+        y_adjusted = math.ceil((maxy - miny) / 2 / self.resolution)
 
         midx = minx + (x_adjusted * self.resolution)
-        midy = miny + (y_adjusted * self.resolution)
+        midy = maxy - (y_adjusted * self.resolution)
 
-        return [
+        exts =  [
             Extents(Bounds(minx, miny, midx, midy), self.resolution, self.root), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution, self.root), #lower right
             Extents(Bounds(minx, midy, midx, maxy), self.resolution, self.root), #top left
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution, self.root)  #top right
         ]
+        return exts
 
     @dask.delayed
     def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0):
@@ -238,17 +243,17 @@ class Extents(object):
             ], dtype=np.float64)
         dx = (res * local_xs) + self.root.minx
 
+        local_ys = np.array([
+                [min(y+ynum, self.y2), y]
+                for y in range(self.y1, self.y2, int(ynum))
+            ], dtype=np.float64)
+        dy = self.root.maxy - (res * local_ys)
+
         # local_ys = np.array([
-        #         [min(y+ynum, self.y2), y]
+        #         [y, min(y+ynum, self.y2)]
         #         for y in range(self.y1, self.y2, int(ynum))
         #     ], dtype=np.float64)
         # dy = (res * local_ys) + self.root.miny
-
-        local_ys = np.array([
-                [y, min(y+ynum, self.y2)]
-                for y in range(self.y1, self.y2, int(ynum))
-            ], dtype=np.float64)
-        dy = (res * local_ys) + self.root.miny
 
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [

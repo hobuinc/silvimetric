@@ -65,7 +65,7 @@ def partial_storage_config(tdb_filepath, crs, attrs, metrics) -> Generator[Stora
                         log = log,
                         crs = crs,
                         root = bounds,
-                        resolution = 7,
+                        resolution = 30,
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
@@ -76,10 +76,10 @@ def partial_storage_config(tdb_filepath, crs, attrs, metrics) -> Generator[Stora
 def partial_shatter_config(tdb_filepath, copc_filepath, date, partial_storage_config) -> Generator[ShatterConfig, None, None]:
     psc: StorageConfig = partial_storage_config
     log = Log('INFO') # INFO
-    yield ShatterConfig(tdb_dir = tdb_filepath,
-                      log = log,
+    yield ShatterConfig(tdb_dir=tdb_filepath,
+                      log=log,
                       attrs=psc.attrs,
                       metrics=psc.metrics,
-                      filename = copc_filepath,
-                      debug = True,
+                      filename=copc_filepath,
+                      debug=True,
                       date=date)

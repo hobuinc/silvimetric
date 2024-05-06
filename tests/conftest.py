@@ -64,9 +64,9 @@ def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
                       filename = copc_filepath,
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
-                      bounds=bounds,
+                      bounds = bounds,
                       debug = True,
-                      date=date)
+                      date = date, tile_size=10)
 
     yield s
 

@@ -1,4 +1,4 @@
-from silvimetric import Data, Storage
+from silvimetric import Data, Storage, Bounds
 
 class Test_Data(object):
 
@@ -21,10 +21,18 @@ class Test_Data(object):
     def test_pipeline_bounds(self, no_cell_line_pipeline, bounds, storage: Storage, no_cell_line_pc):
         """Check open a pipeline with our own bounds"""
         ll = list(bounds.bisect())[0]
+
+        #data will be collared upon execution, extra data will be grabbed
+        minx, miny, maxx, maxy = ll.get()
+        collared = Bounds(minx - 30, miny - 30, maxx + 30, maxy + 30)
+
         data = Data(no_cell_line_pipeline, storage.config, bounds = ll)
         assert data.is_pipeline() == True
         data.execute()
-        assert len(data.array) == no_cell_line_pc / 4
+
+        collared_count = data.count(collared)
+        assert len(data.array) == collared_count
+
         assert data.estimate_count(ll) == no_cell_line_pc
         assert data.count(ll) == no_cell_line_pc / 4
 

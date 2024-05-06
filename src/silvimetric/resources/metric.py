@@ -119,7 +119,7 @@ class Metric(Entry):
         if 'dependencies' in data.keys() and \
                 data['dependencies'] and \
                 data['dependencies'] is not None:
-            dependencies = [ Entry.from_dict(d) for d in data['dependencies'] ]
+            dependencies = [ Attribute.from_dict(d) for d in data['dependencies'] ]
         else:
             dependencies = [ ]
 
@@ -190,6 +190,6 @@ Metrics = {
     'mode' : Metric('mode', np.float32, m_mode),
     'median' : Metric('median', np.float32, m_median),
     'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max, filters=[f_2plus]),
+    'max' : Metric('max', np.float32, m_max),
     'stddev' : Metric('stddev', np.float32, m_stddev),
 }
