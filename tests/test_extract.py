@@ -19,6 +19,13 @@ def tif_test(extract_config):
 
         raster: gdal.Dataset = gdal.Open(str(path))
         derived = CRS.from_user_input(raster.GetProjection())
+        rminx, xres, xskew, rmaxy, yskew, yres  = raster.GetGeoTransform()
+        assert rminx == minx
+        assert rmaxy == maxy
+        assert xres == resolution
+        assert -yres == resolution
+
+
         assert derived == extract_config.crs
 
         xsize = int((maxx - minx) / resolution)

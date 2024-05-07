@@ -1,13 +1,16 @@
-from osgeo import gdal, osr
-import numpy as np
+import math
 from pathlib import Path
-import pandas as pd
-import dask
-import dask.dataframe as dd
-
 from typing import Dict
 
+from osgeo import gdal, osr
+import dask
+import dask.dataframe as dd
+import numpy as np
+import pandas as pd
+
+
 from .. import Storage, Extents, ExtractConfig
+from ..commands.shatter import get_metrics, agg_list, join
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -22,8 +25,8 @@ np_to_gdal_types = {
     np.dtype(np.float64).str: gdal.GDT_Float64
 }
 
-def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
-              config: ExtractConfig) -> None:
+def write_tif(xsize: int, ysize: int, rminx: float, rmaxy: float,
+        data:np.ndarray, name: str, config: ExtractConfig) -> None:
     """
     Write out a raster with GDAL
 
@@ -42,7 +45,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     b = config.bounds
 
     transform = [b.minx, config.resolution, 0,
-                 b.maxy, 0, -1* config.resolution]
+                 b.maxy, 0, -1*config.resolution]
 
     driver = gdal.GetDriverByName("GTiff")
     gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]
@@ -50,7 +53,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    tif.GetRasterBand(1).SetNoDataValue(np.nan)
+    tif.GetRasterBand(1).SetNoDataValue(-9999)
     tif.FlushCache()
     tif = None
 
@@ -63,6 +66,8 @@ def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
     :param config: ExtractConfig.
     :return: Combined dict of attribute and newly derived metric data.
     """
+
+    #TODO should just use the metric calculation methods from shatter
     if data_in is None:
         return None
 
@@ -113,8 +118,9 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     with storage.open("r") as tdb:
         data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
                 miny:maxy]
-        data['X'] = data['X'] - data['X'].min()
-        data['Y'] = data['Y'] - data['Y'].min()
+        #TODO fix this shit
+        # data['X'] = data['X'] - data['X'].min()
+        # data['Y'] = data['Y'] - data['Y'].min()
 
         # 1. should find values that are not unique, meaning they have multiple
         # entries
@@ -140,7 +146,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
             redo['Y'] = redo['Y'] - miny
 
         parts = min(int(redo['X'].max() * redo['Y'].max()), 1000)
-        r = dd.from_pandas(redo, npartitions=parts, name='MetricDataFrame')
+        r = dd.from_pandas(redo, npartitions=parts)
         def squash(x):
             def s2(vals):
                 if vals.dtype == object:
@@ -181,16 +187,21 @@ def extract(config: ExtractConfig) -> None:
     maxx = i['x'].max()
     miny = i['y'].min()
     maxy = i['y'].max()
-    x1 = maxx - minx + 1
-    y1 = maxy - miny + 1
+    xsize = maxx - minx + 1
+    ysize = maxy - miny + 1
 
+    # TODO make sure that the data isn't being manipulated by the redo section
     final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
+    rminx = e.bounds.minx + (final.X.min() * config.resolution)
+    rmaxy = e.bounds.maxy + (final.Y.min() * config.resolution)
+    # transform = [638190.0, config.resolution, 0,
+    #              4402380.0, 0, -1*config.resolution]
 
     # output metric data to tifs
     for ma in ma_list:
-        m_data = np.full(shape=(y1,x1), fill_value=np.nan, dtype=final[ma].dtype)
+        m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)
         a = final[['X','Y',ma]].to_numpy()
         for x,y,md in a[:]:
             m_data[int(y)][int(x)] = md
 
-        write_tif(x1, y1, m_data, ma, config)
+        write_tif(xsize, ysize, rminx, rmaxy, m_data, ma, config)
