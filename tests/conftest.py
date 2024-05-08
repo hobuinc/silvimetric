@@ -2,6 +2,7 @@ import pytest
 import os
 import dask
 import pdal
+import copy
 
 from datetime import datetime
 from typing import Generator
@@ -84,20 +85,20 @@ def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_
     yield c
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def metrics() -> Generator[list[Metric], None, None]:
-    yield [Metrics['mean'], Metrics['median']]
+    yield [copy.deepcopy(Metrics['mean']), copy.deepcopy(Metrics['median'])]
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='function')
 def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
     b =  Bounds(minx, miny, maxx, maxy)
     yield b
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='function')
 def extents(resolution, bounds) -> Generator[Extents, None, None]:
     yield Extents(bounds,resolution,bounds)
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def attrs(dims) -> Generator[list[str], None, None]:
     yield [Attribute(a, dims[a]) for a in
            ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']]
@@ -106,34 +107,34 @@ def attrs(dims) -> Generator[list[str], None, None]:
 def dims() -> Generator[dict, None, None]:
     yield { d['name']: d['dtype'] for d in pdal.dimensions }
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def resolution() -> Generator[int, None, None]:
     yield 30
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def test_point_count() -> Generator[int, None, None]:
     yield 90000
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def minx() -> Generator[float, None, None]:
     yield 300
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def miny() -> Generator[float, None, None]:
     yield 300
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def maxx() -> Generator[float, None, None]:
     yield 600
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def maxy() -> Generator[float, None, None]:
     yield 600
 
-@pytest.fixture(scope="class")
+@pytest.fixture(scope='session')
 def crs() -> Generator[str, None, None]:
     yield "EPSG:5070"
 
-@pytest.fixture(scope='class')
+@pytest.fixture(scope='session')
 def date() -> Generator[datetime, None, None]:
     yield datetime(2011, 1, 1)

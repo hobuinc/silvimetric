@@ -106,6 +106,8 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         att_meta[a.name] =  a.dtype
 
     with storage.open("r") as tdb:
+        # TODO this can be more efficient. Use count to find indices, then work
+        # with that smaller set from there. Working as is for now, but slow.
         dit = tdb.query(attrs=[*att_list, *ma_list], order='F', coords=True,
                 return_incomplete=True, use_arrow=False).df[minx:maxx, miny:maxy]
         data = pd.DataFrame()
