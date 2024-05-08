@@ -93,7 +93,7 @@ class Test_Shatter(object):
         assert pc == test_point_count
 
     @pytest.mark.parametrize('sh_cfg', ['shatter_config', 'uneven_shatter_config'])
-    def test_sub_bounds(self, sh_cfg, test_point_count, request):
+    def test_sub_bounds(self, sh_cfg, test_point_count, request, maxy, resolution):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)
         e = Extents.from_storage(s.tdb_dir)
@@ -120,6 +120,19 @@ class Test_Shatter(object):
         assert sum(pcs) == test_point_count
         assert pc == test_point_count
 
+        with storage.open('r') as a:
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+
+            data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
+            data = data.set_index(['X','Y'])
+
+            for xi in range(xdom):
+                for yi in range(ydom):
+                    curr = data.loc[xi,yi]
+                    # check that each cell only has one allocation
+                    curr.size == 1
+
     def test_partial_overlap(self, partial_shatter_config, test_point_count):
         pc = shatter(partial_shatter_config)
         assert pc == test_point_count / 4
@@ -141,11 +154,15 @@ class Test_Shatter(object):
             ydom = a.schema.domain.dim('Y').domain[1]
             assert xdom == 10
             assert ydom == 10
+            # get all data local so we're not hittin s3 all the time
+            data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
+            data = data.set_index(['X','Y'])
 
             for xi in range(xdom):
                 for yi in range(ydom):
-                    a[xi, yi]['Z'].size == 1
-                    a[xi, yi]['Z'][0].size == 900
+                    curr = data.loc[xi,yi]
+                    curr.size == 1
+                    curr[0].size == 900
                     # this should have all indices from 0 to 9 filled.
                     # if oob error, it's not this test's fault
-                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/resolution) - (yi + 1)) ))
+                    assert bool(np.all( curr[0] == ((maxy/resolution) - (yi + 1)) ))

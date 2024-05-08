@@ -217,6 +217,8 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 
     #TODO only allow metrics and attributes to be added if they're present
     # in the storage config.
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+        app.watch, app.log)
 
     config = ExtractConfig(tdb_dir = app.tdb_dir,
             log = app.log,

@@ -1,6 +1,8 @@
 import math
 from pathlib import Path
 from typing import Dict
+from itertools import chain
+
 
 from osgeo import gdal, osr
 import dask
@@ -10,7 +12,7 @@ import pandas as pd
 
 
 from .. import Storage, Extents, ExtractConfig
-from ..commands.shatter import get_metrics, agg_list, join
+# from ..commands.shatter import get_metrics, agg_list, join
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -25,8 +27,8 @@ np_to_gdal_types = {
     np.dtype(np.float64).str: gdal.GDT_Float64
 }
 
-def write_tif(xsize: int, ysize: int, rminx: float, rmaxy: float,
-        data:np.ndarray, name: str, config: ExtractConfig) -> None:
+def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
+        config: ExtractConfig) -> None:
     """
     Write out a raster with GDAL
 
@@ -57,13 +59,12 @@ def write_tif(xsize: int, ysize: int, rminx: float, rmaxy: float,
     tif.FlushCache()
     tif = None
 
-MetricDict = Dict[str, np.ndarray]
-def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
+def get_metrics(data_in: pd.DataFrame, storage: Storage):
     """
     Reruns a metric over this cell. Only called if there is overlapping data.
 
-    :param data_in: Cell data to be rerun.
-    :param config: ExtractConfig.
+    :param data_in: Dataframe to be rerun.
+    :param storage: Base storage object.
     :return: Combined dict of attribute and newly derived metric data.
     """
 
@@ -71,20 +72,10 @@ def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
     if data_in is None:
         return None
 
-    # make sure it's not empty. No empty writes
-    if not np.any(data_in['count']):
-        return None
+    exploded = data_in.agg(lambda x: x.explode())
+    metric_data = dask.persist(*[ m.do(exploded) for m in storage.config.metrics ])
 
-    # doing dask compute inside the dict array because it was too fine-grained
-    # when it was outside
-    #TODO move this operation to a dask bag and convert to dataframe and then
-    # to a dict for better efficiency?
-    metric_data = {
-        f'{m.entry_name(attr.name)}': [m(cell_data) for cell_data in data_in[attr.name]]
-        for attr in config.attrs for m in config.metrics
-    }
-    # md = dask.compute(metric_data)[0]
-    data_out = data_in | metric_data
+    data_out = data_in.set_index(['X','Y']).join([m for m in metric_data])
     return data_out
 
 def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray) -> pd.DataFrame:
@@ -100,8 +91,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     """
 
     ma_list = storage.getDerivedNames()
-    att_list = [ a.name for a in config.attrs ] + [ 'count' ]
-    out_list = [ *ma_list, 'X', 'Y' ]
+    att_list = [ a.name for a in config.attrs ]
 
     minx = indices['x'].min()
     maxx = indices['x'].max()
@@ -116,56 +106,30 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         att_meta[a.name] =  a.dtype
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
-                miny:maxy]
-        #TODO fix this shit
-        # data['X'] = data['X'] - data['X'].min()
-        # data['Y'] = data['Y'] - data['Y'].min()
+        dit = tdb.query(attrs=[*att_list, *ma_list], order='F', coords=True,
+                return_incomplete=True, use_arrow=False).df[minx:maxx, miny:maxy]
+        data = pd.DataFrame()
+
+        storage.config.log.info('Collecting database information...')
+        for d in dit:
+            if data.empty:
+                data = d
+            else:
+                data = pd.concat([data, d])
+
 
         # 1. should find values that are not unique, meaning they have multiple
         # entries
-        recarray = data.to_records()
-        xys = recarray[['X', 'Y']]
-        unq, idx, counts = np.unique(xys, return_index=True, return_counts=True)
-        redos = np.where(counts >= 2)
+        data = data.set_index(['X','Y'])
+        redo_indices = data.index[data.index.duplicated(keep='first')]
+        if redo_indices.empty:
+            return data.reset_index()
+        storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
 
-        if not np.any(redos):
-            return data
-
-        leaves = data.loc[idx[np.where(counts == 1)]]
-
-        # 2. then should combine the values of those attribute/cell combos
-        ridx = np.unique(unq[redos])
-        rxs = list(ridx['X'])
-        rys = list(ridx['Y'])
-        if np.any(rxs):
-            redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
-            if redo.empty:
-                return data
-            redo['X'] = redo['X'] - minx
-            redo['Y'] = redo['Y'] - miny
-
-        parts = min(int(redo['X'].max() * redo['Y'].max()), 1000)
-        r = dd.from_pandas(redo, npartitions=parts)
-        def squash(x):
-            def s2(vals):
-                if vals.dtype == object:
-                    return np.array([*vals], vals.dtype).reshape(-1)
-                elif vals.name == 'X' or vals.name == 'Y':
-                    return vals.values[0]
-                else:
-                    return sum(vals)
-            val = x.aggregate(s2)
-            p = pd.DataFrame(val).T
-            return p
-
-        recs = r.groupby(['X','Y']).apply(squash, meta=att_meta)
-        rs = recs.compute().to_dict(orient='list')
-
-        # 3. Should rerun the metrics over them
-        metrics = get_metrics(rs, config)
-        ms = pd.DataFrame.from_dict(metrics)[out_list]
-        return pd.concat((ms, leaves[out_list]))
+        redo_data = data.loc[redo_indices][att_list].groupby(['X','Y']).agg(lambda x: list(chain(*x)))
+        clean_data = data.loc[data.index[~data.index.duplicated(False)]]
+        new_metrics = get_metrics(redo_data.reset_index(), storage)
+        return pd.concat([clean_data, new_metrics]).reset_index()
 
 def extract(config: ExtractConfig) -> None:
     """
@@ -183,25 +147,18 @@ def extract(config: ExtractConfig) -> None:
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
     i = e.get_indices()
-    minx = i['x'].min()
-    maxx = i['x'].max()
-    miny = i['y'].min()
-    maxy = i['y'].max()
-    xsize = maxx - minx + 1
-    ysize = maxy - miny + 1
+    xsize = e.x2
+    ysize = e.y2
 
-    # TODO make sure that the data isn't being manipulated by the redo section
+    # figure out if there are any overlaps and handle them
     final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
-    rminx = e.bounds.minx + (final.X.min() * config.resolution)
-    rmaxy = e.bounds.maxy + (final.Y.min() * config.resolution)
-    # transform = [638190.0, config.resolution, 0,
-    #              4402380.0, 0, -1*config.resolution]
 
     # output metric data to tifs
     for ma in ma_list:
+        # TODO should output in sections so we don't have memory problems
         m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)
         a = final[['X','Y',ma]].to_numpy()
         for x,y,md in a[:]:
             m_data[int(y)][int(x)] = md
 
-        write_tif(xsize, ysize, rminx, rmaxy, m_data, ma, config)
+        write_tif(xsize, ysize, m_data, ma, config)

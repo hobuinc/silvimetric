@@ -88,7 +88,7 @@ class Storage:
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
             attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
-            capacity=100000)
+            capacity=1000)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)

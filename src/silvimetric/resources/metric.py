@@ -57,14 +57,28 @@ class Metric(Entry):
 
     def do(self, data: pd.DataFrame) -> pd.DataFrame:
         """Run metric and filters."""
+        idx = ['xi','yi']
+        if any([i not in data.columns for i in idx]):
+            idx = ['X','Y']
+
         if self.attributes:
-            attrs = [*[a.name for a in self.attributes],'xi','yi']
+            attrs = [*[a.name for a in self.attributes],*idx]
             data = data[attrs]
 
         data = self.run_filters(data)
-        idx = ['xi','yi']
         gb = data.groupby(idx)
+
+        # try:
+        #     idx = ['xi','yi']
+        #     gb = data.groupby(idx)
+        # except Exception as e:
+        #     # coming from extract re-run
+        #     idx = ['X','Y']
+        #     gb = data.groupby(idx)
+
+        # create map of current column name to tuple of new column name and metric method
         cols = data.columns
+
         new_cols = {
             c: [(self.entry_name(c), self._method)]
             for c in cols if c not in idx
@@ -92,6 +106,7 @@ class Metric(Entry):
     def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
         for f in self.filters:
             ndf = f(data)
+            #TODO should this check be here?
             if not isinstance(ndf, pd.DataFrame):
                 raise TypeError('Filter outputs must be a DataFrame. '
                         f'Type detected: {type(ndf)}')

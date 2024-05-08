@@ -16,7 +16,8 @@ pytest_plugins=[
     'fixtures.shatter_fixtures', 'fixtures.extract_fixtures',
     'fixtures.command_fixtures', 'fixtures.chunk_fixtures',
     'fixtures.western_fixtures', 'fixtures.data_fixtures',
-    'fixtures.cli_fixtures', 'fixtures.fusion_fixtures']
+    'fixtures.cli_fixtures', 'fixtures.fusion_fixtures',
+    'fixtures.metric_fixtures']
 
 @pytest.fixture(scope="session", autouse=True)
 def configure_dask() -> None:
