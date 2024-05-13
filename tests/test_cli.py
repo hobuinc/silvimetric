@@ -52,13 +52,19 @@ class TestCli(object):
         assert res.exit_code == 0
 
     def test_cli_extract(self, runner, extract_config, storage):
-        atts = ' '.join([f'-a {a.name}' for a in extract_config.attrs])
-        ms = ' '.join([f'-m {m.name}' for m in extract_config.metrics])
+        atts = []
+        for a in extract_config.attrs:
+            atts.append('-a')
+            atts.append(a.name)
+        ms = []
+        for m in extract_config.metrics:
+            ms.append('-m')
+            ms.append(m.name)
         out_dir = extract_config.out_dir
         tdb_dir = extract_config.tdb_dir
 
-        res = runner.invoke(cli.cli, args=(f'-d {tdb_dir} --scheduler '+
-            f'single-threaded extract {atts} {ms} --outdir {out_dir}'))
+        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler',
+            'single-threaded', 'extract', *atts, *ms, '--outdir' ,out_dir])
 
         assert res.exit_code == 0
 
