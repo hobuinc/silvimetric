@@ -162,7 +162,7 @@ class Test_Shatter(object):
                 for yi in range(ydom):
                     curr = data.loc[xi,yi]
                     curr.size == 1
-                    curr[0].size == 900
+                    curr.iloc[0].size == 900
                     # this should have all indices from 0 to 9 filled.
                     # if oob error, it's not this test's fault
-                    assert bool(np.all( curr[0] == ((maxy/resolution) - (yi + 1)) ))
+                    assert bool(np.all( curr.iloc[0] == ((maxy/resolution) - (yi + 1)) ))
