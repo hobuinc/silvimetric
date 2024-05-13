@@ -3,7 +3,7 @@ import os
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
-from silvimetric import ShatterConfig
+from silvimetric import ShatterConfig, Storage
 
 class TestCli(object):
     def test_cli_init(self, tmp_path_factory, runner, bounds):
@@ -51,7 +51,7 @@ class TestCli(object):
         res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'info'])
         assert res.exit_code == 0
 
-    def test_cli_extract(self, runner, extract_config):
+    def test_cli_extract(self, runner, extract_config, storage):
         atts = ' '.join([f'-a {a.name}' for a in extract_config.attrs])
         ms = ' '.join([f'-m {m.name}' for m in extract_config.metrics])
         out_dir = extract_config.out_dir

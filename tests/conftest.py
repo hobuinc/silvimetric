@@ -56,15 +56,13 @@ def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics) ->
                         version = svversion)
     Storage.create(sc)
     yield sc
-    rmtree(path)
 
 @pytest.fixture(scope='function')
 def storage(storage_config):
     yield Storage.from_db(storage_config.tdb_dir)
 
 @pytest.fixture(scope='function')
-def shatter_config(copc_filepath, storage_config, bounds, date
-        ) -> Generator[ShatterConfig, None, None]:
+def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[ShatterConfig, None, None]:
     log = Log('INFO') # INFO
     s = ShatterConfig(tdb_dir = storage_config.tdb_dir,
                       log = log,
