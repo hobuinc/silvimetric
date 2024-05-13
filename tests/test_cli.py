@@ -1,19 +1,22 @@
 import numpy as np
+import os
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
 from silvimetric import ShatterConfig
 
 class TestCli(object):
-    def test_cli_init(self, tdb_filepath, runner, bounds):
-        res = runner.invoke(cli.cli, args=["-d", tdb_filepath, "--debug",
+    def test_cli_init(self, tmp_path_factory, runner, bounds):
+        path = tmp_path_factory.mktemp("test_tdb")
+        p = os.path.abspath(path)
+        res = runner.invoke(cli.cli, args=["-d", p, "--debug",
                 "--scheduler", "single-threaded", "initialize", "--resolution",
                 '10', '--crs', 'EPSG:3857', '--bounds', str(bounds)],
                 catch_exceptions=False)
         assert res.exit_code == 0
 
-    def test_cli_shatter(self, runner, storage, maxy, date, tdb_filepath,
-            copc_filepath):
+    def test_cli_shatter(self, runner, maxy, date, tdb_filepath,
+            copc_filepath, storage):
 
         res = runner.invoke(cli.cli, args=["-d", tdb_filepath,
                 "--scheduler", "single-threaded",
@@ -37,8 +40,9 @@ class TestCli(object):
                     # if oob error, it's not this test's fault
                     assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
 
-    def test_cli_scan(self, tdb_filepath, runner, copc_filepath, storage):
-        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'scan', copc_filepath])
+    def test_cli_scan(self, runner, copc_filepath, storage_config):
+        tdb_dir = storage_config.tdb_dir
+        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler', 'single-threaded', 'scan', copc_filepath])
         print(res.output)
         assert res.exit_code == 0
 

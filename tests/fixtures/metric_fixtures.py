@@ -7,10 +7,12 @@ from silvimetric import Log, StorageConfig, ShatterConfig, Storage
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
-def metric_shatter_config(tdb_filepath, copc_filepath, attrs, metrics, bounds,
+def metric_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, bounds,
         date, crs, resolution) -> Generator[pd.Series, None, None]:
 
-    log = Log(10)
+    path = tmp_path_factory.mktemp("test_tdb")
+    p = os.path.abspath(path)
+    log = Log('DEBUG')
 
     def dummy_fn(df: pd.DataFrame) -> pd.DataFrame:
         assert isinstance(df, pd.DataFrame)
@@ -22,7 +24,7 @@ def metric_shatter_config(tdb_filepath, copc_filepath, attrs, metrics, bounds,
     metrics[0].attributes=attrs
 
     """Make output"""
-    st_config=StorageConfig(tdb_dir=tdb_filepath,
+    st_config=StorageConfig(tdb_dir=p,
                         log=log,
                         crs=crs,
                         root=bounds,
@@ -32,7 +34,7 @@ def metric_shatter_config(tdb_filepath, copc_filepath, attrs, metrics, bounds,
                         version=svversion)
 
     s = Storage.create(st_config)
-    sh_config = ShatterConfig(tdb_dir=tdb_filepath,
+    sh_config = ShatterConfig(tdb_dir=p,
             log=log,
             filename=copc_filepath,
             bounds=bounds,

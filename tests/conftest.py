@@ -3,6 +3,7 @@ import os
 import dask
 import pdal
 import copy
+from shutil import rmtree
 
 from datetime import datetime
 from typing import Generator
@@ -29,10 +30,8 @@ def threaded_dask() -> None:
     dask.config.set(scheduler="threads")
 
 @pytest.fixture(scope='function')
-def tdb_filepath(tmp_path_factory) -> Generator[str, None, None]:
-    path = tmp_path_factory.mktemp("test_tdb")
-    p = os.path.abspath(path)
-    yield p
+def tdb_filepath(storage_config) -> Generator[str, None, None]:
+    yield storage_config.tdb_dir
 
 @pytest.fixture(scope='function')
 def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, None]:
@@ -42,9 +41,12 @@ def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, N
     yield app
 
 @pytest.fixture(scope='function')
-def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
+def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
+    path = tmp_path_factory.mktemp("test_tdb")
+    p = os.path.abspath(path)
     log = Log('DEBUG')
-    yield StorageConfig(tdb_dir = tdb_filepath,
+
+    sc =  StorageConfig(tdb_dir = p,
                         log = log,
                         crs = crs,
                         root = bounds,
@@ -52,16 +54,19 @@ def storage_config(tdb_filepath, bounds, resolution, crs, attrs, metrics) -> Gen
                         attrs = attrs,
                         metrics = metrics,
                         version = svversion)
-
-@pytest.fixture(scope="function")
-def storage(storage_config) -> Generator[Storage, None, None]:
-    yield Storage.create(storage_config)
+    Storage.create(sc)
+    yield sc
+    rmtree(path)
 
 @pytest.fixture(scope='function')
-def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
-        app_config, storage, date) -> Generator[ShatterConfig, None, None]:
+def storage(storage_config):
+    yield Storage.from_db(storage_config.tdb_dir)
+
+@pytest.fixture(scope='function')
+def shatter_config(copc_filepath, storage_config, bounds, date
+        ) -> Generator[ShatterConfig, None, None]:
     log = Log('INFO') # INFO
-    s = ShatterConfig(tdb_dir = tdb_filepath,
+    s = ShatterConfig(tdb_dir = storage_config.tdb_dir,
                       log = log,
                       filename = copc_filepath,
                       attrs = storage_config.attrs,
@@ -73,11 +78,12 @@ def shatter_config(tdb_filepath, copc_filepath, storage_config, bounds,
     yield s
 
 @pytest.fixture(scope='function')
-def extract_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs, storage):
+def extract_config(tif_filepath, metrics, shatter_config, extract_attrs):
     from silvimetric.commands import shatter
+    tdb_dir = shatter_config.tdb_dir
     shatter.shatter(shatter_config)
     log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
+    c =  ExtractConfig(tdb_dir = tdb_dir,
                        log = log,
                        out_dir = tif_filepath,
                        attrs = extract_attrs,

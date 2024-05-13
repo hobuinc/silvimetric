@@ -18,7 +18,7 @@ def extract_attrs(dims)->Generator[list[str], None, None]:
 
 
 @pytest.fixture(scope='function')
-def multivalue_config(tdb_filepath, tif_filepath, metric_shatter_config):
+def multivalue_config(tif_filepath, metric_shatter_config):
 
     shatter(metric_shatter_config)
 
@@ -32,7 +32,8 @@ def multivalue_config(tdb_filepath, tif_filepath, metric_shatter_config):
 
     shatter(second_config)
     log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
+    tdb_dir = metric_shatter_config.tdb_dir
+    c =  ExtractConfig(tdb_dir = tdb_dir,
                        log = log,
                        out_dir = tif_filepath)
     yield c
