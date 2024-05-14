@@ -130,11 +130,11 @@ class StorageConfig(Config):
         if 'metrics' in x:
             ms = [ Metric.from_dict(m) for m in x['metrics']]
         else:
-            ms = None
+            ms = [ ]
         if 'attrs' in x:
             attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         else:
-            attrs = None
+            attrs = [ ]
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
@@ -152,7 +152,8 @@ class StorageConfig(Config):
         return n
 
     def __repr__(self):
-        return json.dumps(self.to_json())
+        j = self.to_json()
+        return json.dumps(j)
 
 @dataclass
 class ApplicationConfig(Config):
@@ -256,7 +257,7 @@ class ShatterConfig(Config):
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['mbr'] = self.mbr
+        d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]

@@ -17,5 +17,6 @@ dependencies:
   - websocket-client
   - python-json-logger
   - dill
+  - pandas
   - pip:
     - line-profiler

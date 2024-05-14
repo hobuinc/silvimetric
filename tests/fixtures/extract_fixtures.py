@@ -5,7 +5,7 @@ import uuid
 from typing import Generator
 
 from silvimetric.commands.shatter import shatter
-from silvimetric import Attribute, ExtractConfig, Extents, Log
+from silvimetric import Attribute, ExtractConfig, Log, Bounds
 
 @pytest.fixture(scope='function')
 def tif_filepath(tmp_path_factory) -> Generator[str, None, None]:
@@ -18,22 +18,22 @@ def extract_attrs(dims)->Generator[list[str], None, None]:
 
 
 @pytest.fixture(scope='function')
-def multivalue_config(tdb_filepath, tif_filepath, metrics, shatter_config, extract_attrs):
+def multivalue_config(tif_filepath, metric_shatter_config):
 
-    shatter(shatter_config)
-    e = Extents.from_storage(shatter_config.tdb_dir)
-    b: Extents = e.split()[0]
+    shatter(metric_shatter_config)
 
-    second_config = copy.deepcopy(shatter_config)
-    second_config.bounds = b.bounds
+    # reset config
+    second_config = copy.deepcopy(metric_shatter_config)
     second_config.name = uuid.uuid4()
+    second_config.bounds = Bounds(300,300,450,450)
     second_config.point_count = 0
+    second_config.time_slot = 0
+    second_config.mbr = ()
 
     shatter(second_config)
     log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_filepath,
+    tdb_dir = metric_shatter_config.tdb_dir
+    c =  ExtractConfig(tdb_dir = tdb_dir,
                        log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
+                       out_dir = tif_filepath)
     yield c

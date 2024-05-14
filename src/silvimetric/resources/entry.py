@@ -1,7 +1,6 @@
 import json
 import numpy as np
 import pdal
-from typing import Union
 from abc import ABC, abstractmethod
 from tiledb import Attr
 
@@ -11,8 +10,7 @@ class Entry(ABC):
 
     def __eq__(self, other):
         return self.name == other.name and \
-            self.dtype == other.dtype and \
-            self.dependencies == other.dependencies
+            self.dtype == other.dtype
 
     @abstractmethod
     def entry_name(self) -> str:
@@ -48,14 +46,12 @@ class Attribute(Entry):
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
-    def __init__(self, name: str, dtype: np.dtype, deps=None):
+    def __init__(self, name: str, dtype: np.dtype):
         super().__init__()
         self.name = name
         """Name of the attribute, eg. Intensity."""
         self.dtype = dtype
         """Numpy data type."""
-        self.dependencies = deps
-        """Attributes/Metrics this is dependent on."""
 
     def entry_name(self) -> str:
         """Return TileDB attribute name."""
@@ -71,16 +67,17 @@ class Attribute(Entry):
     def to_json(self) -> object:
         return {
             'name': self.name,
-            'dtype': np.dtype(self.dtype).str,
-            'dependencies': self.dependencies,
+            'dtype': np.dtype(self.dtype).str
         }
 
     @staticmethod
     def from_dict(data: dict):
+        """
+        Make an Attribute from a JSON like object
+        """
         name = data['name']
         dtype = data['dtype']
-        deps = data['dependencies']
-        return Attribute(name, dtype, deps)
+        return Attribute(name, dtype)
 
     @staticmethod
     def from_string(data: str):

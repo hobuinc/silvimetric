@@ -2,7 +2,7 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric import Metrics, ExtractConfig, Extents, Log, extract
+from silvimetric import Metrics, ExtractConfig, Extents, Log, extract, Storage
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
@@ -10,24 +10,34 @@ def tif_test(extract_config):
     filenames = [Metrics[m.name].entry_name(a.name)
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
-    e = Extents.from_storage(extract_config.tdb_dir)
-    yimin = e.get_indices()['y'].min()
+    storage = Storage.from_db(extract_config.tdb_dir)
+    e = Extents(extract_config.bounds, extract_config.resolution, storage.config.root)
+    root_maxy = storage.config.root.maxy
 
     for f in filenames:
+        if 'Return' in f:
+            continue
         path = Path(extract_config.out_dir) / f'{f}.tif'
         assert path.exists()
 
         raster: gdal.Dataset = gdal.Open(str(path))
         derived = CRS.from_user_input(raster.GetProjection())
+        rminx, xres, xskew, rmaxy, yskew, yres  = raster.GetGeoTransform()
+        assert rminx == minx
+        assert rmaxy == maxy
+        assert xres == resolution
+        assert -yres == resolution
+
+
         assert derived == extract_config.crs
 
-        xsize = int((maxx - minx) / resolution)
-        ysize = int((maxy - miny) / resolution)
+        xsize = e.x2
+        ysize = e.y2
         assert raster.RasterXSize == xsize
         assert raster.RasterYSize == ysize
 
         r = raster.ReadAsArray()
-        assert all([ r[y,x] == ((maxy/resolution)-(y+yimin))  for y in range(ysize) for x in range(xsize)])
+        assert all([ r[y,x] == ((root_maxy/resolution)-y-1)  for y in range(e.y1, e.y2) for x in range(e.x1, e.x2)])
 
 class Test_Extract(object):
 

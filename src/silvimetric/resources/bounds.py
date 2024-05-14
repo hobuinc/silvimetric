@@ -1,6 +1,7 @@
 import json
 import ast
 
+#TODO should these bounds have a buffer?
 class Bounds(dict): #for JSON serializing
     """Simple class to represent a 2 or 3-dimensional bounding box that can be
     generated from both JSON or PDAL bounds form."""
@@ -25,6 +26,8 @@ class Bounds(dict): #for JSON serializing
     def __bool__(self):
         return True
 
+    def __repr__(self) -> str:
+        return str(self.get())
 
     @staticmethod
     def from_string(bbox_str: str):
@@ -84,10 +87,6 @@ class Bounds(dict): #for JSON serializing
         return [self.minx, self.miny, self.maxx, self.maxy]
 
 
-    def __repr__(self) -> str:
-        return str(self.get())
-
-
     def to_string(self) -> str:
         """Return string representation of Bounds
 
@@ -128,6 +127,21 @@ class Bounds(dict): #for JSON serializing
         if other.miny > self.maxy or other.maxy < self.miny:
             return True
         return False
+
+    def adjust_to_cell_lines(self, resolution):
+        xmindif = self.minx % resolution
+        xmaxdif = self.maxx % resolution
+        ymaxdif = self.maxy % resolution
+        ymindif = self.miny % resolution
+
+        if xmindif:
+            self.minx = self.minx - xmindif
+        if xmaxdif:
+            self.maxx = self.maxx + (resolution - xmaxdif)
+        if ymindif:
+            self.miny = self.miny - ymindif
+        if ymaxdif:
+            self.maxy = self.maxy + (resolution - ymaxdif)
 
     @staticmethod
     def shared_bounds(first, second):

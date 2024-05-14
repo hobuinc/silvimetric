@@ -10,7 +10,7 @@ class Test_Configuration(object):
         mean = [ m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1
 
-        assert int(mean[0]([2,2,2,2])) == 2
+        assert int(mean[0]._method([2,2,2,2])) == 2
         assert storage_config == c
 
         # shatter
