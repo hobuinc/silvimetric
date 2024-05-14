@@ -10,11 +10,9 @@ from dask.distributed import as_completed, futures_of, CancelledError
 from dask.diagnostics import ProgressBar
 import dask.array as da
 import dask.bag as db
-from line_profiler import profile
 
 from .. import Extents, Storage, Data, ShatterConfig
 
-@profile
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
     Execute pipeline and retrieve point cloud data for this extent
@@ -30,7 +28,6 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     data.execute()
     return p.get_dataframe(0)
 
-@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     """
     Arrange data to fit key-value TileDB input format.
@@ -58,7 +55,6 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     return points
 
 
-@profile
 def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
@@ -75,7 +71,6 @@ def get_metrics(data_in, storage: Storage):
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
-@profile
 def agg_list(df: pd.DataFrame):
     """
     Make variable-length point data attributes into lists
@@ -86,7 +81,6 @@ def agg_list(df: pd.DataFrame):
     grouped = grouped.agg(list)
     return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
-@profile
 def join(list_data, metric_data):
     """
     Join the list data and metric DataFrames together
@@ -95,7 +89,6 @@ def join(list_data, metric_data):
         return None
     return list_data.join([m for m in metric_data])
 
-@profile
 def write(data_in, tdb):
     """
     Write cell data to database
@@ -194,6 +187,10 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         ## Handle non-distributed dask scenarios
         else:
             config.point_count = sum(writes)
+
+        config.log.info('ayyyy')
+
+        tdb.close()
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)

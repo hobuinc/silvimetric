@@ -50,6 +50,25 @@ class TestCommands(object):
         h = info.info(tdb_dir=tdb_filepath)
         assert not bool(h['history'])
 
+    def test_311_failure(self, shatter_config):
+        # make sure we handle tiledb contexts correctly within dask
+        import dask
+        from dask.distributed import Client
+        dask.config.set(scheduler='processes')
+        client = Client()
+        dask.config.set({'distributed.client': client})
+
+        tdb_dir = shatter_config.tdb_dir
+        shatter.shatter(shatter_config)
+
+        i = info.info(tdb_dir)
+        history = i['history'][-1]
+
+        finished_config = ShatterConfig.from_dict(history)
+        sh_id = finished_config.name
+        manage.delete(tdb_dir, sh_id)
+
+
     def test_restart(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]
 

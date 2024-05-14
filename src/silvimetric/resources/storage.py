@@ -193,6 +193,10 @@ class Storage:
         :raises Exception: Path does not exist.
         :yield: TileDB array context manager.
         """
+
+        # tiledb and dask have bad interaction with opening an array if
+        # other threads present
+
         if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode in ['w', 'r', 'd', 'm']:
                 tdb = tiledb.open(self.config.tdb_dir, mode, timestamp=timestamp)
@@ -200,7 +204,7 @@ class Storage:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
             raise Exception(f"Path {self.config.tdb_dir} already exists and is not" +
-                            " initialized for TileDB access.")
+                    " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
 
@@ -316,13 +320,16 @@ class Storage:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
+            r.close()
 
         self.config.log.debug('Deleting fragments...')
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
+            m.close()
         self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
+            w.close()
         return sh_cfg
 
     def consolidate_shatter(self, proc_num: int, retries=0) -> None:
