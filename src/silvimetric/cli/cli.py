@@ -5,8 +5,8 @@ import logging
 
 
 from .. import __version__
-from ..resources import Attribute, Metric, Bounds, Log
-from ..resources import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from .. import Attribute, Metric, Bounds, Log
+from .. import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
 from ..commands import shatter, extract, scan, info, initialize, manage
 from .common import BoundsParamType, CRSParamType, AttrParamType, MetricParamType
 from .common import dask_handle, close_dask
@@ -16,7 +16,7 @@ from .common import dask_handle, close_dask
 @click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=12, help="Number of workers for Dask")
+@click.option("--workers", type=int, default=10, help="Number of workers for Dask")
 @click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
         help="Open dask diagnostic page in default web browser.")
@@ -148,7 +148,7 @@ def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
             root = bounds,
             crs = crs,
             attrs = attributes,
-            metrics = list(itertools.chain(*metrics)),
+            metrics = metrics,
             resolution = resolution)
     return initialize.initialize(storageconfig)
 
@@ -180,21 +180,24 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
     if date is None and dates is None:
         raise ValueError("One of '--date' or '--dates' must be provided.")
 
-    config = ShatterConfig(tdb_dir = app.tdb_dir,
+    config = ShatterConfig(tdb_dir=app.tdb_dir,
             date=dates if dates else tuple([date]),
-            log = app.log,
-            filename = pointcloud,
-            bounds = bounds,
+            log=app.log,
+            filename=pointcloud,
+            bounds=bounds,
             tile_size=tilesize)
 
     if report:
         if app.scheduler != 'distributed':
+            from dask.diagnostics import ProgressBar
             app.log.warning('Report option is incompatible with scheduler'
                             '{scheduler}, skipping.')
-        report_path = f'reports/{config.name}.html'
-        with performance_report(report_path) as pr:
             shatter.shatter(config)
-        print(f'Writing report to {report_path}.')
+        else:
+            report_path = f'reports/{config.name}.html'
+            with performance_report(report_path) as pr:
+                shatter.shatter(config)
+            print(f'Writing report to {report_path}.')
     else:
         shatter.shatter(config)
 
@@ -214,6 +217,8 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 
     #TODO only allow metrics and attributes to be added if they're present
     # in the storage config.
+    dask_handle(app.dasktype, app.scheduler, app.workers, app.threads,
+        app.watch, app.log)
 
     config = ExtractConfig(tdb_dir = app.tdb_dir,
             log = app.log,

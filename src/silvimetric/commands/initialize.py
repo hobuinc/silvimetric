@@ -1,4 +1,4 @@
-from silvimetric.resources import Storage, StorageConfig
+from .. import Storage, StorageConfig
 
 def initialize(storage: StorageConfig):
     """
@@ -8,7 +8,6 @@ def initialize(storage: StorageConfig):
     :return: :class:`silvimetric.resources.storage.Storage` database object.
     """
 
-    storage.log.info(f"Initializing SilviMetric Database at '{storage.tdb_dir}'")
-
     s = Storage.create(storage)
+    storage.log.info(f"Initialized SilviMetric Database at '{storage.tdb_dir}'")
     return s

@@ -42,6 +42,10 @@ class Config(ABC):
         return d
 
     @classmethod
+    def from_json(self, data: str):
+        return self.from_string(json.dumps(data))
+
+    @classmethod
     @abstractmethod
     def from_string(self, data: str):
         raise NotImplementedError
@@ -124,13 +128,13 @@ class StorageConfig(Config):
         x = json.loads(data)
         root = Bounds(*x['root'])
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         else:
-            ms = None
+            ms = [ ]
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         else:
-            attrs = None
+            attrs = [ ]
         if 'crs' in x:
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
@@ -148,7 +152,8 @@ class StorageConfig(Config):
         return n
 
     def __repr__(self):
-        return json.dumps(self.to_json())
+        j = self.to_json()
+        return json.dumps(j)
 
 @dataclass
 class ApplicationConfig(Config):
@@ -233,6 +238,10 @@ class ShatterConfig(Config):
         from .storage import Storage
         s = Storage.from_db(self.tdb_dir)
 
+        if isinstance(self.tile_size, float):
+            self.tile_size = int(self.tile_size)
+            self.log.warning(f'Truncating tile size to integer({self.tile_size})')
+            pass
         if not self.attrs:
             self.attrs = s.getAttributes()
         if not self.metrics:
@@ -248,7 +257,7 @@ class ShatterConfig(Config):
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['attrs'] = [a.to_json() for a in self.attrs]
         d['metrics'] = [m.to_json() for m in self.metrics]
-        d['mbr'] = self.mbr
+        d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
             d['date'] = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
@@ -265,8 +274,8 @@ class ShatterConfig(Config):
     def from_dict(cls, data: dict):
         x = data
 
-        ms = list([ Metric.from_string(m) for m in x['metrics']])
-        attrs = list([ Attribute.from_string(a) for a in x['attrs']])
+        ms = list([ Metric.from_dict(m) for m in x['metrics']])
+        attrs = list([ Attribute.from_dict(a) for a in x['attrs']])
         if isinstance(x['date'], list):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
@@ -340,9 +349,9 @@ class ExtractConfig(Config):
     def from_string(cls, data: str):
         x = json.loads(data)
         if 'metrics' in x:
-            ms = [ Metric.from_string(m) for m in x['metrics']]
+            ms = [ Metric.from_dict(m) for m in x['metrics']]
         if 'attrs' in x:
-            attrs = [ Attribute.from_string(a) for a in x['attrs']]
+            attrs = [ Attribute.from_dict(a) for a in x['attrs']]
         if 'bounds' in x:
             bounds = Bounds(*x['bounds'])
         if 'log' in x:

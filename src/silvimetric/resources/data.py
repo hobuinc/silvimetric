@@ -1,6 +1,7 @@
-from . import Bounds
+from .bounds import Bounds
 from .config import StorageConfig
 import numpy as np
+import copy
 
 import pdal
 
@@ -17,21 +18,37 @@ class Data:
                  bounds: Bounds = None):
         self.filename = filename
         """Path to either PDAL pipeline or point cloud file"""
+
         self.bounds = bounds
         """Bounds of this section of data"""
 
         self.reader_thread_count = 2
         """Thread count for PDAL reader. Keep to 2 so we don't hog threads"""
 
-        self.storageconfig = storageconfig
-        """:class:`silvimetric.resources.StorageConfig`"""
         self.reader = self.get_reader()
         """PDAL reader"""
-        self.pipeline = self.get_pipeline()
-        """PDAL pipeline"""
+
         if self.bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 
+        # adjust bounds if necessary
+        self.bounds.adjust_to_cell_lines(storageconfig.resolution)
+        self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
+
+        self.storageconfig = storageconfig
+        """:class:`silvimetric.resources.StorageConfig`"""
+        self.pipeline = self.get_pipeline()
+        """PDAL pipeline"""
+
+        self.log = storageconfig.log
+
+    def to_json(self):
+        j = dict(filename=self.filename, bounds=self.bounds.get(),
+                pipeline=json.loads(self.pipeline.pipeline), is_pipeline=self.is_pipeline())
+        return j
+
+    def __repr__(self):
+        return json.dumps(self.to_json(), indent=2)
 
     def is_pipeline(self) -> bool:
         """Does this instance represent a pdal.Pipeline or a simple filename
@@ -58,14 +75,9 @@ class Data:
         class_zero = pdal.Filter.assign(value="Classification = 0")
         rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
         nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-        ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
+        # ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
 
-        # assign_x = pdal.Filter.assign(
-        #     value=f"xi = (X - {self.root.minx}) / {resolution}")
-        # assign_y = pdal.Filter.assign(
-        #     value=f"yi = ({self.root.maxy} - Y) / {resolution}")
-
-        return reader | class_zero | rn | nor #| ferry | assign_x | assign_y #| smrf | hag
+        return reader | class_zero | rn | nor
 
     def get_pipeline(self) -> pdal.Pipeline:
         """Fetch the pipeline for the instance
@@ -103,7 +115,15 @@ class Data:
             # we only answer to copc or ept readers
             if stage_kind in allowed_readers:
                 if self.bounds:
-                    stage._options['bounds'] = str(self.bounds)
+                    res = self.storageconfig.resolution
+                    collar = Bounds(
+                        self.bounds.minx - res,
+                        self.bounds.miny - res,
+                        self.bounds.maxx + res,
+                        self.bounds.maxy + res
+                    )
+                    stage._options['bounds'] = str(collar)
+                    # stage._options['bounds'] = str(self.bounds)
 
             # We strip off any writers from the pipeline that were
             # given to us and drop them  on the floor
@@ -119,10 +139,13 @@ class Data:
         # Add xi and yi – only need this for PDAL < 2.6
         ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
         assign_x = pdal.Filter.assign(value=f"xi = (X - {self.storageconfig.root.minx}) / {resolution}")
-        assign_y = pdal.Filter.assign(value=f"yi = ({self.storageconfig.root.maxy} - Y) / {resolution}")
+        assign_y = pdal.Filter.assign(value=f"yi = (({self.storageconfig.root.maxy} - Y) / {resolution}) - 1")
+        # hag = pdal.Filter.hag_nn()
+
         stages.append(ferry)
         stages.append(assign_x)
         stages.append(assign_y)
+        # stages.append(hag)
 
         # return our pipeline
         return pdal.Pipeline(stages)
@@ -134,8 +157,11 @@ class Data:
         """
         try:
             self.pipeline.execute()
-            # self.storageconfig.log.debug(f"PDAL log: {self.pipeline.log}")
+            if self.pipeline.log and self.pipeline.log is not None:
+                self.log.debug(f"PDAL log: {self.pipeline.log}")
         except Exception as e:
+            if self.pipeline.log and self.pipeline.log is not None:
+                self.log.debug(f"PDAL log: {self.pipeline.log}")
             print(self.pipeline.pipeline, e)
             raise e
 
@@ -203,7 +229,7 @@ class Data:
         :return: point count
         """
 
-        reader = self.get_reader()
+        reader = copy.deepcopy(self.get_reader())
         if bounds:
             reader._options['bounds'] = str(bounds)
         pipeline = reader.pipeline()

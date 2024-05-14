@@ -1,20 +1,22 @@
 import numpy as np
-import pytest
+import os
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
-from silvimetric.resources import ShatterConfig
+from silvimetric import ShatterConfig
 
 class TestCli(object):
-    def test_cli_init(self, tdb_filepath, runner, bounds):
-        res = runner.invoke(cli.cli, args=["-d", tdb_filepath, "--debug",
+    def test_cli_init(self, tmp_path_factory, runner, bounds):
+        path = tmp_path_factory.mktemp("test_tdb")
+        p = os.path.abspath(path)
+        res = runner.invoke(cli.cli, args=["-d", p, "--debug",
                 "--scheduler", "single-threaded", "initialize", "--resolution",
                 '10', '--crs', 'EPSG:3857', '--bounds', str(bounds)],
                 catch_exceptions=False)
         assert res.exit_code == 0
 
-    def test_cli_shatter(self, runner, storage, maxy, date, tdb_filepath,
-            copc_filepath):
+    def test_cli_shatter(self, runner, maxy, date, tdb_filepath,
+            copc_filepath, storage):
 
         res = runner.invoke(cli.cli, args=["-d", tdb_filepath,
                 "--scheduler", "single-threaded",
@@ -24,17 +26,24 @@ class TestCli(object):
         assert res.exit_code == 0
 
         with storage.open('r') as a:
-            y = a[:,0]['Z'].shape[0]
-            x = a[0,:]['Z'].shape[0]
-            assert y == 10
-            assert x == 10
-            for xi in range(x):
-                for yi in range(y):
-                    a[xi, yi]['Z'].size == 1
-                    assert bool(np.all(a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution)-yi)))
+            assert a[:,:]['Z'].shape[0] == 100
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+            assert xdom == 10
+            assert ydom == 10
 
-    def test_cli_scan(self, tdb_filepath, runner, copc_filepath, storage):
-        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'scan', copc_filepath])
+            for xi in range(xdom):
+                for yi in range(ydom):
+                    a[xi, yi]['Z'].size == 1
+                    a[xi, yi]['Z'][0].size == 900
+                    # this should have all indices from 0 to 9 filled.
+                    # if oob error, it's not this test's fault
+                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
+
+    def test_cli_scan(self, runner, copc_filepath, storage_config):
+        tdb_dir = storage_config.tdb_dir
+        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler', 'single-threaded', 'scan', copc_filepath])
+        print(res.output)
         assert res.exit_code == 0
 
     def test_cli_info(self, tdb_filepath, runner, shatter_config):
@@ -42,14 +51,20 @@ class TestCli(object):
         res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'info'])
         assert res.exit_code == 0
 
-    def test_cli_extract(self, runner, extract_config):
-        atts = ' '.join([f'-a {a.name}' for a in extract_config.attrs])
-        ms = ' '.join([f'-m {m.name}' for m in extract_config.metrics])
+    def test_cli_extract(self, runner, extract_config, storage):
+        atts = []
+        for a in extract_config.attrs:
+            atts.append('-a')
+            atts.append(a.name)
+        ms = []
+        for m in extract_config.metrics:
+            ms.append('-m')
+            ms.append(m.name)
         out_dir = extract_config.out_dir
         tdb_dir = extract_config.tdb_dir
 
-        res = runner.invoke(cli.cli, args=(f'-d {tdb_dir} --scheduler '+
-            f'single-threaded extract {atts} {ms} --outdir {out_dir}'))
+        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler',
+            'single-threaded', 'extract', *atts, *ms, '--outdir' ,out_dir])
 
         assert res.exit_code == 0
 

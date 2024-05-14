@@ -1,9 +1,10 @@
 import pytest
 from typing import Generator
 from uuid import uuid4
+import os
 
 from silvimetric import __version__ as svversion
-from silvimetric.resources import StorageConfig, ShatterConfig, Storage, Log
+from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
 
 @pytest.fixture(scope="function")
 def s3_bucket() -> Generator[str, None, None]:
@@ -32,9 +33,13 @@ def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics, date) -> Genera
                         debug=True, tdb_dir=config.tdb_dir, date=date)
 
 @pytest.fixture(scope='function')
-def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
+def uneven_storage_config(tmp_path_factory, bounds, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
     log = Log('INFO')
-    sc = StorageConfig(tdb_dir = tdb_filepath,
+    path = tmp_path_factory.mktemp("test_tdb")
+    p = os.path.abspath(path)
+
+    log = Log('DEBUG')
+    sc = StorageConfig(tdb_dir = p,
                         log = log,
                         crs = crs,
                         root = bounds,
@@ -46,13 +51,11 @@ def uneven_storage_config(tdb_filepath, bounds, crs, attrs, metrics) -> Generato
     yield sc
 
 @pytest.fixture(scope='function')
-def uneven_storage(tdb_filepath) -> Generator[Storage, None, None]:
-    yield Storage.from_db(tdb_filepath)
+def uneven_shatter_config(copc_filepath, uneven_storage_config, date) -> Generator[ShatterConfig, None, None]:
+    tdb_dir = uneven_storage_config.tdb_dir
+    log = uneven_storage_config.log
 
-@pytest.fixture(scope='function')
-def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, date) -> Generator[ShatterConfig, None, None]:
-    log = Log('INFO') # INFO
-    s = ShatterConfig(tdb_dir = tdb_filepath,
+    s = ShatterConfig(tdb_dir = tdb_dir,
                       log = log,
                       filename = copc_filepath,
                       attrs = uneven_storage_config.attrs,
@@ -60,3 +63,34 @@ def uneven_shatter_config(tdb_filepath, copc_filepath, uneven_storage_config, da
                       debug = True,
                       date=date)
     yield s
+
+@pytest.fixture(scope='function')
+def partial_storage_config(tmp_path_factory, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
+    path = tmp_path_factory.mktemp("test_tdb")
+    p = os.path.abspath(path)
+    log = Log('DEBUG')
+
+    bounds = Bounds(300,300,450,450)
+    sc = StorageConfig(tdb_dir = p,
+                        log = log,
+                        crs = crs,
+                        root = bounds,
+                        resolution = 30,
+                        attrs = attrs,
+                        metrics = metrics,
+                        version = svversion)
+    Storage.create(sc)
+    yield sc
+
+@pytest.fixture(scope='function')
+def partial_shatter_config(copc_filepath, date, partial_storage_config) -> Generator[ShatterConfig, None, None]:
+    tdb_dir = partial_storage_config.tdb_dir
+    psc: StorageConfig = partial_storage_config
+    log = Log('INFO') # INFO
+    yield ShatterConfig(tdb_dir=tdb_dir,
+                      log=log,
+                      attrs=psc.attrs,
+                      metrics=psc.metrics,
+                      filename=copc_filepath,
+                      debug=True,
+                      date=date)

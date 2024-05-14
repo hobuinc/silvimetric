@@ -5,7 +5,6 @@ import logging
 import dask
 import dask.bag as db
 
-from typing import Self
 from math import ceil
 
 from .log import Log
@@ -29,7 +28,10 @@ class Extents(object):
         self.root = root
         """Root bounding box of the database."""
 
+        # adjust bounds so they're matching up with cell lines
+        self.bounds.adjust_to_cell_lines(resolution)
         minx, miny, maxx, maxy = self.bounds.get()
+
 
         self.rangex = maxx - minx
         """Range of X Indices"""
@@ -42,12 +44,13 @@ class Extents(object):
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         """Minimum X index"""
-        self.y1 = math.floor((self.root.maxy - maxy) / resolution)
-        """Minimum Y index"""
         self.x2 = math.ceil((maxx - self.root.minx) / resolution)
         """Maximum X index"""
+
+        self.y1 = math.ceil((self.root.maxy - maxy) / resolution)
+        """Minimum Y index, or maximum Y value in point cloud"""
         self.y2 = math.ceil((self.root.maxy - miny) / resolution)
-        """Maximum Y index"""
+        """Maximum Y index, or minimum Y value in point cloud"""
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
         """Minimum bounding rectangle of this Extents"""
 
@@ -81,7 +84,7 @@ class Extents(object):
             return True
         return False
 
-    def disjoint(self, other: Self):
+    def disjoint(self, other):
         """
         Determined if this Extents shares any points with another Extents object.
 
@@ -112,6 +115,7 @@ class Extents(object):
         # make bounds in scale with the desired resolution
         minx = bminx + (self.x1 * self.resolution)
         maxx = bminx + (self.x2 * self.resolution)
+
         miny = bmaxy - (self.y2 * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
@@ -121,12 +125,11 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed(chunk.filter(data, res_threshold, pc_threshold, depth_threshold))
-        curr_depth = 0
+        curr = db.from_delayed([ch.filter(data, res_threshold, pc_threshold,
+            depth_threshold, 1) for ch in chunk.split()])
+        curr_depth = 1
 
-        logger = logging.getLogger('silvimetric')
-        if not logger.handlers:
-            logger = Log('INFO')
+        logger = data.storageconfig.log
         while curr.npartitions > 0:
 
             logger.debug(f'Filtering {curr.npartitions} tiles at depth {curr_depth}')
@@ -150,20 +153,21 @@ class Extents(object):
         minx, miny, maxx, maxy = self.bounds.get()
 
         x_adjusted = math.floor((maxx - minx) / 2 / self.resolution)
-        y_adjusted = math.floor((maxy - miny) / 2 / self.resolution)
+        y_adjusted = math.ceil((maxy - miny) / 2 / self.resolution)
 
         midx = minx + (x_adjusted * self.resolution)
         midy = maxy - (y_adjusted * self.resolution)
 
-        return [
+        exts =  [
             Extents(Bounds(minx, miny, midx, midy), self.resolution, self.root), #lower left
             Extents(Bounds(midx, miny, maxx, midy), self.resolution, self.root), #lower right
             Extents(Bounds(minx, midy, midx, maxy), self.resolution, self.root), #top left
             Extents(Bounds(midx, midy, maxx, maxy), self.resolution, self.root)  #top right
         ]
+        return exts
 
     @dask.delayed
-    def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0) -> Self:
+    def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0):
         """
         Creates quad tree of chunks for this bounds, runs pdal quickinfo over
         this to determine if there are any points available. Uses a bottom resolution

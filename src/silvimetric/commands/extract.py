@@ -1,14 +1,14 @@
-from osgeo import gdal, osr
-import numpy as np
 from pathlib import Path
-import pandas as pd
+from itertools import chain
+
+
+from osgeo import gdal, osr
 import dask
-import dask.dataframe as dd
+import numpy as np
+import pandas as pd
 
-from typing import Dict
 
-from ..resources import Storage, ExtractConfig, Metric, Attribute
-from ..resources import Extents
+from .. import Storage, Extents, ExtractConfig
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -24,7 +24,7 @@ np_to_gdal_types = {
 }
 
 def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
-              config: ExtractConfig) -> None:
+        config: ExtractConfig) -> None:
     """
     Write out a raster with GDAL
 
@@ -39,11 +39,10 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     crs = config.crs
     srs = osr.SpatialReference()
     srs.ImportFromWkt(crs.to_wkt())
-    # transform = [x, res, 0, y, 0, res]
     b = config.bounds
 
     transform = [b.minx, config.resolution, 0,
-                 b.maxy, 0, -1* config.resolution]
+                 b.maxy, 0, -1*config.resolution]
 
     driver = gdal.GetDriverByName("GTiff")
     gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]
@@ -51,36 +50,27 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    tif.GetRasterBand(1).SetNoDataValue(np.nan)
+    tif.GetRasterBand(1).SetNoDataValue(-9999)
     tif.FlushCache()
     tif = None
 
-MetricDict = Dict[str, np.ndarray]
-def get_metrics(data_in: MetricDict, config: ExtractConfig) -> MetricDict:
+def get_metrics(data_in: pd.DataFrame, storage: Storage):
     """
     Reruns a metric over this cell. Only called if there is overlapping data.
 
-    :param data_in: Cell data to be rerun.
-    :param config: ExtractConfig.
+    :param data_in: Dataframe to be rerun.
+    :param storage: Base storage object.
     :return: Combined dict of attribute and newly derived metric data.
     """
+
+    #TODO should just use the metric calculation methods from shatter
     if data_in is None:
         return None
 
-    # make sure it's not empty. No empty writes
-    if not np.any(data_in['count']):
-        return None
+    exploded = data_in.agg(lambda x: x.explode())
+    metric_data = dask.persist(*[ m.do(exploded) for m in storage.config.metrics ])
 
-    # doing dask compute inside the dict array because it was too fine-grained
-    # when it was outside
-    #TODO move this operation to a dask bag and convert to dataframe and then
-    # to a dict for better efficiency?
-    metric_data = {
-        f'{m.entry_name(attr.name)}': [m(cell_data) for cell_data in data_in[attr.name]]
-        for attr in config.attrs for m in config.metrics
-    }
-    # md = dask.compute(metric_data)[0]
-    data_out = data_in | metric_data
+    data_out = data_in.set_index(['X','Y']).join([m for m in metric_data])
     return data_out
 
 def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray) -> pd.DataFrame:
@@ -95,10 +85,8 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
     :return: Dataframe of rerun data.
     """
 
-    ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
-        config.attrs ]
-    att_list = [ a.name for a in config.attrs ] + [ 'count' ]
-    out_list = [ *ma_list, 'X', 'Y' ]
+    ma_list = storage.getDerivedNames()
+    att_list = [ a.name for a in config.attrs ]
 
     minx = indices['x'].min()
     maxx = indices['x'].max()
@@ -113,53 +101,34 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         att_meta[a.name] =  a.dtype
 
     with storage.open("r") as tdb:
-        data = tdb.query(attrs=ma_list, order='F', coords=True).df[minx:maxx,
-                miny:maxy]
-        data['X'] = data['X'] - data['X'].min()
-        data['Y'] = data['Y'] - data['Y'].min()
+        # TODO this can be more efficient. Use count to find indices, then work
+        # with that smaller set from there. Working as is for now, but slow.
+        dit = tdb.query(attrs=[*att_list, *ma_list], order='F', coords=True,
+                return_incomplete=True, use_arrow=False).df[minx:maxx, miny:maxy]
+        data = pd.DataFrame()
 
-        # 1. should find values that are not unique, meaning they have multiple
-        # entries
-        recarray = data.to_records()
-        xys = recarray[['X', 'Y']]
-        unq, idx, counts = np.unique(xys, return_index=True, return_counts=True)
-        redos = np.where(counts >= 2)
+        storage.config.log.info('Collecting database information...')
+        for d in dit:
+            if data.empty:
+                data = d
+            else:
+                data = pd.concat([data, d])
 
-        if not np.any(redos):
-            return data
 
-        leaves = data.loc[idx[np.where(counts == 1)]]
+        # should find values that are not unique, meaning they have multiple entries
+        data = data.set_index(['X','Y'])
+        redo_indices = data.index[data.index.duplicated(keep='first')]
+        if redo_indices.empty:
+            return data.reset_index()
 
-        # 2. then should combine the values of those attribute/cell combos
-        ridx = np.unique(unq[redos])
-        rxs = list(ridx['X'])
-        rys = list(ridx['Y'])
-        if np.any(rxs):
-            redo = pd.DataFrame(tdb.query(attrs=att_list).multi_index[[rxs], [rys]])
-            redo['X'] = redo['X'] - minx
-            redo['Y'] = redo['Y'] - miny
+        # data with overlaps
+        redo_data = data.loc[redo_indices][att_list].groupby(['X','Y']).agg(lambda x: list(chain(*x)))
+        # data that has no overlaps
+        clean_data = data.loc[data.index[~data.index.duplicated(False)]]
 
-        parts = min(int(redo['X'].max() * redo['Y'].max()), 1000)
-        r = dd.from_pandas(redo, npartitions=parts, name='MetricDataFrame')
-        def squash(x):
-            def s2(vals):
-                if vals.dtype == object:
-                    return np.array([*vals], vals.dtype).reshape(-1)
-                elif vals.name == 'X' or vals.name == 'Y':
-                    return vals.values[0]
-                else:
-                    return sum(vals)
-            val = x.aggregate(s2)
-            p = pd.DataFrame(val).T
-            return p
-
-        recs = r.groupby(['X','Y']).apply(squash, meta=att_meta)
-        rs = recs.compute().to_dict(orient='list')
-
-        # 3. Should rerun the metrics over them
-        metrics = get_metrics(rs, config)
-        ms = pd.DataFrame.from_dict(metrics)[out_list]
-        return pd.concat((ms, leaves[out_list]))
+        storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
+        new_metrics = get_metrics(redo_data.reset_index(), storage)
+        return pd.concat([clean_data, new_metrics]).reset_index()
 
 def extract(config: ExtractConfig) -> None:
     """
@@ -170,29 +139,25 @@ def extract(config: ExtractConfig) -> None:
 
     dask.config.set({"dataframe.convert-string": False})
 
-    ma_list = [ m.entry_name(a.name) for m in config.metrics for a in
-        config.attrs ]
-
-
     storage = Storage.from_db(config.tdb_dir)
+    ma_list = storage.getDerivedNames()
+    config.log.debug(f'Extracting metrics {[m for m in ma_list]}')
     root_bounds=storage.config.root
 
     e = Extents(config.bounds, config.resolution, root=root_bounds)
     i = e.get_indices()
-    minx = i['x'].min()
-    maxx = i['x'].max()
-    miny = i['y'].min()
-    maxy = i['y'].max()
-    x1 = maxx - minx + 1
-    y1 = maxy - miny + 1
+    xsize = e.x2
+    ysize = e.y2
 
+    # figure out if there are any overlaps and handle them
     final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
 
     # output metric data to tifs
     for ma in ma_list:
-        m_data = np.full(shape=(y1,x1), fill_value=np.nan, dtype=final[ma].dtype)
+        # TODO should output in sections so we don't run into memory problems
+        m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)
         a = final[['X','Y',ma]].to_numpy()
         for x,y,md in a[:]:
             m_data[int(y)][int(x)] = md
 
-        write_tif(x1, y1, m_data, ma, config)
+        write_tif(xsize, ysize, m_data, ma, config)

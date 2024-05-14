@@ -6,13 +6,13 @@ import pathlib
 import contextlib
 import json
 import urllib
-from typing import Any
+from typing import Generator
 
 from math import floor
 
 from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
-from ..resources import Bounds
+from .bounds import Bounds
 
 class Storage:
     """ Handles storage of shattered data in a TileDB Database. """
@@ -59,6 +59,9 @@ class Storage:
         if not ctx:
             ctx = tiledb.default_ctx()
 
+        # adjust cell bounds if necessary
+        config.root.adjust_to_cell_lines(config.resolution)
+
         # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor((config.root.maxx - config.root.minx) / float(config.resolution))
         yi = floor((config.root.maxy - config.root.miny) / float(config.resolution))
@@ -70,13 +73,22 @@ class Storage:
         count_att = tiledb.Attr(name="count", dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs]
+        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs if a in m.attributes or not m.attributes]
+
+        # Check that all attributes required for metric usage are available
+        att_list = [a.name for a in config.attrs]
+        required_atts = [d.name for m in config.metrics for d in m.dependencies
+                if isinstance(d, Attribute)]
+        for ra in required_atts:
+            if ra not in att_list:
+                raise ValueError(f'Missing required dependency, {ra}.')
 
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True)
+            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
+            capacity=1000)
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
@@ -164,8 +176,12 @@ class Storage:
         """
         return self.getConfig().metrics
 
+    def getDerivedNames(self) -> list[str]:
+        # if no attributes are set in the metric, use all
+        return [m.entry_name(a.name) for m in self.config.metrics
+                for a in self.config.attrs if not m.attributes or a in m.attributes]
     @contextlib.contextmanager
-    def open(self, mode:str='r', timestamp=None) -> tiledb.SparseArray:
+    def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
         """
         Open stream for TileDB database in given mode and at given timestamp.
 
@@ -294,17 +310,22 @@ class Storage:
         :param proc_num: Shatter process time slot
         :return: Config of deleted Shatter process
         """
+
+        self.config.log.debug(f'Deleting time slot {proc_num}...')
         with self.open('r', (proc_num, proc_num)) as r:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
+
+        self.config.log.debug('Deleting fragments...')
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
+        self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
         return sh_cfg
 
-    def consolidate_shatter(self, proc_num: int) -> None:
+    def consolidate_shatter(self, proc_num: int, retries=0) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
@@ -312,8 +333,19 @@ class Storage:
 
         :param proc_num: Time slot associated with shatter process.
         """
-        # TODO move from timestamp to fragment_uris, timestamp is deprecated
-        # this is currently failing, I believe from a bug in tiledb
-        afs = self.get_fragments_by_time(proc_num)
-        uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
-        tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+        try:
+            afs = self.get_fragments_by_time(proc_num)
+            uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
+            tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+            c = tiledb.Config({"sm.vacuum.mode": "fragments"})
+            tiledb.vacuum(self.config.tdb_dir, c)
+            self.config.log.info(f"Consolidated time slot {proc_num}.")
+        except Exception as e:
+            if retries >= 3:
+                self.config.log.warning("Failed to consolidate time slot "
+                        f"{proc_num} {retries} time(s). Stopping.")
+                raise e
+            self.config.log.warning("Failed to consolidate time slot "
+                    f"{proc_num} {retries+1} time. Retrying...")
+            self.consolidate_shatter(proc_num, retries+1)
+
