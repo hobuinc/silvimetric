@@ -333,12 +333,12 @@ class Storage:
 
         :param proc_num: Time slot associated with shatter process.
         """
-        # TODO move from timestamp to fragment_uris, timestamp is deprecated
-        # this is currently failing, I believe from a bug in tiledb
         try:
             afs = self.get_fragments_by_time(proc_num)
             uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
             tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+            c = tiledb.Config({"sm.vacuum.mode": "fragments"})
+            tiledb.vacuum(self.config.tdb_dir, c)
             self.config.log.info(f"Consolidated time slot {proc_num}.")
         except Exception as e:
             if retries >= 3:

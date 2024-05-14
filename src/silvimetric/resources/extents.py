@@ -249,12 +249,6 @@ class Extents(object):
             ], dtype=np.float64)
         dy = self.root.maxy - (res * local_ys)
 
-        # local_ys = np.array([
-        #         [y, min(y+ynum, self.y2)]
-        #         for y in range(self.y1, self.y2, int(ynum))
-        #     ], dtype=np.float64)
-        # dy = (res * local_ys) + self.root.miny
-
         coords_list = np.array([[*x,*y] for x in dx for y in dy],dtype=np.float64)
         yield from [
             Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.root)

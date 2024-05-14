@@ -69,6 +69,9 @@ class Attribute(Entry):
 
     @staticmethod
     def from_dict(data: dict):
+        """
+        Make an Attribute from a JSON like object
+        """
         name = data['name']
         dtype = data['dtype']
         return Attribute(name, dtype)

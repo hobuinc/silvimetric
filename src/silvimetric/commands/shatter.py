@@ -61,11 +61,12 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 @profile
 def get_metrics(data_in, storage: Storage):
     """
-    Run DataFrames through
+    Run DataFrames through metric processes
     """
     if data_in is None:
         return None
 
+    # TODO dependencies on other metrics:
     # - Iterate through metrics and figure out which ones are being used as
     #   dependencies
     # - Remove those from the list and run them first
@@ -192,8 +193,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
         ## Handle non-distributed dask scenarios
         else:
-            # with ProgressBar():
-                config.point_count = sum(writes)
+            config.point_count = sum(writes)
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)

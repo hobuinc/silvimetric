@@ -1,18 +1,14 @@
-import math
 from pathlib import Path
-from typing import Dict
 from itertools import chain
 
 
 from osgeo import gdal, osr
 import dask
-import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 
 
 from .. import Storage, Extents, ExtractConfig
-# from ..commands.shatter import get_metrics, agg_list, join
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -43,7 +39,6 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     crs = config.crs
     srs = osr.SpatialReference()
     srs.ImportFromWkt(crs.to_wkt())
-    # transform = [x, res, 0, y, 0, res]
     b = config.bounds
 
     transform = [b.minx, config.resolution, 0,
@@ -120,16 +115,18 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
                 data = pd.concat([data, d])
 
 
-        # 1. should find values that are not unique, meaning they have multiple
-        # entries
+        # should find values that are not unique, meaning they have multiple entries
         data = data.set_index(['X','Y'])
         redo_indices = data.index[data.index.duplicated(keep='first')]
         if redo_indices.empty:
             return data.reset_index()
-        storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
 
+        # data with overlaps
         redo_data = data.loc[redo_indices][att_list].groupby(['X','Y']).agg(lambda x: list(chain(*x)))
+        # data that has no overlaps
         clean_data = data.loc[data.index[~data.index.duplicated(False)]]
+
+        storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
         new_metrics = get_metrics(redo_data.reset_index(), storage)
         return pd.concat([clean_data, new_metrics]).reset_index()
 
@@ -157,7 +154,7 @@ def extract(config: ExtractConfig) -> None:
 
     # output metric data to tifs
     for ma in ma_list:
-        # TODO should output in sections so we don't have memory problems
+        # TODO should output in sections so we don't run into memory problems
         m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)
         a = final[['X','Y',ma]].to_numpy()
         for x,y,md in a[:]:
