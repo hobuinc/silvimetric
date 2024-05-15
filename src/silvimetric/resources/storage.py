@@ -180,6 +180,7 @@ class Storage:
         # if no attributes are set in the metric, use all
         return [m.entry_name(a.name) for m in self.config.metrics
                 for a in self.config.attrs if not m.attributes or a in m.attributes]
+
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
         """
@@ -208,6 +209,7 @@ class Storage:
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
 
+        # return tdb
         try:
             yield tdb
         finally:
@@ -320,16 +322,13 @@ class Storage:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
-            r.close()
 
         self.config.log.debug('Deleting fragments...')
         with self.open('m', (proc_num, proc_num)) as m:
             m.delete_fragments(proc_num, proc_num)
-            m.close()
         self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
-            w.close()
         return sh_cfg
 
     def consolidate_shatter(self, proc_num: int, retries=0) -> None:

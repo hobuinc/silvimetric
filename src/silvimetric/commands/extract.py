@@ -128,8 +128,6 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
 
         storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
         new_metrics = get_metrics(redo_data.reset_index(), storage)
-        tdb.close()
-
     return pd.concat([clean_data, new_metrics]).reset_index()
 
 def extract(config: ExtractConfig) -> None:
