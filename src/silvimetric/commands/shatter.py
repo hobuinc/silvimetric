@@ -75,8 +75,6 @@ def agg_list(df: pd.DataFrame, att_dict: dict[str, Attribute]):
     """
     Make variable-length point data attributes into lists
     """
-    # TODO get pandas extensions working so that we can write directly
-    # to tiledb
     if df is None:
         return None
     # grouped = df.groupby(['xi','yi'])
