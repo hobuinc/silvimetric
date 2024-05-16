@@ -71,34 +71,19 @@ def get_metrics(data_in, storage: Storage):
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
-def agg_list(df: pd.DataFrame, att_dict: dict[str, Attribute]):
+def agg_list(df: pd.DataFrame):
     """
     Make variable-length point data attributes into lists
     """
     if df is None:
         return None
-    # grouped = df.groupby(['xi','yi'])
 
-    def make_arr(data):
-        # val = np.array(data, data.dtype)
-        return data.apply(np.array)
-        # return [ data.to_numpy() ]
-        # return val
-        # v =  AttributeArray(arrays=data, dtype=AttributeDtype(data.dtype))
-        # return v
-
-    # cols = {c: lambda x: AttributeArray(x, AttributeDtype(x.dtype)) for c in df if c not in ['xi','yi']}
-
-    # grouped = grouped.agg(make_arr)
-    # a = df.set_index(['xi','yi']).agg(np.array)
-    # a = a.reset_index()
-    a = df.groupby(['xi','yi']).agg(list).agg(lambda x: x.apply(np.array))
-
-    # a = a.agg(make_arr)
+    # coerce datatypes to object so we can store np arrays as cell values
+    old_dtypes = df.dtypes
+    new_dtypes = {a: np.dtype('O') for a in df.columns if a not in ['xi','yi']} | {'xi': np.float64, 'yi': np.float64}
+    df = df.astype(new_dtypes)
+    a = df.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
     return a.assign(count=lambda x: [len(z) for z in a.Z])
-
-
-    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
 def join(list_data, metric_data):
     """
@@ -117,7 +102,6 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    # TODO get this working at some point. Look at pandas extensions
     data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
 
@@ -132,21 +116,6 @@ def write(data_in, storage, timestamp):
         dataframe=data_in, mode='append', timestamp=timestamp,
         column_types=dtype_dict, varlen_types=varlen_types)
 
-        # tiledb.from_pandas(
-        #     uri, df, column_types={"data": data_dtype}, varlen_types={data_dtype}
-        # )
-    # if data_in is None or data_in.empty:
-    #     return 0
-
-    # with storage.open('w', timestamp=timestamp) as tdb:
-    #     idf = data_in.index.to_frame()
-
-    #     dx = idf['xi'].to_list()
-    #     dy = idf['yi'].to_list()
-    #     dt = lambda a: tdb.schema.attr(a).dtype
-    #     dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
-
-    #     tdb[dx,dy] = dd
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
 
@@ -159,7 +128,6 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
 
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in config.attrs]
-    attr_dict = {f'{a.name}': a for a in config.attrs }
     timestamp = (config.time_slot, config.time_slot)
 
     # remove any extents that have already been donem, only skip if full overlap
@@ -172,7 +140,7 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(get_metrics, storage)
-    lists: db.Bag = arranged.map(agg_list, attr_dict)
+    lists: db.Bag = arranged.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
