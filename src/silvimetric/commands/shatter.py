@@ -6,13 +6,14 @@ import datetime
 import copy
 from typing import Generator
 import pandas as pd
+import tiledb
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
 
-from .. import Extents, Storage, Data, ShatterConfig
+from .. import Extents, Storage, Data, ShatterConfig, AttributeArray, Attribute, AttributeDtype
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
@@ -54,7 +55,6 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     return points
 
-
 def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
@@ -71,15 +71,35 @@ def get_metrics(data_in, storage: Storage):
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
-def agg_list(df: pd.DataFrame):
+def agg_list(df: pd.DataFrame, att_dict: dict[str, Attribute]):
     """
     Make variable-length point data attributes into lists
     """
+    # TODO get pandas extensions working so that we can write directly
+    # to tiledb
     if df is None:
         return None
-    grouped = df.groupby(['xi','yi'])
-    grouped = grouped.agg(list)
-    return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    # grouped = df.groupby(['xi','yi'])
+
+    def make_arr(data):
+        val = np.fromiter([*[np.array(nd, data.dtype) for nd in data], None], object)[:-1]
+        # val = np.array(data, data.dtype)
+        return val
+        # v =  AttributeArray(arrays=data, dtype=AttributeDtype(data.dtype))
+        # return v
+
+    # cols = {c: lambda x: AttributeArray(x, AttributeDtype(x.dtype)) for c in df if c not in ['xi','yi']}
+
+    # grouped = grouped.agg(make_arr)
+    # a = df.set_index(['xi','yi']).agg(np.array)
+    # a = a.reset_index()
+    a = df.groupby(['xi','yi']).agg(make_arr)
+
+    # a = a.agg(make_arr)
+    return a.assign(count=lambda x: [len(z) for z in a.Z])
+
+
+    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
 def join(list_data, metric_data):
     """
@@ -99,26 +119,39 @@ def write(data_in, storage, timestamp):
     """
 
     # TODO get this working at some point. Look at pandas extensions
-    # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+    data_in = data_in.reset_index()
+    data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+    attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
+    xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
+    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
 
-    # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
-    #         column_types=dict(data_in.dtypes),
-    #         varlen_types=[np.dtype('O')])
+    dtype_dict = attr_dict | xy_dict | metr_dict
+    varlen_types = {a.dtype for a in storage.config.attrs}
 
-    if data_in is None or data_in.empty:
-        return 0
+    try:
+        tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
+            dataframe=data_in, mode='append',
+            column_types=dtype_dict, varlen_types=varlen_types)
+    except Exception as e:
+        print(e)
 
-    with storage.open('w', timestamp=timestamp) as tdb:
-        idf = data_in.index.to_frame()
+        # tiledb.from_pandas(
+        #     uri, df, column_types={"data": data_dtype}, varlen_types={data_dtype}
+        # )
+    # if data_in is None or data_in.empty:
+    #     return 0
 
-        dx = idf['xi'].to_list()
-        dy = idf['yi'].to_list()
-        dt = lambda a: tdb.schema.attr(a).dtype
-        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+    # with storage.open('w', timestamp=timestamp) as tdb:
+    #     idf = data_in.index.to_frame()
 
-        tdb[dx,dy] = dd
-        pc = dd['count'].sum().item()
-        p = copy.deepcopy(pc)
+    #     dx = idf['xi'].to_list()
+    #     dy = idf['yi'].to_list()
+    #     dt = lambda a: tdb.schema.attr(a).dtype
+    #     dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+
+    #     tdb[dx,dy] = dd
+    pc = data_in['count'].sum().item()
+    p = copy.deepcopy(pc)
 
     del pc, data_in
     return p
@@ -129,6 +162,7 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
 
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in config.attrs]
+    attr_dict = {f'{a.name}': a for a in config.attrs }
     timestamp = (config.time_slot, config.time_slot)
 
     # remove any extents that have already been donem, only skip if full overlap
@@ -141,7 +175,7 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(get_metrics, storage)
-    lists: db.Bag = arranged.map(agg_list)
+    lists: db.Bag = arranged.map(agg_list, attr_dict)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
