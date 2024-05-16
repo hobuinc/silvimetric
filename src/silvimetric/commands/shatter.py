@@ -82,9 +82,10 @@ def agg_list(df: pd.DataFrame, att_dict: dict[str, Attribute]):
     # grouped = df.groupby(['xi','yi'])
 
     def make_arr(data):
-        val = np.fromiter([*[np.array(nd, data.dtype) for nd in data], None], object)[:-1]
         # val = np.array(data, data.dtype)
-        return val
+        return data.apply(np.array)
+        # return [ data.to_numpy() ]
+        # return val
         # v =  AttributeArray(arrays=data, dtype=AttributeDtype(data.dtype))
         # return v
 
@@ -93,7 +94,7 @@ def agg_list(df: pd.DataFrame, att_dict: dict[str, Attribute]):
     # grouped = grouped.agg(make_arr)
     # a = df.set_index(['xi','yi']).agg(np.array)
     # a = a.reset_index()
-    a = df.groupby(['xi','yi']).agg(make_arr)
+    a = df.groupby(['xi','yi']).agg(list).agg(lambda x: x.apply(np.array))
 
     # a = a.agg(make_arr)
     return a.assign(count=lambda x: [len(z) for z in a.Z])
@@ -121,19 +122,17 @@ def write(data_in, storage, timestamp):
     # TODO get this working at some point. Look at pandas extensions
     data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
     xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
     metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
-
     dtype_dict = attr_dict | xy_dict | metr_dict
+
     varlen_types = {a.dtype for a in storage.config.attrs}
 
-    try:
-        tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
-            dataframe=data_in, mode='append',
-            column_types=dtype_dict, varlen_types=varlen_types)
-    except Exception as e:
-        print(e)
+    tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
+        dataframe=data_in, mode='append', timestamp=timestamp,
+        column_types=dtype_dict, varlen_types=varlen_types)
 
         # tiledb.from_pandas(
         #     uri, df, column_types={"data": data_dtype}, varlen_types={data_dtype}

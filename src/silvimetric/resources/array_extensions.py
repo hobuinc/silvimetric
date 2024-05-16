@@ -10,12 +10,14 @@ import pandas as pd
 @pd.api.extensions.register_extension_dtype
 class AttributeDtype(pd.api.extensions.ExtensionDtype):
     type = np.generic
-    # na_value = None
 
     def __init__(self, subtype=np.float32):
         self._subtype = np.dtype(subtype)
 
     def __str__(self) -> str:
+        return f'Attribute[{self.subtype}]'
+
+    def __repr__(self) -> str:
         return f'Attribute[{self.subtype}]'
 
     # TestDtypeTests
@@ -26,7 +28,6 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
     @property
     def subtype(self):
         return self._subtype
-
 
     @property
     def name(self):
