@@ -4,6 +4,8 @@ import pdal
 from abc import ABC, abstractmethod
 from tiledb import Attr
 
+from .array_extensions import AttributeArray, AttributeDtype
+
 class Entry(ABC):
     """Base class for Attribute and Metric. These represent entries into the
     database."""
@@ -50,8 +52,11 @@ class Attribute(Entry):
         super().__init__()
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype = dtype
+        self.dtype = AttributeDtype(subtype=dtype)
         """Numpy data type."""
+
+    def make_array(self, data, copy=False):
+        return AttributeArray(data=data, copy=copy)
 
     def entry_name(self) -> str:
         """Return TileDB attribute name."""
@@ -62,12 +67,12 @@ class Attribute(Entry):
         Create the tiledb schema for this attribute.
         :return: TileDB attribute schema
         """
-        return Attr(name=self.name, dtype=self.dtype, var=True)
+        return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
 
     def to_json(self) -> object:
         return {
             'name': self.name,
-            'dtype': np.dtype(self.dtype).str
+            'dtype': np.dtype(self.dtype.subtype).str
         }
 
     @staticmethod

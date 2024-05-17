@@ -8,6 +8,7 @@ from .resources.log import Log
 from .resources.data import Data
 from .resources.entry import Attribute, Pdal_Attributes, Attributes
 from .resources.config import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from .resources.array_extensions import AttributeArray, AttributeDtype
 
 from .commands.shatter import shatter
 from .commands.extract import extract
