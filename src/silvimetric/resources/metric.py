@@ -159,6 +159,10 @@ class Metric(Entry):
         j = json.loads(data)
         return Metric.from_dict(j)
 
+    def from_string(data: str):
+        j = json.loads(data)
+        return Metric.from_dict(j)
+
     def __eq__(self, other):
         return (self.name == other.name and
                 self.dtype == other.dtype and

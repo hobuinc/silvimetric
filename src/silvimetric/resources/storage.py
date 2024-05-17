@@ -180,6 +180,7 @@ class Storage:
         # if no attributes are set in the metric, use all
         return [m.entry_name(a.name) for m in self.config.metrics
                 for a in self.config.attrs if not m.attributes or a in m.attributes]
+
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
         """
@@ -193,6 +194,10 @@ class Storage:
         :raises Exception: Path does not exist.
         :yield: TileDB array context manager.
         """
+
+        # tiledb and dask have bad interaction with opening an array if
+        # other threads present
+
         if tiledb.object_type(self.config.tdb_dir) == "array":
             if mode in ['w', 'r', 'd', 'm']:
                 tdb = tiledb.open(self.config.tdb_dir, mode, timestamp=timestamp)
@@ -200,10 +205,11 @@ class Storage:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
             raise Exception(f"Path {self.config.tdb_dir} already exists and is not" +
-                            " initialized for TileDB access.")
+                    " initialized for TileDB access.")
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
 
+        # return tdb
         try:
             yield tdb
         finally:
