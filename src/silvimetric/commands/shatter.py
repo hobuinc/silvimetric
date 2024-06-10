@@ -99,7 +99,6 @@ def join(list_data, metric_data):
     return list_data.join([m for m in metric_data])
 
 def write(data_in, storage, timestamp):
-def write(data_in, storage, timestamp):
     """
     Write cell data to database
 
@@ -152,29 +151,6 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
 
     return writes
 
-def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db.Bag:
-    """ Create dask bags and the order of operations.  """
-
-    ## Handle dask bag transitions through work states
-    attrs = [a.name for a in config.attrs]
-    timestamp = (config.time_slot, config.time_slot)
-
-    # remove any extents that have already been donem, only skip if full overlap
-    leaf_bag: db.Bag = db.from_sequence(leaves)
-    if config.mbr:
-        def mbr_filter(one: Extents):
-            return all(one.disjoint_by_mbr(m) for m in config.mbr)
-        leaf_bag = leaf_bag.filter(mbr_filter)
-
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, storage)
-    lists: db.Bag = arranged.map(agg_list)
-    joined: db.Bag = lists.map(join, metrics)
-    writes: db.Bag = joined.map(write, storage, timestamp)
-
-    return writes
-
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
@@ -204,19 +180,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     signal.signal(signal.SIGINT, kill_gracefully)
 
     processes = get_processes(leaves, config, storage)
-    processes = get_processes(leaves, config, storage)
 
-    ## If dask is distributed, use the futures feature
-    dc = dask.config.get('distributed.client')
-    if isinstance(dc, dask.distributed.Client):
-        pc_futures = futures_of(processes.persist())
-        for batch in as_completed(pc_futures, with_results=True).batches():
-            for future, pack in batch:
-                if isinstance(pack, CancelledError):
-                    continue
-                for pc in pack:
-                    config.point_count = config.point_count + pc
-                    del pc
     ## If dask is distributed, use the futures feature
     dc = dask.config.get('distributed.client')
     if isinstance(dc, dask.distributed.Client):
@@ -232,13 +196,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        config.finished = True
 
-    ## Handle non-distributed dask scenarios
-    else:
-        config.point_count = sum(processes)
     ## Handle non-distributed dask scenarios
     else:
         config.point_count = sum(processes)
