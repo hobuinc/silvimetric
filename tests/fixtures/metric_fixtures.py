@@ -8,7 +8,10 @@ from silvimetric import Log, StorageConfig, ShatterConfig, Storage, Data, Bounds
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
-def autzen_storage(tdb_filepath):
+def autzen_storage(tmp_path_factory):
+    path = tmp_path_factory.mktemp("test_tdb")
+    p = os.path.abspath(path)
+
     srs = """PROJCS[\"NAD83 / Oregon GIC Lambert (ft)\",
 GEOGCS[\"NAD83\",DATUM[\"North_American_Datum_1983\",SPHEROID[\"GRS 1980\",
 6378137,298.257222101,AUTHORITY[\"EPSG\",\"7019\"]],AUTHORITY[\"EPSG\",\"6269\"]],
@@ -21,7 +24,7 @@ PROJECTION[\"Lambert_Conformal_Conic_2SP\"],PARAMETER[\"latitude_of_origin\",
 AUTHORITY[\"EPSG\",\"9002\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],
 AUTHORITY[\"EPSG\",\"2992\"]]"""
     b = Bounds(635579.2,848884.83,639003.73,853536.21)
-    sc = StorageConfig(b, srs, 10, tdb_dir=tdb_filepath)
+    sc = StorageConfig(b, srs, 10, tdb_dir=p)
     Storage.create(sc)
     yield sc
 
@@ -37,8 +40,8 @@ def metric_data(autzen_data):
     points = p.get_dataframe(0)
     points.loc[:, 'xi'] = np.floor(points.xi)
     points.loc[:, 'yi'] = np.ceil(points.yi)
-    points = points.loc[points.xi == 21175.0]
-    points = points.loc[points.yi == -28432.0]
+    points = points.loc[points.xi == 1]
+    points = points.loc[points.yi == 437]
     yield points[['Z', 'xi', 'yi']]
 
 @pytest.fixture(scope='function')

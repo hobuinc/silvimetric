@@ -414,7 +414,7 @@ Metrics = {
     'l2' : Metric('l2', np.float32, m_l2),
     'l3' : Metric('l3', np.float32, m_l3),
     'l4' : Metric('l4', np.float32, m_l4),
-    'lcv' : Metric('iq', np.float32, m_lcv),
+    'lcv' : Metric('lcv', np.float32, m_lcv),
     'lskewness' : Metric('lskewness', np.float32, m_lskewness),
     'lkurtosis' : Metric('lkurtosis', np.float32, m_lkurtosis),
     '90m10' : Metric('90m10', np.float32, m_90m10),

@@ -9,7 +9,7 @@ class TestMetrics():
         for mname in Metrics:
             m: Metric = Metrics[mname]
             d = m.do(metric_data)
-            assert(isinstance(d, pd.DataFrame))
+            assert isinstance(d, pd.DataFrame), f"Metric {mname} failed to make a dataframe. Data created: {d}"
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):
