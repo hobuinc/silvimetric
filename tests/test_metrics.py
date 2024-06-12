@@ -1,8 +1,16 @@
 import numpy as np
+import pandas as pd
 
-from silvimetric import shatter, Storage
+from silvimetric import shatter, Storage, Metrics, Metric
 
 class TestMetrics():
+
+    def test_metrics(self, metric_data):
+        for mname in Metrics:
+            m: Metric = Metrics[mname]
+            d = m.do(metric_data)
+            assert(isinstance(d, pd.DataFrame))
+
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):
 

@@ -1,5 +1,6 @@
 import json
 import numpy as np
+from scipy import stats
 from typing import Callable, Optional, Any, Union, List
 from inspect import getsource
 from tiledb import Attr
@@ -8,12 +9,8 @@ import base64
 import dill
 import pandas as pd
 
-<<<<<<< HEAD
-from .entry import Attribute, Entry
-from .lmom4 import lmom4
-=======
 from .entry import Attribute, Entry, Attributes
->>>>>>> main
+from .lmom4 import lmom4
 
 MetricFn = Callable[[np.ndarray], np.ndarray]
 FilterFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
@@ -237,7 +234,9 @@ def m_madmean(data):
     return stats.median_abs_deviation(data, center=np.mean)
 
 def m_madmode(data):
-    return stats.median_abs_deviation(data, center=stats.mode)
+    def mode_center(data, axis):
+        return stats.mode(data, axis=axis).mode
+    return stats.median_abs_deviation(data, center=mode_center)
 
 # TODO test various methods for interpolation=... for all percentile-related metrics
 # I think the default matches FUSION method but need to test
@@ -253,7 +252,7 @@ def m_95m05(data):
     return p[1] - p[0]
 
 def m_crr(data):
-    return (np.mean(data) - np.min(data)) / (np.max(data) - np-min(data))
+    return (np.mean(data) - np.min(data)) / (np.max(data) - np.min(data))
 
 def m_sqmean(data):
     return np.sqrt(np.mean(np.square(data)))
@@ -289,15 +288,24 @@ def m_l4(data):
 
 def m_lcv(data):
     l = lmom4(data)
-    return l[1] / l[0]
+    try:
+        return l[1] / l[0]
+    except ZeroDivisionError as e:
+        return np.nan
 
 def m_lskewness(data):
     l = lmom4(data)
-    return l[2] / l[1]
+    try:
+        return l[2] / l[1]
+    except ZeroDivisionError as e:
+        return np.nan
 
 def m_lkurtosis(data):
     l = lmom4(data)
-    return l[3] / l[1]
+    try:
+        return l[3] / l[1]
+    except ZeroDivisionError as e:
+        return np.nan
 
 # not sure how an array of metrics can be ingested by shatter
 # so do these as 15 separate metrics. may be slower than doing all in one call
@@ -355,7 +363,7 @@ def m_profilearea(data):
         return -9999.0
 
 
-    p = np.percentile(data, range(1, 99))
+    p = np.percentile(data, range(1, 100))
     p0 = max(np.min(data), 0.0)
 
     # second sanity check...99th percentile must be > 0
@@ -376,6 +384,7 @@ def m_profilearea(data):
 def m_cover(data):
     threshold = 2
     return (data > threshold).sum() / len(data)
+
 def f_2plus(data):
     return data[data['HeightAboveGround'] > 2]
 

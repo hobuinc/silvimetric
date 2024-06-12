@@ -6,11 +6,12 @@ import numpy as np
 #   Water Resour. Res., 29, 1745–1752, https://doi.org/10.1029/93WR00341, 1993.
 def lmom4(data):
     # lmom4 returns the first four L-moments of data
-    # data is the 1-d array    
+    # data is the 1-d array
     # n is the total number of points in data, j is the j_th point
     #
     # j range in for loops starts with 1 so we need to subtract 1 for all b# equations
 
+    data = data.values
     n = len(data)
     # sort in descending order
     data = np.sort(data.reshape(n))[::-1]
