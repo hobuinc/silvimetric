@@ -50,7 +50,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    tif.GetRasterBand(1).SetNoDataValue(-9999)
+    tif.GetRasterBand(1).SetNoDataValue(np.nan)
     tif.FlushCache()
     tif = None
 
@@ -128,7 +128,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
 
         storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
         new_metrics = get_metrics(redo_data.reset_index(), storage)
-        return pd.concat([clean_data, new_metrics]).reset_index()
+    return pd.concat([clean_data, new_metrics]).reset_index()
 
 def extract(config: ExtractConfig) -> None:
     """

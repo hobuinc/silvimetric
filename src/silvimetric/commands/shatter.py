@@ -1,3 +1,5 @@
+import dask.diagnostics
+import dask.distributed
 import numpy as np
 import signal
 import datetime
@@ -7,14 +9,11 @@ import pandas as pd
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
-from dask.diagnostics import ProgressBar
 import dask.array as da
 import dask.bag as db
-from line_profiler import profile
 
 from .. import Extents, Storage, Data, ShatterConfig
 
-@profile
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
     Execute pipeline and retrieve point cloud data for this extent
@@ -24,13 +23,11 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     :param storage: :class:`silvimetric.resources.storage.Storage` database object.
     :return: Point data array from PDAL.
     """
-    #TODO look at making a record array here
     data = Data(filename, storage.config, bounds = extents.bounds)
     p = data.pipeline
     data.execute()
     return p.get_dataframe(0)
 
-@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     """
     Arrange data to fit key-value TileDB input format.
@@ -58,24 +55,22 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     return points
 
 
-@profile
 def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
     """
-    if data_in is None:
-        return None
-
     # TODO dependencies on other metrics:
     # - Iterate through metrics and figure out which ones are being used as
     #   dependencies
     # - Remove those from the list and run them first
     # - Then pass them to the metrics that require them as we get there?
 
+    if data_in is None:
+        return None
+
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
-@profile
 def agg_list(df: pd.DataFrame):
     """
     Make variable-length point data attributes into lists
@@ -86,7 +81,6 @@ def agg_list(df: pd.DataFrame):
     grouped = grouped.agg(list)
     return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
-@profile
 def join(list_data, metric_data):
     """
     Join the list data and metric DataFrames together
@@ -95,8 +89,7 @@ def join(list_data, metric_data):
         return None
     return list_data.join([m for m in metric_data])
 
-@profile
-def write(data_in, tdb):
+def write(data_in, storage, timestamp):
     """
     Write cell data to database
 
@@ -104,8 +97,6 @@ def write(data_in, tdb):
     :param tdb: TileDB write stream.
     :return: Number of points written.
     """
-    if data_in is None or data_in.empty:
-        return 0
 
     # TODO get this working at some point. Look at pandas extensions
     # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
@@ -114,20 +105,48 @@ def write(data_in, tdb):
     #         column_types=dict(data_in.dtypes),
     #         varlen_types=[np.dtype('O')])
 
-    idf = data_in.index.to_frame()
+    if data_in is None or data_in.empty:
+        return 0
 
-    dx = idf['xi'].to_list()
-    dy = idf['yi'].to_list()
-    dt = lambda a: tdb.schema.attr(a).dtype
-    dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+    with storage.open('w', timestamp=timestamp) as tdb:
+        idf = data_in.index.to_frame()
 
-    tdb[dx,dy] = dd
-    pc = dd['count'].sum().item()
-    p = copy.deepcopy(pc)
+        dx = idf['xi'].to_list()
+        dy = idf['yi'].to_list()
+        dt = lambda a: tdb.schema.attr(a).dtype
+        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
+
+        tdb[dx,dy] = dd
+        pc = dd['count'].sum().item()
+        p = copy.deepcopy(pc)
+
     del pc, data_in
     return p
 
 Leaves = Generator[Extents, None, None]
+def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db.Bag:
+    """ Create dask bags and the order of operations.  """
+
+    ## Handle dask bag transitions through work states
+    attrs = [a.name for a in config.attrs]
+    timestamp = (config.time_slot, config.time_slot)
+
+    # remove any extents that have already been donem, only skip if full overlap
+    leaf_bag: db.Bag = db.from_sequence(leaves)
+    if config.mbr:
+        def mbr_filter(one: Extents):
+            return all(one.disjoint_by_mbr(m) for m in config.mbr)
+        leaf_bag = leaf_bag.filter(mbr_filter)
+
+    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
+    metrics: db.Bag = arranged.map(get_metrics, storage)
+    lists: db.Bag = arranged.map(agg_list)
+    joined: db.Bag = lists.map(join, metrics)
+    writes: db.Bag = joined.map(write, storage, timestamp)
+
+    return writes
+
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
@@ -156,44 +175,27 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
+    processes = get_processes(leaves, config, storage)
 
-    ## Handle dask bag transitions through work states
-    attrs = [a.name for a in config.attrs]
-    timestamp = (config.time_slot, config.time_slot)
+    ## If dask is distributed, use the futures feature
+    dc = dask.config.get('distributed.client')
+    if isinstance(dc, dask.distributed.Client):
+        pc_futures = futures_of(processes.persist())
+        for batch in as_completed(pc_futures, with_results=True).batches():
+            for future, pack in batch:
+                if isinstance(pack, CancelledError):
+                    continue
+                for pc in pack:
+                    config.point_count = config.point_count + pc
+                    del pc
 
-    with storage.open('w', timestamp=timestamp) as tdb:
-        leaf_bag: db.Bag = db.from_sequence(leaves)
-        if config.mbr:
-            def mbr_filter(one: Extents):
-                return all(one.disjoint_by_mbr(m) for m in config.mbr)
-            leaf_bag = leaf_bag.filter(mbr_filter)
+        end_time = datetime.datetime.now().timestamp() * 1000
+        config.end_time = end_time
+        config.finished = True
 
-        points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-        arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-        metrics: db.Bag = arranged.map(get_metrics, storage)
-        lists: db.Bag = arranged.map(agg_list)
-        joined: db.Bag = lists.map(join, metrics)
-        writes: db.Bag = joined.map(write, tdb)
-
-        ## If dask is distributed, use the futures feature
-        dc = dask.config.get('distributed.client')
-        if isinstance(dc, dask.distributed.Client):
-            pc_futures = futures_of(writes.persist())
-            for batch in as_completed(pc_futures, with_results=True).batches():
-                for future, pack in batch:
-                    if isinstance(pack, CancelledError):
-                        continue
-                    for pc in pack:
-                        config.point_count = config.point_count + pc
-                        del pc
-
-            end_time = datetime.datetime.now().timestamp() * 1000
-            config.end_time = end_time
-            config.finished = True
-
-        ## Handle non-distributed dask scenarios
-        else:
-            config.point_count = sum(writes)
+    ## Handle non-distributed dask scenarios
+    else:
+        config.point_count = sum(processes)
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)
@@ -203,7 +205,6 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     storage.saveMetadata('shatter', str(config), config.time_slot)
     return config.point_count
-
 
 def shatter(config: ShatterConfig) -> int:
     """
