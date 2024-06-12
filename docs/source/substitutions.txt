@@ -13,3 +13,4 @@
 .. |CondaForge| replace:: `Conda Forge <https://conda-forge.org/docs/>`__
 .. |S3| replace:: `S3 <https://aws.amazon.com/pm/serv-s3/>`__
 .. |FUSION| replace:: `FUSION <http://forsys.sefs.uw.edu/fusion/fusionlatest.html>`__
+.. |Click| replace:: `Click <https://click.palletsprojects.com/en/8.1.x/>`__
