@@ -8,7 +8,7 @@ from silvimetric import Log, StorageConfig, ShatterConfig, Storage, Data, Bounds
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
-def autzen_storage(tmp_path_factory):
+def autzen_storage(tmp_path_factory: pytest.TempPathFactory) -> Generator[StorageConfig, os.Any, None]:
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
 
@@ -29,12 +29,12 @@ AUTHORITY[\"EPSG\",\"2992\"]]"""
     yield sc
 
 @pytest.fixture(scope='function')
-def autzen_data(autzen_filepath, autzen_storage) -> Generator[Data, None, None]:
+def autzen_data(autzen_filepath: str, autzen_storage: StorageConfig) -> Generator[Data, None, None]:
     d = Data(autzen_filepath, autzen_storage)
     yield d
 
 @pytest.fixture(scope='function')
-def metric_data(autzen_data):
+def metric_data(autzen_data: Data) -> Generator[pd.DataFrame, None, None]:
     p = autzen_data.pipeline
     autzen_data.execute()
     points = p.get_dataframe(0)

@@ -42,15 +42,15 @@ class Entry(ABC):
         raise NotImplementedError
 
 
-class Attribute(Entry):
+class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
-    def __init__(self, name: str, dtype: np.dtype):
+    def __init__(self, name: str, dtype: np.dtype) -> None:
         super().__init__()
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype = dtype
+        self.dtype =  dtype
         """Numpy data type."""
 
     def entry_name(self) -> str:
@@ -71,7 +71,7 @@ class Attribute(Entry):
         }
 
     @staticmethod
-    def from_dict(data: dict):
+    def from_dict(data: dict) -> "Attribute":
         """
         Make an Attribute from a JSON like object
         """
@@ -80,7 +80,7 @@ class Attribute(Entry):
         return Attribute(name, dtype)
 
     @staticmethod
-    def from_string(data: str):
+    def from_string(data: str) -> "Attribute":
         """
         Create Attribute from string or dict version of it.
 
@@ -92,7 +92,7 @@ class Attribute(Entry):
         return Attribute.from_dict(j)
 
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return json.dumps(self.to_json())
 
 # A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html

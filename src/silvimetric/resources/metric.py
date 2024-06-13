@@ -9,15 +9,15 @@ import base64
 import dill
 import pandas as pd
 
-from .entry import Attribute, Entry, Attributes
+from .entry import Attribute
 from .lmom4 import lmom4
 
-MetricFn = Callable[[np.ndarray], np.ndarray]
-FilterFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
+MetricFn = Callable[[pd.DataFrame], pd.DataFrame]
+FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
-class Metric(Entry):
+class Metric():
     """
     A Metric is an Entry representing derived cell data. There is a base set of
     metrics available through Silvimetric, or you can create your own. A Metric
@@ -25,8 +25,8 @@ class Metric(Entry):
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Entry]=[], filters: List[FilterFn]=[],
-            attributes: List[Attribute]=[]):
+            dependencies: list[Attribute | "Metric"]=[], filters: List[FilterFn]=[],
+            attributes: List[Attribute]=[]) -> None:
 
         super().__init__()
         self.name = name
@@ -43,7 +43,7 @@ class Metric(Entry):
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
 
-    def schema(self, attr: Attribute):
+    def schema(self, attr: Attribute) -> Any:
         """
         Create schema for TileDB creation.
 
@@ -128,7 +128,7 @@ class Metric(Entry):
         }
 
     @staticmethod
-    def from_dict(data: dict):
+    def from_dict(data: dict) -> "Metric":
         name = data['name']
         dtype = np.dtype(data['dtype'])
         method = dill.loads(base64.b64decode(data['method'].encode()))
@@ -157,15 +157,15 @@ class Metric(Entry):
         return Metric(name, dtype, method, dependencies, filters, attributes)
 
     @staticmethod
-    def from_string(data: str):
+    def from_string(data: str) -> "Metric":
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def from_string(data: str):
+    def from_string(data: str) -> "Metric":
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> tuple:
         return (self.name == other.name and
                 self.dtype == other.dtype and
                 self.dependencies == other.dependencies and
@@ -390,7 +390,7 @@ def f_2plus(data):
 
 #TODO change to correct dtype
 #TODO not sure what to do with percentiles since it is an array of values instead of a single value
-Metrics = {
+Metrics: dict[str, Metric] = {
     'mean' : Metric('mean', np.float32, m_mean),
     'mode' : Metric('mode', np.float32, m_mode),
     'median' : Metric('median', np.float32, m_median),

@@ -22,7 +22,7 @@ class BoundsParamType(click.ParamType):
 class CRSParamType(click.ParamType):
     name = "CRS"
 
-    def convert(self, value, param, ctx):
+    def convert(self, value, param, ctx) -> pyproj.CRS:
         try:
             crs = pyproj.CRS.from_user_input(value)
             return crs
@@ -77,7 +77,7 @@ class MetricParamType(click.ParamType):
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 
 def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
-        watch: bool, log: Log):
+        watch: bool, log: Log) -> None:
     dask_config = { }
 
     if dasktype == 'threads':
@@ -117,7 +117,7 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
 
     dask.config.set(dask_config)
 
-def close_dask():
+def close_dask() -> None:
     client = dask.config.get('distributed.client')
     if isinstance(client, Client):
         client.close()

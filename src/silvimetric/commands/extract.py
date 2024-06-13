@@ -54,7 +54,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.FlushCache()
     tif = None
 
-def get_metrics(data_in: pd.DataFrame, storage: Storage):
+def get_metrics(data_in: pd.DataFrame, storage: Storage) -> None | pd.DataFrame:
     """
     Reruns a metric over this cell. Only called if there is overlapping data.
 
