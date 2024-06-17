@@ -12,7 +12,9 @@ SilviMetric is an open source library and set of utilities from
 data into raster and raster-like products.
 
 Find out more about SilviMetric by visiting :ref:`about`. A slide deck about
-SilviMetric is also available on `Google Slides <https://docs.google.com/presentation/d/1E561EgWwLgN5R9P0LBxuI1r7kG155u8E6-MOWpkycSM/edit?usp=sharing>`__.
+SilviMetric is also available on `Google Slides <https://docs.google.com/presentation/d/1E561EgWwLgN5R9P0LBxuI1r7kG155u8E6-MOWpkycSM/edit?usp=sharing>`__,
+and examples are available for viewing in `Google Colab <https://colab.research.google.com/drive/1u3Qdq3Fdy2du36WG823rKVlQtBL8eK0g#scrollTo=kY0ikB6JQ2G7>`__.
+
 
 .. toctree::
    :caption: Contents
