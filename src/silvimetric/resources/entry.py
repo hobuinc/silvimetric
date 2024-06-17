@@ -4,58 +4,27 @@ import pdal
 from abc import ABC, abstractmethod
 from tiledb import Attr
 
-class Entry(ABC):
-    """Base class for Attribute and Metric. These represent entries into the
-    database."""
-
-    def __eq__(self, other):
-        return self.name == other.name and \
-            self.dtype == other.dtype
-
-    @abstractmethod
-    def entry_name(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def schema(self) -> Attr:
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_json(self) -> object:
-        raise NotImplementedError
-
-    def toJSON(self) -> object:
-        return self.to_json()
-
-    @staticmethod
-    @abstractmethod
-    def from_dict(data: dict):
-        raise NotImplementedError
-
-    @staticmethod
-    @abstractmethod
-    def from_string(data: str):
-        raise NotImplementedError
-
-    @abstractmethod
-    def __repr__(self):
-        raise NotImplementedError
-
-
 class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
     def __init__(self, name: str, dtype: np.dtype) -> None:
-        super().__init__()
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype =  dtype
-        """Numpy data type."""
+        self.dtype =  np.dtype(dtype).str
+        """Numpy data type str."""
 
     def entry_name(self) -> str:
         """Return TileDB attribute name."""
         return self.name
+
+    def __eq__(self, other):
+        if self.dtype != other.dtype:
+            return False
+        elif self.name != other.name:
+            return False
+        else:
+            return True
 
     def schema(self) -> Attr:
         """
@@ -67,7 +36,7 @@ class Attribute():
     def to_json(self) -> object:
         return {
             'name': self.name,
-            'dtype': np.dtype(self.dtype).str
+            'dtype': self.dtype
         }
 
     @staticmethod

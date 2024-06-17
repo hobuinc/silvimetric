@@ -8,7 +8,7 @@ from silvimetric import Log, StorageConfig, ShatterConfig, Storage, Data, Bounds
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
-def autzen_storage(tmp_path_factory: pytest.TempPathFactory) -> Generator[StorageConfig, os.Any, None]:
+def autzen_storage(tmp_path_factory: pytest.TempPathFactory) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
 

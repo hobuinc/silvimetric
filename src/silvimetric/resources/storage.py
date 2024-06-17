@@ -179,7 +179,8 @@ class Storage:
     def getDerivedNames(self) -> list[str]:
         # if no attributes are set in the metric, use all
         return [m.entry_name(a.name) for m in self.config.metrics
-                for a in self.config.attrs if not m.attributes or a in m.attributes]
+                for a in self.config.attrs if not m.attributes
+                or a.name in [ma.name for ma in m.attributes]]
 
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:

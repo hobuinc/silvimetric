@@ -1,7 +1,7 @@
 import json
 import numpy as np
 from scipy import stats
-from typing import Callable, Optional, Any, Union, List
+from typing import Callable, Optional, Any, Union, List, Self
 from inspect import getsource
 from tiledb import Attr
 import dask
@@ -25,13 +25,12 @@ class Metric():
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Attribute | "Metric"]=[], filters: List[FilterFn]=[],
+            dependencies: list[Union[Attribute | Self]]=[], filters: List[FilterFn]=[],
             attributes: List[Attribute]=[]) -> None:
 
-        super().__init__()
         self.name = name
         """Metric name. eg. mean"""
-        self.dtype = dtype
+        self.dtype = np.dtype(dtype).str
         """Numpy data type."""
         self.dependencies = dependencies
         """Attributes/Metrics this is dependent on."""
@@ -42,6 +41,22 @@ class Metric():
         self.attributes = attributes
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
+
+    def __eq__(self, other):
+        if self.name != other.name:
+            return False
+        elif self.dtype != other.dtype:
+            return False
+        elif self.dependencies != other.dependencies:
+            return False
+        elif self._method != other._method:
+            return False
+        elif self.filters != other.filters:
+            return False
+        elif self.attributes != other.attributes:
+            return False
+        else:
+            return True
 
     def schema(self, attr: Attribute) -> Any:
         """

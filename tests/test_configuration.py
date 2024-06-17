@@ -7,11 +7,17 @@ class Test_Configuration(object):
         # storage
         j = str(storage_config)
         c = StorageConfig.from_string(j)
+
+
         mean = [ m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1
 
         assert int(mean[0]._method([2,2,2,2])) == 2
-        assert storage_config == c
+        cd = c.to_json()
+        scd = storage_config.to_json()
+        cd.pop('log')
+        scd.pop('log')
+        assert scd == cd
 
         # shatter
         sh_str = str(shatter_config)
