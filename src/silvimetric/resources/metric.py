@@ -72,8 +72,9 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def do(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Run metric and filters."""
+    def do(self, data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
+        """Run metric and filters. Use previously run metrics to avoid running
+        the same thing multiple times."""
         idx = ['xi','yi']
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
