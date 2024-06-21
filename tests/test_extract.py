@@ -2,12 +2,12 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 
-from silvimetric import Metrics, ExtractConfig, Extents, Log, extract, Storage
+from silvimetric import grid_metrics, ExtractConfig, Extents, Log, extract, Storage
 
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
     resolution = extract_config.resolution
-    filenames = [Metrics[m.name].entry_name(a.name)
+    filenames = [grid_metrics[m.name].entry_name(a.name)
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
     storage = Storage.from_db(extract_config.tdb_dir)

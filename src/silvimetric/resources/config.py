@@ -13,8 +13,9 @@ from dataclasses import dataclass, field
 
 from .log import Log
 from .extents import Bounds
-from .metric import Metric, Metrics
-from .entry import Attribute, Attributes
+from .metric import Metric
+from .metrics import grid_metrics
+from .attribute import Attribute, Attributes
 from .. import __version__
 
 
@@ -69,12 +70,12 @@ class StorageConfig(Config):
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
-    """List of :class:`silvimetric.resources.entry.Attribute` attributes that
+    """List of :class:`silvimetric.resources.attribute.Attribute` attributes that
     represent point data, defaults to Z, NumberOfReturns, ReturnNumber, Intensity"""
-    metrics: list[Metric] = field(default_factory=lambda: [ Metrics[m]
-                                  for m in Metrics.keys() ])
-    """List of :class:`silvimetric.resources.metric.Metric` Metrics that
-    represent derived data, defaults to values in Metrics object"""
+    metrics: list[Metric] = field(default_factory=lambda: [ grid_metrics[m]
+                                  for m in grid_metrics.keys() ])
+    """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics that
+    represent derived data, defaults to values in grid_metrics object"""
     version: str = __version__
     """Silvimetric version"""
     capacity: int = 1000000
@@ -97,7 +98,7 @@ class StorageConfig(Config):
             self.attrs = [Attributes[a] for a in [ 'Z', 'NumberOfReturns',
                                             'ReturnNumber', 'Intensity' ]]
         if not len(self.metrics):
-            self.metrics = [ Metrics[m] for m in Metrics.keys() ]
+            self.metrics = [ grid_metrics[m] for m in grid_metrics.keys() ]
 
         if not self.crs.is_projected:
             raise Exception(f"Given coordinate system is not a rectilinear projected coordinate system")

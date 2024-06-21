@@ -1,15 +1,33 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, Metrics, Metric
+from silvimetric import shatter, Storage, grid_metrics, Metric
+from silvimetric.resources.metrics import all_metrics as s
 
 class TestMetrics():
 
     def test_metrics(self, metric_data):
-        for mname in Metrics:
-            m: Metric = Metrics[mname]
+        for mname in grid_metrics:
+            m: Metric = grid_metrics[mname]
             d = m.do(metric_data)
             assert isinstance(d, pd.DataFrame), f"Metric {mname} failed to make a dataframe. Data created: {d}"
+
+    def test_dependencies(self, metric_data):
+        from dask import get
+
+        cv = s['cv']
+        mean = s['mean']
+        stddev = s['stddev']
+        median = s['median']
+
+        mean.dependencies = [ median ]
+        stddev.dependencies = [ median ]
+        cv.dependencies = [ mean, stddev ]
+
+        graph = cv.make_graph(metric_data)
+
+        res = get(graph, 'cv')
+        print(res)
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):

@@ -9,8 +9,7 @@ import base64
 import dill
 import pandas as pd
 
-from .entry import Attribute
-from .lmom4 import lmom4
+from .attribute import Attribute
 
 MetricFn = Callable[[pd.DataFrame], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
@@ -19,7 +18,7 @@ FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 ## TODO should create list of metrics as classes that derive from Metric?
 class Metric():
     """
-    A Metric is an Entry representing derived cell data. There is a base set of
+    A Metric is a TileDB entry representing derived cell data. There is a base set of
     metrics available through Silvimetric, or you can create your own. A Metric
     object has all the information necessary to facilitate the derivation of
     data as well as its insertion into the database.
@@ -27,6 +26,8 @@ class Metric():
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
             dependencies: list[Union[Attribute | Self]]=[], filters: List[FilterFn]=[],
             attributes: List[Attribute]=[]) -> None:
+
+        #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
 
         self.name = name
         """Metric name. eg. mean"""
@@ -72,9 +73,11 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def do(self, data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
+    #TODO add kwargs so we can pass arguments to abstract methods
+    def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
         the same thing multiple times."""
+
         idx = ['xi','yi']
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
@@ -86,19 +89,11 @@ class Metric():
         data = self.run_filters(data)
         gb = data.groupby(idx)
 
-        # try:
-        #     idx = ['xi','yi']
-        #     gb = data.groupby(idx)
-        # except Exception as e:
-        #     # coming from extract re-run
-        #     idx = ['X','Y']
-        #     gb = data.groupby(idx)
-
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
 
         new_cols = {
-            c: [(self.entry_name(c), self._method)]
+            c: [(self.entry_name(c, args), self._method)]
             for c in cols if c not in idx
         }
 
@@ -173,13 +168,27 @@ class Metric():
         return Metric(name, dtype, method, dependencies, filters, attributes)
 
     @staticmethod
-    def from_string(data: str) -> "Metric":
+    def from_string(data: str) -> Self:
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def from_string(data: str) -> "Metric":
-        j = json.loads(data)
-        return Metric.from_dict(j)
+    def make_graph(self, df: pd.DataFrame=None):
+        """ Create dict that tells dask how to manage dependencies. """
+        from dask.utils import apply
+
+        # data from other metrics may already have filters applied to them
+        # and will not have new filters applied to them in the current metric
+
+        layers = {
+            self.name: (self.do, 'data', *(d.name for d in self.dependencies))
+        }
+        if df is not None:
+            layers['data'] = df
+
+        for d in self.dependencies:
+            layers = layers | d.make_graph()
+
+        return layers
 
     def __eq__(self, other) -> tuple:
         return (self.name == other.name and
@@ -193,263 +202,4 @@ class Metric():
         return self.do(data)
 
     def __repr__(self) -> str:
-        return json.dumps(self.to_json())
-
-#TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
-
-def m_mean(data):
-    return np.mean(data)
-
-def m_mode(data):
-    u, c = np.unique(data, return_counts=True)
-    i = np.where(c == c.max())
-    v = u[i[0][0]]
-    return v
-
-def m_median(data):
-    return np.median(data)
-
-def m_min(data):
-    return np.min(data)
-
-def m_max(data):
-    return np.max(data)
-
-def m_stddev(data):
-    return np.std(data)
-
-# start of new metrics to match FUSION
-def m_variance(data):
-    return np.var(data)
-
-def m_cv(data):
-    return np.std(data) / np.mean(data)
-
-# TODO check performance of other methods
-def m_abovemean(data):
-    return (data > np.mean(data)).sum() / len(data)
-
-# TODO check performance of other methods
-def m_abovemode(data):
-    return (data > stats.mode(data).mode).sum() / len(data)
-
-def m_skewness(data):
-    return stats.skew(data)
-
-def m_kurtosis(data):
-    return stats.kurtosis(data)
-
-def m_aad(data):
-    m = np.mean(data)
-    return np.mean(np.absolute(data - m))
-
-def m_madmedian(data):
-    return stats.median_abs_deviation(data)
-
-def m_madmean(data):
-    return stats.median_abs_deviation(data, center=np.mean)
-
-def m_madmode(data):
-    def mode_center(data, axis):
-        return stats.mode(data, axis=axis).mode
-    return stats.median_abs_deviation(data, center=mode_center)
-
-# TODO test various methods for interpolation=... for all percentile-related metrics
-# I think the default matches FUSION method but need to test
-def m_iq(data):
-    return stats.iqr(data)
-
-def m_90m10(data):
-    p = np.percentile(data, [10,90])
-    return p[1] - p[0]
-
-def m_95m05(data):
-    p = np.percentile(data, [5,95])
-    return p[1] - p[0]
-
-def m_crr(data):
-    return (np.mean(data) - np.min(data)) / (np.max(data) - np.min(data))
-
-def m_sqmean(data):
-    return np.sqrt(np.mean(np.square(data)))
-
-def m_cumean(data):
-    return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
-
-# TODO compute L-moments. These are done separately because we only add
-# a single element to TileDB. This is very inefficient since we have to
-# compute all L-moments at once. Ideally, we would have a single metric
-# function that returns an array with 7 values
-
-# added code to compute first 4 l-moments in lmom4.py. There is a package,
-# lmoments3 that can compute the same values but I wanted to avoid the
-# package as it has some IBM copyright requirements (need to include copyright
-# statement with derived works)
-
-# L1 is same as mean...compute using np.mean for speed
-def m_l1(data):
-    return np.mean(data)
-
-def m_l2(data):
-    l = lmom4(data)
-    return l[1]
-
-def m_l3(data):
-    l = lmom4(data)
-    return l[2]
-
-def m_l4(data):
-    l = lmom4(data)
-    return l[3]
-
-def m_lcv(data):
-    l = lmom4(data)
-    try:
-        return l[1] / l[0]
-    except ZeroDivisionError as e:
-        return np.nan
-
-def m_lskewness(data):
-    l = lmom4(data)
-    try:
-        return l[2] / l[1]
-    except ZeroDivisionError as e:
-        return np.nan
-
-def m_lkurtosis(data):
-    l = lmom4(data)
-    try:
-        return l[3] / l[1]
-    except ZeroDivisionError as e:
-        return np.nan
-
-# not sure how an array of metrics can be ingested by shatter
-# so do these as 15 separate metrics. may be slower than doing all in one call
-#def m_percentiles(data):
-#    return(np.percentile(data, [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]))
-
-def m_p01(data):
-    return(np.percentile(data, 1))
-
-def m_p05(data):
-    return(np.percentile(data, 5))
-
-def m_p10(data):
-    return(np.percentile(data, 10))
-
-def m_p20(data):
-    return(np.percentile(data, 20))
-
-def m_p25(data):
-    return(np.percentile(data, 25))
-
-def m_p30(data):
-    return(np.percentile(data, 30))
-
-def m_p40(data):
-    return(np.percentile(data, 40))
-
-def m_p50(data):
-    return(np.percentile(data, 50))
-
-def m_p60(data):
-    return(np.percentile(data, 60))
-
-def m_p70(data):
-    return(np.percentile(data, 70))
-
-def m_p75(data):
-    return(np.percentile(data, 75))
-
-def m_p80(data):
-    return(np.percentile(data, 80))
-
-def m_p90(data):
-    return(np.percentile(data, 90))
-
-def m_p95(data):
-    return(np.percentile(data, 95))
-
-def m_p99(data):
-    return(np.percentile(data, 99))
-
-def m_profilearea(data):
-    # sanity check...must have valid heights/elevations
-    if np.max(data) <= 0:
-        return -9999.0
-
-
-    p = np.percentile(data, range(1, 100))
-    p0 = max(np.min(data), 0.0)
-
-    # second sanity check...99th percentile must be > 0
-    if p[98] > 0.0:
-        # compute area under normalized percentile height curve using composite trapeziod rule
-        pa = p0 / p[98]
-        for ip in p[:97]:
-            pa += 2.0 * ip / p[98]
-        pa += 1.0
-
-        return pa * 0.5
-    else:
-        return -9999.0
-
-
-# TODO example for cover using all returns and a height threshold
-# the threshold must be a parameter and not hardcoded
-def m_cover(data):
-    threshold = 2
-    return (data > threshold).sum() / len(data)
-
-def f_2plus(data):
-    return data[data['HeightAboveGround'] > 2]
-
-#TODO change to correct dtype
-#TODO not sure what to do with percentiles since it is an array of values instead of a single value
-Metrics: dict[str, Metric] = {
-    'mean' : Metric('mean', np.float32, m_mean),
-    'mode' : Metric('mode', np.float32, m_mode),
-    'median' : Metric('median', np.float32, m_median),
-    'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max),
-    'stddev' : Metric('stddev', np.float32, m_stddev),
-    'variance' : Metric('variance', np.float32, m_variance),
-    'cv' : Metric('cv', np.float32, m_cv),
-    'abovemean' : Metric('abovemean', np.float32, m_abovemean),
-    'abovemode' : Metric('abovemode', np.float32, m_abovemode),
-    'skewness' : Metric('skewness', np.float32, m_skewness),
-    'kurtosis' : Metric('kurtosis', np.float32, m_kurtosis),
-    'aad' : Metric('aad', np.float32, m_aad),
-    'madmedian' : Metric('madmedian', np.float32, m_madmedian),
-    'madmode' : Metric('madmode', np.float32, m_madmode),
-    'iq' : Metric('iq', np.float32, m_iq),
-    'crr' : Metric('crr', np.float32, m_crr),
-    'sqmean' : Metric('sqmean', np.float32, m_sqmean),
-    'cumean' : Metric('cumean', np.float32, m_cumean),
-    'l1' : Metric('l1', np.float32, m_l1),
-    'l2' : Metric('l2', np.float32, m_l2),
-    'l3' : Metric('l3', np.float32, m_l3),
-    'l4' : Metric('l4', np.float32, m_l4),
-    'lcv' : Metric('lcv', np.float32, m_lcv),
-    'lskewness' : Metric('lskewness', np.float32, m_lskewness),
-    'lkurtosis' : Metric('lkurtosis', np.float32, m_lkurtosis),
-    '90m10' : Metric('90m10', np.float32, m_90m10),
-    '95m05' : Metric('95m05', np.float32, m_95m05),
-    'p01' : Metric('p01', np.float32, m_p01),
-    'p05' : Metric('p05', np.float32, m_p05),
-    'p10' : Metric('p10', np.float32, m_p10),
-    'p20' : Metric('p20', np.float32, m_p20),
-    'p25' : Metric('p25', np.float32, m_p25),
-    'p30' : Metric('p30', np.float32, m_p30),
-    'p40' : Metric('p40', np.float32, m_p40),
-    'p50' : Metric('p50', np.float32, m_p50),
-    'p60' : Metric('p60', np.float32, m_p60),
-    'p70' : Metric('p70', np.float32, m_p70),
-    'p75' : Metric('p75', np.float32, m_p75),
-    'p80' : Metric('p80', np.float32, m_p80),
-    'p90' : Metric('p90', np.float32, m_p90),
-    'p95' : Metric('p95', np.float32, m_p95),
-    'p99' : Metric('p99', np.float32, m_p99),
-    'cover' : Metric('cover', np.float32, m_cover),
-    'profilearea' : Metric('profilearea', np.float32, m_profilearea),
-}
+        return f"Metric_{self.name}"

@@ -59,12 +59,6 @@ def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
     """
-    # TODO dependencies on other metrics:
-    # - Iterate through metrics and figure out which ones are being used as
-    #   dependencies
-    # - Remove those from the list and run them first
-    # - Then pass them to the metrics that require them as we get there?
-
     if data_in is None:
         return None
 
@@ -131,7 +125,7 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
     attrs = [a.name for a in config.attrs]
     timestamp = (config.time_slot, config.time_slot)
 
-    # remove any extents that have already been donem, only skip if full overlap
+    # remove any extents that have already been done, only skip if full overlap
     leaf_bag: db.Bag = db.from_sequence(leaves)
     if config.mbr:
         def mbr_filter(one: Extents):

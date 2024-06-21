@@ -6,7 +6,7 @@ import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
 
-from .. import Bounds, Attribute, Metric, Attributes, Metrics, Log
+from .. import Bounds, Attribute, Metric, Attributes, all_metrics, Log
 
 
 class BoundsParamType(click.ParamType):
@@ -72,7 +72,7 @@ class MetricParamType(click.ParamType):
             return user_metrics.metrics()
 
         try:
-            return Metrics[value]
+            return all_metrics[value]
         except Exception as e:
             self.fail(f"{value!r} is not available in Metrics, {e}", param, ctx)
 

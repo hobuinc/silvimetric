@@ -3,11 +3,14 @@ __version__ = '1.2.1'
 from .resources.bounds import Bounds
 from .resources.extents import Extents
 from .resources.storage import Storage
-from .resources.metric import Metric, Metrics
+from .resources.metric import Metric
+from .resources.metrics import grid_metrics, l_moments, percentiles, statistics
+from .resources.metrics import product_moments
 from .resources.log import Log
 from .resources.data import Data
-from .resources.entry import Attribute, Pdal_Attributes, Attributes
-from .resources.config import StorageConfig, ShatterConfig, ExtractConfig, ApplicationConfig
+from .resources.attribute import Attribute, Pdal_Attributes, Attributes
+from .resources.config import StorageConfig, ShatterConfig, ExtractConfig
+from .resources.config import ApplicationConfig
 
 from .commands.shatter import shatter
 from .commands.extract import extract
