@@ -4,7 +4,7 @@ from .resources.bounds import Bounds
 from .resources.extents import Extents
 from .resources.storage import Storage
 from .resources.metric import Metric
-from .resources.metrics import grid_metrics, l_moments, percentiles, statistics
+from .resources.metrics import grid_metrics, l_moments, percentiles, statistics, all_metrics
 from .resources.metrics import product_moments
 from .resources.metric_graph import MetricGraph
 from .resources.log import Log

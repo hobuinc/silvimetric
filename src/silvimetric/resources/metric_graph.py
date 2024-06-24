@@ -5,6 +5,7 @@ import pandas as pd
 import base64
 import dill
 
+from .attribute import Attribute
 from .metric import MetricFn, Metric
 
 type MetricGraphDict = Dict[str, tuple[MetricFn, Literal['data'], Any]]
@@ -14,6 +15,8 @@ class MetricGraph():
         self.graph: MetricGraphDict = graph
 
     def add(self, metric) -> None:
+        if isinstance(metric, Attribute):
+            return
         self.graph[metric.name] = (metric.do, 'data',
                 *(d.name for d in metric.dependencies) )
         for d in metric.dependencies:
@@ -48,7 +51,7 @@ class MetricGraph():
         }
 
     @staticmethod
-    def from_dict(self, d):
+    def from_dict(d):
         graph = { key: (
                 dill.loads(base64.b64decode(val[0].encode())),
                 val[1:]

@@ -62,8 +62,12 @@ def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
-    return metric_data
+    # metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
+    graph = storage.config.metric_graph
+    keys = [m.name for m in storage.config.metrics]
+
+    data_out = graph.run(data_in, keys)
+    return data_out
 
 def agg_list(df: pd.DataFrame):
     """
@@ -81,7 +85,7 @@ def join(list_data, metric_data):
     """
     if list_data is None or metric_data is None:
         return None
-    return list_data.join([m for m in metric_data])
+    return list_data.join(metric_data)
 
 def write(data_in, storage, timestamp):
     """
@@ -101,7 +105,6 @@ def write(data_in, storage, timestamp):
 
     if data_in is None or data_in.empty:
         return 0
-    graph = storage.config.metric_graph
 
     with storage.open('w', timestamp=timestamp) as tdb:
         idf = data_in.index.to_frame()

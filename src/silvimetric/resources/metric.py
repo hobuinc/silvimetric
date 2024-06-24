@@ -13,7 +13,6 @@ from .attribute import Attribute
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
-MetricGraph = Dict[str, tuple[MetricFn, Literal['data'], Any]]
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
@@ -25,7 +24,7 @@ class Metric():
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Union[Attribute | Self]]=[], filters: List[FilterFn]=[],
+            dependencies: list[Self]=[], filters: List[FilterFn]=[],
             attributes: List[Attribute]=[]) -> None:
 
         #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
@@ -180,21 +179,6 @@ class Metric():
     def from_string(data: str) -> Self:
         j = json.loads(data)
         return Metric.from_dict(j)
-
-    def make_graph(self) -> MetricGraph:
-        """ Create dict that tells dask how to manage dependencies. """
-
-        # data from other metrics may already have filters applied to them
-        # and will not have new filters applied to them in the current metric
-
-        layers = {
-            self.name: (self.do, 'data', *(d.name for d in self.dependencies))
-        }
-
-        for d in self.dependencies:
-            layers : MetricGraph = layers | d.make_graph()
-
-        return layers
 
     def __eq__(self, other) -> tuple:
         return (self.name == other.name and
