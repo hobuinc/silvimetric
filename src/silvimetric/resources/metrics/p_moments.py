@@ -3,7 +3,7 @@ from scipy.stats import skew, kurtosis
 
 from ..metric import Metric
 
-def m_mean(data):
+def m_mean(data, *args):
     return np.mean(data)
 
 def m_variance(data):

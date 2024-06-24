@@ -9,7 +9,7 @@ def m_mode(data):
     v = u[i[0][0]]
     return v
 
-def m_median(data):
+def m_median(data, *args):
     return np.median(data)
 
 def m_min(data):
@@ -18,10 +18,11 @@ def m_min(data):
 def m_max(data):
     return np.max(data)
 
-def m_stddev(data):
+def m_stddev(data, *args):
     return np.std(data)
 
-def m_cv(data, stddev, mean):
+def m_cv(data, *args):
+    stddev, mean = args
     return stddev / mean
 
 # TODO check performance of other methods

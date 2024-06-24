@@ -1,7 +1,7 @@
 import json
 import numpy as np
 from scipy import stats
-from typing import Callable, Optional, Any, Union, List, Self
+from typing import Callable, Optional, Any, Union, List, Self, Dict, Literal
 from inspect import getsource
 from tiledb import Attr
 import dask
@@ -11,8 +11,9 @@ import pandas as pd
 
 from .attribute import Attribute
 
-MetricFn = Callable[[pd.DataFrame], pd.DataFrame]
+MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
+MetricGraph = Dict[str, tuple[MetricFn, Literal['data'], Any]]
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
@@ -73,6 +74,13 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
+    def sanitize_and_run(self, d, *args):
+        # args come in as a value wrapped in one index of a 2D dataframe
+        # we need to remove the wrapping and pass the values to the method
+        # to make things easier
+        a = tuple( a.values[0][0] for a in args)
+        return self._method(d, *a)
+
     #TODO add kwargs so we can pass arguments to abstract methods
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
@@ -91,13 +99,14 @@ class Metric():
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
+        runner = lambda d: self.sanitize_and_run(d, *args)
 
         new_cols = {
-            c: [(self.entry_name(c, args), self._method)]
+            c: [ (self.entry_name(c), runner) ]
             for c in cols if c not in idx
         }
 
-        val = gb.agg(new_cols)
+        val = gb.aggregate(new_cols, args=args)
 
         #remove hierarchical columns
         val.columns = val.columns.droplevel(0)
@@ -172,9 +181,8 @@ class Metric():
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def make_graph(self, df: pd.DataFrame=None):
+    def make_graph(self) -> MetricGraph:
         """ Create dict that tells dask how to manage dependencies. """
-        from dask.utils import apply
 
         # data from other metrics may already have filters applied to them
         # and will not have new filters applied to them in the current metric
@@ -182,11 +190,9 @@ class Metric():
         layers = {
             self.name: (self.do, 'data', *(d.name for d in self.dependencies))
         }
-        if df is not None:
-            layers['data'] = df
 
         for d in self.dependencies:
-            layers = layers | d.make_graph()
+            layers : MetricGraph = layers | d.make_graph()
 
         return layers
 

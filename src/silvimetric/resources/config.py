@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from .log import Log
 from .extents import Bounds
 from .metric import Metric
+from .metric_graph import MetricGraph
 from .metrics import grid_metrics
 from .attribute import Attribute, Attributes
 from .. import __version__
@@ -83,6 +84,7 @@ class StorageConfig(Config):
     next_time_slot: int = 1
     """Next time slot to be allocated to a shatter process. Increment after
     use., defaults to 1"""
+    metric_graph: MetricGraph = field(default_factory=lambda: {})
 
 
     def __post_init__(self) -> None:
@@ -105,6 +107,8 @@ class StorageConfig(Config):
 
         self.metric_definitions = { m.name: str(m) for m in self.metrics}
 
+        self.metric_graph = MetricGraph.make_graph(self.metrics)
+
     def __eq__(self, other):
 
         # We don't compare logs
@@ -122,6 +126,9 @@ class StorageConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['root'] = self.root.to_json()
+
+        d['metric_graph'] = self.metric_graph.to_json()
+
         return d
 
     @classmethod
@@ -140,6 +147,11 @@ class StorageConfig(Config):
             crs = pyproj.CRS.from_user_input(json.dumps(x['crs']))
         else:
             crs = None
+        if 'metric_graph' in x:
+            mg = MetricGraph.from_dict(x['metric_graph'])
+        else:
+            mg = MetricGraph.make_graph(ms)
+
         n = cls(tdb_dir = x['tdb_dir'],
                 root = root,
                 log = Log(**x['log']),
@@ -148,7 +160,8 @@ class StorageConfig(Config):
                 crs = crs,
                 metrics = ms,
                 capacity = x['capacity'],
-                version = x['version'])
+                version = x['version'],
+                metric_graph = mg)
 
         return n
 

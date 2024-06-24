@@ -6,6 +6,7 @@ from .resources.storage import Storage
 from .resources.metric import Metric
 from .resources.metrics import grid_metrics, l_moments, percentiles, statistics
 from .resources.metrics import product_moments
+from .resources.metric_graph import MetricGraph
 from .resources.log import Log
 from .resources.data import Data
 from .resources.attribute import Attribute, Pdal_Attributes, Attributes

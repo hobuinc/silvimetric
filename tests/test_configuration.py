@@ -3,11 +3,9 @@ from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 class Test_Configuration(object):
 
     def test_serialization(self, storage_config, shatter_config, extract_config):
-
         # storage
         j = str(storage_config)
         c = StorageConfig.from_string(j)
-
 
         mean = [ m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1

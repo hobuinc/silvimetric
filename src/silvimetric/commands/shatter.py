@@ -101,6 +101,7 @@ def write(data_in, storage, timestamp):
 
     if data_in is None or data_in.empty:
         return 0
+    graph = storage.config.metric_graph
 
     with storage.open('w', timestamp=timestamp) as tdb:
         idf = data_in.index.to_frame()

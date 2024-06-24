@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, grid_metrics, Metric
+from silvimetric import shatter, Storage, grid_metrics, Metric, MetricGraph
 from silvimetric.resources.metrics import all_metrics as s
 
 class TestMetrics():
@@ -14,6 +14,8 @@ class TestMetrics():
 
     def test_dependencies(self, metric_data):
         from dask import get
+        # should be able to create a dependency graph, use dask.get to retrieve
+        # the necessary keys, and those values should be dataframes.
 
         cv = s['cv']
         mean = s['mean']
@@ -24,10 +26,11 @@ class TestMetrics():
         stddev.dependencies = [ median ]
         cv.dependencies = [ mean, stddev ]
 
-        graph = cv.make_graph(metric_data)
+        graph: MetricGraph = MetricGraph.make_graph(cv)
+        a = graph.run(metric_data, ['cv', 'mean'])
 
-        res = get(graph, 'cv')
-        print(res)
+        assert a.m_Z_cv.any()
+        assert a.m_Z_mean.any()
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):
