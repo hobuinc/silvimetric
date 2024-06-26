@@ -133,14 +133,13 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
         help="Coordinate system of data")
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
         help="List of attributes to include in Database")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
-        help="List of metrics to include in Database")
+@click.option("--metrics", "-m", type=MetricParamType(), default=[],
+        help="List of metrics to include in output, eg. '-m stats,percentiles'")
 @click.option("--resolution", type=float, default=30.0,
         help="Summary pixel resolution")
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
-    import itertools
     """Initialize silvimetrics DATABASE"""
 
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
@@ -205,8 +204,8 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 @cli.command('extract')
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(), default=[],
         help="List of attributes to include output")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(), default=[],
-        help="List of metrics to include in output")
+@click.option("--metrics", "-m", type=MetricParamType(), default=[],
+        help="List of metrics to include in output, eg. '-m stats,percentiles'")
 @click.option("--bounds", type=BoundsParamType(), default=None,
         help="Bounds for data to include in output")
 @click.option("--outdir", "-o", type=click.Path(exists=False), required=True,

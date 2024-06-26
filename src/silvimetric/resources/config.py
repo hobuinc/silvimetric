@@ -103,11 +103,13 @@ class StorageConfig(Config):
             self.metrics = [ grid_metrics[m] for m in grid_metrics.keys() ]
 
         if not self.crs.is_projected:
-            raise Exception(f"Given coordinate system is not a rectilinear projected coordinate system")
+            raise Exception("Given coordinate system is not a rectilinear"
+                    " projected coordinate system")
 
-        self.metric_definitions = { m.name: str(m) for m in self.metrics}
-
-        self.metric_graph = MetricGraph.make_graph(self.metrics)
+        self.metric_definitions = { m.name: str(m) for m in
+                self.metrics}
+        if not self.metric_graph or self.metric_graph is None:
+            self.metric_graph = MetricGraph.make_graph(self.metrics)
 
     def __eq__(self, other):
 
@@ -223,7 +225,8 @@ class ShatterConfig(Config):
     """List of attributes to use in shatter. If this is not set it will be
     filled by the attributes in the database instance."""
     metrics: list[Metric] = field(default_factory=list)
-    """A list of metrics to use in shatter. If this is not set it will be filled by the metrics in the database instance."""
+    """A list of metrics to use in shatter. If this is not set it will be filled
+    by the metrics in the database instance."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())

@@ -12,10 +12,10 @@ def m_mode(data):
 def m_median(data, *args):
     return np.median(data)
 
-def m_min(data):
+def m_min(data, *args):
     return np.min(data)
 
-def m_max(data):
+def m_max(data, *args):
     return np.max(data)
 
 def m_stddev(data, *args):
@@ -26,18 +26,21 @@ def m_cv(data, *args):
     return stddev / mean
 
 # TODO check performance of other methods
-def m_abovemean(data):
-    return (data > np.mean(data)).sum() / len(data)
+def m_abovemean(data, *args):
+    mean = args[0]
+    return (data > mean).sum() / len(data)
 
 # TODO check performance of other methods
-def m_abovemode(data):
-    return (data > stats.mode(data).mode).sum() / len(data)
+def m_abovemode(data, *args):
+    mode = args[0]
+    return (data > mode).sum() / len(data)
 
 def m_iq(data):
     return stats.iqr(data)
 
-def m_crr(data, **kwargs):
-    return (np.mean(data) - np.min(data)) / (np.max(data) - np.min(data))
+def m_crr(data, *args):
+    mean, minimum, maximum = args
+    return (mean - minimum) / (maximum - minimum)
 
 def m_sqmean(data):
     return np.sqrt(np.mean(np.square(data)))
@@ -45,13 +48,14 @@ def m_sqmean(data):
 def m_cumean(data):
     return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
 
-def m_profilearea(data):
+def m_profilearea(data, *args):
     # sanity check...must have valid heights/elevations
-    if np.max(data) <= 0:
+    dmax, dmin = args
+    if dmax <= 0:
         return -9999.0
 
     p = np.percentile(data, range(1, 100))
-    p0 = max(np.min(data), 0.0)
+    p0 = max(dmin, 0.0)
 
     # second sanity check...99th percentile must be > 0
     if p[98] > 0.0:
@@ -71,19 +75,33 @@ def m_profilearea(data):
 #     threshold = 2
 #     return (data > threshold).sum() / len(data)
 
-statistics: dict[str, Metric] = {}
-statistics['mode'] = Metric('mode', np.float32, m_mode)
-statistics['median'] = Metric('median', np.float32, m_median)
-statistics['min'] = Metric('min', np.float32, m_min)
-statistics['max'] = Metric('max', np.float32, m_max)
-statistics['stddev'] = Metric('stddev', np.float32, m_stddev)
-statistics['cv'] = Metric('cv', np.float32, m_cv, [ product_moments['mean'],
-        statistics['stddev'] ])
-statistics['abovemean'] = Metric('abovemean', np.float32, m_abovemean)
-statistics['abovemode'] = Metric('abovemode', np.float32, m_abovemode)
-statistics['iq'] = Metric('iq', np.float32, m_iq)
-statistics['crr'] = Metric('crr', np.float32, m_crr)
-statistics['sqmean'] = Metric('sqmean', np.float32, m_sqmean)
-statistics['cumean'] = Metric('cumean', np.float32, m_cumean)
-statistics['profilearea'] = Metric('profilearea', np.float32, m_profilearea)
+mode = Metric('mode', np.float32, m_mode)
+median = Metric('median', np.float32, m_median)
+# TODO better names?
+sm_min = Metric('min', np.float32, m_min)
+sm_max = Metric('max', np.float32, m_max)
+stddev = Metric('stddev', np.float32, m_stddev)
+cv = Metric('cv', np.float32, m_cv, [ product_moments['mean'], [stddev] ])
+abovemean = Metric('abovemean', np.float32, m_abovemean, [ product_moments['mean'] ])
+abovemode = Metric('abovemode', np.float32, m_abovemode, [ mode ])
+iq = Metric('iq', np.float32, m_iq)
+crr = Metric('crr', np.float32, m_crr, [ product_moments['mean'], sm_min, sm_max ])
+sqmean = Metric('sqmean', np.float32, m_sqmean)
+cumean = Metric('cumean', np.float32, m_cumean)
+profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min ])
+
+statistics: dict[str, Metric] = dict(
+    mode=mode,
+    median=median,
+    sm_min=sm_min,
+    sm_max=sm_max,
+    stddev=stddev,
+    abovemean=abovemean,
+    abovemode=abovemode,
+    iq=iq,
+    crr=crr,
+    sqmean=sqmean,
+    cumean=cumean,
+    profilearea=profilearea
+)
 # statistics['cover'] = Metric('cover', np.float32, m_cover)

@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 
 from silvimetric import shatter, Storage, grid_metrics, Metric, MetricGraph
-from silvimetric.resources.metrics import all_metrics as s
+from silvimetric import all_metrics as s
+from silvimetric import l_moments
 
 class TestMetrics():
 
@@ -12,8 +13,20 @@ class TestMetrics():
             d = m.do(metric_data)
             assert isinstance(d, pd.DataFrame), f"Metric {mname} failed to make a dataframe. Data created: {d}"
 
+    def test_intermediate_metric(self, metric_data):
+        ms = list(l_moments.values())
+        mg = MetricGraph.make_graph(ms)
+        a = mg.run(metric_data, list(l_moments.keys()))
+
+        assert a.m_Z_l1.any()
+        assert a.m_Z_l2.any()
+        assert a.m_Z_l3.any()
+        assert a.m_Z_l4.any()
+        assert a.m_Z_lcv.any()
+        assert a.m_Z_lskewness.any()
+        assert a.m_Z_lkurtosis.any()
+
     def test_dependencies(self, metric_data):
-        from dask import get
         # should be able to create a dependency graph, use dask.get to retrieve
         # the necessary keys, and those values should be dataframes.
 

@@ -26,6 +26,10 @@ class Attribute():
         else:
             return True
 
+    def __hash__(self):
+        return hash(('name', self.name, 'dtype', self.dtype))
+
+
     def schema(self) -> Attr:
         """
         Create the tiledb schema for this attribute.

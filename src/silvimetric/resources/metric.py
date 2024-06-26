@@ -59,6 +59,15 @@ class Metric():
         else:
             return True
 
+    def __hash__(self):
+        return hash((
+            'name', self.name,
+            'dtype', self.dtype,
+            'dependencies', frozenset(self.dependencies),
+            'method', base64.b64encode(dill.dumps(self._method)).decode(),
+            'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
+            'attrs', frozenset(self.attributes)))
+
     def schema(self, attr: Attribute) -> Any:
         """
         Create schema for TileDB creation.

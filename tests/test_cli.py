@@ -15,6 +15,14 @@ class TestCli(object):
                 catch_exceptions=False)
         assert res.exit_code == 0
 
+    def test_cli_metric_groups(self, tmp_path_factory, runner, bounds):
+        path = tmp_path_factory.mktemp("test_tdb")
+        p = os.path.abspath(path)
+        res = runner.invoke(cli.cli, args=["-d", p, "--debug", "--scheduler",
+                "single-threaded", "initialize", "--resolution", "10", "--crs", "EPSG:3857",
+                "--bounds", str(bounds), "-m", "stats,p_moments"], catch_exceptions=False)
+        assert res.exit_code == 0
+
     def test_cli_shatter(self, runner, maxy, date, tdb_filepath,
             copc_filepath, storage):
 
