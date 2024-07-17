@@ -37,6 +37,7 @@ exclude_patterns = []
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
+html_baseurl = os.environ.get("READTHEDOCS_CANONICAL_URL", "")
 html_theme = "sphinx_rtd_theme"
 html_static_path = ['_static']
 html_context = {
@@ -48,6 +49,8 @@ html_context = {
   'conf_py_path': '/docs/source/'
 }
 
+if os.environ.get("READXTHEDOCS", "") == "True":
+    html_context["READTHEDOCS"] = True
 
 
 def read_version(filename):
