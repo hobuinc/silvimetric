@@ -3,81 +3,58 @@ import pandas as pd
 from ..metric import Metric
 
 def percentile_base(data: pd.DataFrame):
-    percentiles = [1,5,10,20,25,30,40,50,60,70,75,80,90,95,99]
-    return np.percentile(data, percentiles).tolist()
-
+    return np.percentile(data, range(100)).tolist()
 
 def m_p01(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[0]
+    return args[0][0]
 
 def m_p05(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[1]
+    return args[0][4]
 
 def m_p10(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[2]
+    return args[0][2]
 
 def m_p20(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[3]
+    return args[0][3]
 
 def m_p25(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[4]
+    return args[0][4]
 
 def m_p30(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[5]
+    return args[0][5]
 
 def m_p40(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[6]
+    return args[0][6]
 
 def m_p50(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[7]
+    return args[0][7]
 
 def m_p60(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[8]
+    return args[0][8]
 
 def m_p70(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[9]
+    return args[0][9]
 
 def m_p75(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[10]
+    return args[0][10]
 
 def m_p80(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[11]
+    return args[0][11]
 
 def m_p90(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[12]
+    return args[0][12]
 
 def m_p95(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[13]
+    return args[0][13]
 
 def m_p99(data: pd.DataFrame, *args):
-    pct = args[0]
-    return pct[14]
+    return args[0][14]
 
 def m_90m10(data, *args):
-    pct = args[0]
-    p90 = pct[12]
-    p10= pct[2]
-    return p90 - p10
+    return args[0][12] - args[0][2]
 
 def m_95m05(data, *args):
-    pct = args[0]
-    p95 = pct[13]
-    p05= pct[1]
-    return p95 - p05
+    return args[0][13] - args[0][1]
 
 pct_base = Metric('pct_base', object, percentile_base)
 

@@ -95,7 +95,11 @@ class MetricParamType(click.ParamType):
                 elif val == 'all':
                     metrics.update(list(all_metrics.values()))
                 else:
-                    metrics.update(all_metrics[val])
+                    m = all_metrics[val]
+                    if isinstance(m, Metric):
+                        metrics.add(m)
+                    else:
+                        metrics.udpate(list(m))
             except Exception as e:
                 self.fail(f"{val!r} is not available in Metrics, {e}", param, ctx)
         return list(metrics)

@@ -1,34 +1,36 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, grid_metrics, Metric, MetricGraph
+from silvimetric import shatter, Storage, grid_metrics, MetricGraph
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
 
 class TestMetrics():
 
     def test_metrics(self, metric_data):
-        for mname in grid_metrics:
-            m: Metric = grid_metrics[mname]
-            d = m.do(metric_data)
-            assert isinstance(d, pd.DataFrame), f"Metric {mname} failed to make a dataframe. Data created: {d}"
+        ms: pd.DataFrame = MetricGraph.run_metrics(metric_data, list(grid_metrics.values()))
+        assert isinstance(ms, pd.DataFrame)
+        adjusted = [k.split('_')[-1] for k in ms.keys()]
+
+        assert all(a in grid_metrics.keys() for a in adjusted)
+
 
     def test_intermediate_metric(self, metric_data):
         ms = list(l_moments.values())
-        mg = MetricGraph.make_graph(ms)
-        a = mg.run(metric_data, list(l_moments.keys()))
+        computed = MetricGraph.run_metrics(metric_data, ms)
 
-        assert a.m_Z_l1.any()
-        assert a.m_Z_l2.any()
-        assert a.m_Z_l3.any()
-        assert a.m_Z_l4.any()
-        assert a.m_Z_lcv.any()
-        assert a.m_Z_lskewness.any()
-        assert a.m_Z_lkurtosis.any()
+        assert computed.m_Z_l1.any()
+        assert computed.m_Z_l2.any()
+        assert computed.m_Z_l3.any()
+        assert computed.m_Z_l4.any()
+        assert computed.m_Z_lcv.any()
+        assert computed.m_Z_lskewness.any()
+        assert computed.m_Z_lkurtosis.any()
 
     def test_dependencies(self, metric_data):
         # should be able to create a dependency graph, use dask.get to retrieve
         # the necessary keys, and those values should be dataframes.
+        import dask
 
         cv = s['cv']
         mean = s['mean']
@@ -39,11 +41,12 @@ class TestMetrics():
         stddev.dependencies = [ median ]
         cv.dependencies = [ mean, stddev ]
 
-        graph: MetricGraph = MetricGraph.make_graph(cv)
-        a = graph.run(metric_data, ['cv', 'mean'])
+        # graph: MetricGraph = MetricGraph.make_graph(cv)
+        a = MetricGraph.get_methods(metric_data, [cv, mean])
+        b = dask.compute(*a)
 
-        assert a.m_Z_cv.any()
-        assert a.m_Z_mean.any()
+        assert b[0].m_Z_cv.any()
+        assert b[1].m_Z_mean.any()
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):

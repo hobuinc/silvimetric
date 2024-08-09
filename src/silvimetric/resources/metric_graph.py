@@ -2,10 +2,13 @@ from typing import Dict, Literal, Any, Self, Union
 from uuid import uuid4
 
 import dask
+from dask.delayed import Delayed
 from dask.highlevelgraph import HighLevelGraph
 import dask.multiprocessing
 import dask.threaded
 import distributed
+import dask.bag as db
+
 from dask.optimization import cull
 
 import pandas as pd
@@ -41,6 +44,7 @@ class MetricGraph():
             c = None
 
         if c is not None:
+            # return dask.threaded.get
             return c.get
         else:
             s = dask.config.get('scheduler')
@@ -53,24 +57,89 @@ class MetricGraph():
             else:
                 raise ValueError(f"Invalid dask scheduler, {s}")
 
+    # def run(self, data: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
+    #     getter = self.get_runner()
+
+    #     #make distinct graph for multiprocessing purposes
+    #     u = uuid4()
+    #     uks = [ f'{k}-{u}' for k in keys ]
+    #     uk2 = [ (f'{k}',f'{u}') for k in keys ]
+    #     g = {
+    #             f'{k}-{u}': ( v[0], *( f'{vd}-{u}' for vd in v[1:] ) )
+    #             for k,v in self.graph.items()
+    #         } | { f'data-{u}': data }
+
+    #     g2 = {
+    #             (f'{k}', f'{u}'): ( v[0], *( (f'{vd}', f'{u}') for vd in v[1:] ) )
+    #             for k,v in self.graph.items()
+    #         } | { (f'data', f'{u}'): data }
+    #     hlg = HighLevelGraph(*cull(g2, uk2))
+    #     asdf = db.Bag(name=str(u), dsk=hlg, npartitions=5)
+
+    #     metric_data : tuple[pd.DataFrame] = getter(g, uks)
+    #     result: pd.DataFrame = metric_data[0]
+
+    #     for m in metric_data[1:]:
+    #         result = result.merge(m, left_index=True, right_index=True)
+
+    #     return result
 
     def run(self, data: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
-        getter = self.get_runner()
-
-        #make distinct graph for multiprocessing purposes
         u = uuid4()
-        uks = [ f'{k}-{u}' for k in keys ]
-        g = {
-                f'{k}-{u}': ( v[0], *( f'{vd}-{u}' for vd in v[1:] ) )
-                for k,v in self.graph.items()
-            } | { f'data-{u}': data }
-        metric_data : tuple[pd.DataFrame] = getter(g, uks)
-        result: pd.DataFrame = metric_data[0]
+        ks = [ (f'{k}',f'{u}') for k in keys ]
+        graph = {
+               (k, u): [ v[0], *( (f'{vd}', f'{u}') for vd in v[1:] ) ]
+               for k,v in self.graph.items()
+           } | { ('data', f'{u}'): data }
+        hlg = HighLevelGraph(*cull(graph, ks))
+        hlg.validate()
+        bag = db.Bag(dsk=hlg, name=str(u), npartitions=len(graph.keys()))
+        return bag.persist()
 
-        for m in metric_data[1:]:
-            result = result.merge(m, left_index=True, right_index=True)
 
-        return result
+    @staticmethod
+    def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None):
+
+        # identitity for this graph, can be created before or during this method
+        # call, but needs to be the same across this graph, and unique compared
+        # to other graphs
+        if uuid is None:
+            uuid = uuid4()
+
+        if not isinstance(data, Delayed):
+            data = dask.delayed(data)
+
+        if isinstance(metrics, Metric):
+            metrics = [ metrics ]
+
+        # iterate through metrics and their dependencies.
+        # uuid here will help guide metrics to use the same dependency method
+        # calls from dask
+        seq = []
+        for m in metrics:
+            if not isinstance(m, Metric):
+                continue
+            ddeps = MetricGraph.get_methods(data, m.dependencies, uuid)
+            dd = dask.delayed(m.do)(data, *ddeps,
+                dask_key_name=f'{m.name}-{str(uuid)}')
+            seq.append(dd)
+
+        return seq
+
+    @staticmethod
+    def run_metrics(data, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+        from functools import reduce
+
+        graph = MetricGraph.get_methods(data, metrics)
+
+        computed_list = dask.compute(*graph)
+
+
+        def merge(x, y):
+            return x.merge(y, on=['xi','yi'])
+        merged = reduce(merge, computed_list)
+
+        return merged
 
     @staticmethod
     def make_graph(metrics: Union[Metric, list[Metric]]) -> Self:

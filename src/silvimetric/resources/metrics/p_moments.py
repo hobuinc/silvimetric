@@ -8,6 +8,9 @@ def m_moments(data, *args):
     return moment(data, center=mean, order=[2,3,4], nan_policy='omit').tolist()
 
 def m_mean(data, *args):
+    import json
+    with open('myfile.txt','a') as file:
+        file.write(str(data.min()) + '\n')
     return np.mean(data)
 
 def m_variance(data, *args):

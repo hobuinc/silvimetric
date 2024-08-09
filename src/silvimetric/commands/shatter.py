@@ -8,13 +8,14 @@ from typing import Generator
 import pandas as pd
 
 import dask
-from dask.distributed import as_completed, futures_of, CancelledError
+from dask.distributed import as_completed, futures_of, CancelledError, get_client
 import dask.array as da
 import dask.bag as db
+from dask.dataframe.io import from_pandas
 
-from .. import Extents, Storage, Data, ShatterConfig
+from .. import Extents, Storage, Data, ShatterConfig, MetricGraph
 
-def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
+def get_data(extents: Extents, filename: str, storage: Storage):
     """
     Execute pipeline and retrieve point cloud data for this extent
 
@@ -62,21 +63,17 @@ def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    # metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
-    graph = storage.config.metric_graph
-    keys = [m.name for m in storage.config.metrics]
+    return MetricGraph.run_metrics(data_in, storage.config.metrics)
 
-    data_out = graph.run(data_in, keys)
-    return data_out
-
-def agg_list(df: pd.DataFrame):
+def agg_list(data_in):
     """
     Make variable-length point data attributes into lists
     """
-    if df is None:
+    if data_in is None:
         return None
-    grouped = df.groupby(['xi','yi'])
+    grouped = data_in.groupby(['xi','yi'])
     grouped = grouped.agg(list)
+
     return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
 def join(list_data, metric_data):
@@ -136,9 +133,14 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
             return all(one.disjoint_by_mbr(m) for m in config.mbr)
         leaf_bag = leaf_bag.filter(mbr_filter)
 
+    metric_graph = storage.config.metric_graph
+    keys = [m.name for m in storage.config.metrics]
+
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, storage)
+    metrics: db.Bag = arranged.map(MetricGraph.run_metrics, storage.config.metrics)
+    # metrics: db.Bag = arranged.map(get_metrics, storage)
+    # metrics: db.Bag = arranged.map(metric_graph.get_methods, storage.config.metrics)
     lists: db.Bag = arranged.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
@@ -157,9 +159,11 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
-        client = dask.config.get('distributed.client')
-        if client is not None:
+        try:
+            client = get_client()
             client.close()
+        except:
+            pass
         end_time = datetime.datetime.now().timestamp() * 1000
 
         storage.consolidate_shatter(config.time_slot)
@@ -175,9 +179,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     processes = get_processes(leaves, config, storage)
 
-    ## If dask is distributed, use the futures feature
-    dc = dask.config.get('distributed.client')
-    if isinstance(dc, dask.distributed.Client):
+    try:
+        ## If dask is distributed, use the futures feature
+        dc = get_client()
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
@@ -190,9 +194,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-
-    ## Handle non-distributed dask scenarios
-    else:
+    except:
+        # Handle non-distributed dask scenarios
         config.point_count = sum(processes)
 
     # modify config to reflect result of shattter process

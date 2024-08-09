@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import stats
 from ..metric import Metric
-from .p_moments import product_moments
+from .p_moments import mean
 
 def m_mode(data):
     u, c = np.unique(data, return_counts=True)
@@ -81,11 +81,11 @@ median = Metric('median', np.float32, m_median)
 sm_min = Metric('min', np.float32, m_min)
 sm_max = Metric('max', np.float32, m_max)
 stddev = Metric('stddev', np.float32, m_stddev)
-cv = Metric('cv', np.float32, m_cv, [ product_moments['mean'], [stddev] ])
-abovemean = Metric('abovemean', np.float32, m_abovemean, [ product_moments['mean'] ])
+cv = Metric('cv', np.float32, m_cv, [ mean, stddev ])
+abovemean = Metric('abovemean', np.float32, m_abovemean, [ mean ])
 abovemode = Metric('abovemode', np.float32, m_abovemode, [ mode ])
 iq = Metric('iq', np.float32, m_iq)
-crr = Metric('crr', np.float32, m_crr, [ product_moments['mean'], sm_min, sm_max ])
+crr = Metric('crr', np.float32, m_crr, [ mean, sm_min, sm_max ])
 sqmean = Metric('sqmean', np.float32, m_sqmean)
 cumean = Metric('cumean', np.float32, m_cumean)
 profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min ])
@@ -93,15 +93,16 @@ profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min 
 statistics: dict[str, Metric] = dict(
     mode=mode,
     median=median,
-    sm_min=sm_min,
-    sm_max=sm_max,
+    min=sm_min,
+    max=sm_max,
     stddev=stddev,
+    cv=cv,
     abovemean=abovemean,
     abovemode=abovemode,
     iq=iq,
     crr=crr,
     sqmean=sqmean,
     cumean=cumean,
-    profilearea=profilearea
+    profilearea=profilearea,
 )
 # statistics['cover'] = Metric('cover', np.float32, m_cover)

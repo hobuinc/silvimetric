@@ -34,7 +34,7 @@ class Metric():
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
         self.dependencies = dependencies
-        """Attributes/Metrics this is dependent on."""
+        """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
         self.filters = filters
@@ -89,11 +89,13 @@ class Metric():
         a = tuple( a.values[0][0] for a in args)
         return self._method(d, *a)
 
-    #TODO add kwargs so we can pass arguments to abstract methods
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
         the same thing multiple times."""
 
+        # the index columns are determined by where this data is coming from
+        # if it has xi and yi, then it's coming from shatter
+        # if it has X and Y, then it's coming from extract as a rerun of a cell
         idx = ['xi','yi']
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
@@ -164,7 +166,7 @@ class Metric():
         if 'dependencies' in data.keys() and \
                 data['dependencies'] and \
                 data['dependencies'] is not None:
-            dependencies = [ Attribute.from_dict(d) for d in data['dependencies'] ]
+            dependencies = [ Metric.from_dict(d) for d in data['dependencies'] ]
         else:
             dependencies = [ ]
 

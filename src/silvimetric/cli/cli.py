@@ -16,8 +16,8 @@ from .common import dask_handle, close_dask
 @click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=10, help="Number of workers for Dask")
-@click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
+@click.option("--workers", type=int, help="Number of workers for Dask")
+@click.option("--threads", type=int, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
         help="Open dask diagnostic page in default web browser.")
 @click.option("--dasktype", default='processes', type=click.Choice(['threads',
