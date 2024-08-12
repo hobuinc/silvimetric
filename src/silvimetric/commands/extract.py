@@ -68,18 +68,18 @@ def get_metrics(data_in: pd.DataFrame, storage: Storage):
         return None
 
     def expl(x):
-        return x.explode().reset_index()
+        return x.explode(['X','Y']).reset_index()
 
     # d = data_in.set_index(['X','Y'])
     # add shape?
-    new_df = pd.DataFrame()
-    for c in data_in.columns:
-        if c in ['X','Y']:
-            continue
-        if new_df.empty:
-            new_df = data_in.explode(c)[[c,'X','Y']]
-        else:
-            new_df = new_df.merge(data_in.explode(c)[[c,'X','Y']])
+    # new_df = pd.DataFrame()
+    # for c in data_in.columns:
+    #     if c in ['X','Y']:
+    #         continue
+    #     if new_df.empty:
+    #         new_df = data_in.explode(c)[[c,'X','Y']]
+    #     else:
+    #         new_df = new_df.merge(data_in.explode(c)[[c,'X','Y']])
 
     exploded = data_in.set_index(['X','Y']).apply(expl)
     metric_data = dask.persist(*[ m.do(exploded) for m in storage.config.metrics ])
