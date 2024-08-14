@@ -1,13 +1,14 @@
 import json
-import numpy as np
-from scipy import stats
-from typing import Callable, Optional, Any, Union, List, Self, Dict, Literal
+from typing import Callable, Optional, Any, Union, List, Self
 from inspect import getsource
-from tiledb import Attr
-import dask
 import base64
+
+from tiledb import Attr
+import numpy as np
+import distributed
 import dill
 import pandas as pd
+
 
 from .attribute import Attribute
 
@@ -96,6 +97,9 @@ class Metric():
         # the index columns are determined by where this data is coming from
         # if it has xi and yi, then it's coming from shatter
         # if it has X and Y, then it's coming from extract as a rerun of a cell
+        if isinstance(data, distributed.Future):
+            data = data.result()
+
         idx = ['xi','yi']
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
@@ -121,11 +125,6 @@ class Metric():
         #remove hierarchical columns
         val.columns = val.columns.droplevel(0)
         return val
-
-    @dask.delayed
-    def do_delayed(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Run metric as a dask delayed method"""
-        return self.do(data)
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes

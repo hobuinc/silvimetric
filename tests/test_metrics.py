@@ -8,7 +8,8 @@ from silvimetric import l_moments
 class TestMetrics():
 
     def test_metrics(self, metric_data):
-        ms: pd.DataFrame = MetricGraph.run_metrics(metric_data, list(grid_metrics.values()))
+        ms: pd.DataFrame = MetricGraph.run_metrics(metric_data,
+            list(grid_metrics.values())).compute()
         assert isinstance(ms, pd.DataFrame)
         adjusted = [k.split('_')[-1] for k in ms.keys()]
 
@@ -17,7 +18,7 @@ class TestMetrics():
 
     def test_intermediate_metric(self, metric_data):
         ms = list(l_moments.values())
-        computed = MetricGraph.run_metrics(metric_data, ms)
+        computed = MetricGraph.run_metrics(metric_data, ms).compute()
 
         assert computed.m_Z_l1.any()
         assert computed.m_Z_l2.any()

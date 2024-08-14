@@ -1,5 +1,3 @@
-import dask.diagnostics
-import dask.distributed
 import numpy as np
 import signal
 import datetime
@@ -7,11 +5,12 @@ import copy
 from typing import Generator
 import pandas as pd
 
-import dask
-from dask.distributed import as_completed, futures_of, CancelledError, get_client
+from dask.distributed import as_completed, futures_of, CancelledError
+from distributed.client import _get_global_client as get_client
+from dask.delayed import Delayed
 import dask.array as da
 import dask.bag as db
-from dask.dataframe.io import from_pandas
+from dask.diagnostics import ProgressBar
 
 from .. import Extents, Storage, Data, ShatterConfig, MetricGraph
 
@@ -76,12 +75,16 @@ def agg_list(data_in):
 
     return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
-def join(list_data, metric_data):
+def join(list_data: pd.DataFrame, metric_data):
     """
-    Join the list data and metric DataFrames together
+    Join the list data and metric DataFrames together.
     """
     if list_data is None or metric_data is None:
         return None
+
+    if isinstance(metric_data, Delayed):
+        metric_data = metric_data.compute()
+
     return list_data.join(metric_data)
 
 def write(data_in, storage, timestamp):
@@ -133,14 +136,9 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
             return all(one.disjoint_by_mbr(m) for m in config.mbr)
         leaf_bag = leaf_bag.filter(mbr_filter)
 
-    metric_graph = storage.config.metric_graph
-    keys = [m.name for m in storage.config.metrics]
-
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     metrics: db.Bag = arranged.map(MetricGraph.run_metrics, storage.config.metrics)
-    # metrics: db.Bag = arranged.map(get_metrics, storage)
-    # metrics: db.Bag = arranged.map(metric_graph.get_methods, storage.config.metrics)
     lists: db.Bag = arranged.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
@@ -159,11 +157,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
-        try:
-            client = get_client()
+        client = get_client()
+        if client is not None:
             client.close()
-        except:
-            pass
         end_time = datetime.datetime.now().timestamp() * 1000
 
         storage.consolidate_shatter(config.time_slot)
@@ -179,9 +175,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     processes = get_processes(leaves, config, storage)
 
-    try:
         ## If dask is distributed, use the futures feature
-        dc = get_client()
+    dc = get_client()
+    if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
@@ -194,9 +190,10 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-    except:
+    else:
         # Handle non-distributed dask scenarios
-        config.point_count = sum(processes)
+        with ProgressBar() as p:
+            config.point_count = sum(processes)
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)
@@ -228,9 +225,9 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug(f'Data: {str(data)}')
     config.log.debug(f'Extents: {str(extents)}')
 
-    if dask.config.get('distributed.client') is None:
+    if get_client() is None:
         config.log.warning("Selected scheduler type does not support"
-                "continuously updated config information.")
+            "continuously updated config information.")
 
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()

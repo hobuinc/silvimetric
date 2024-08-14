@@ -1,5 +1,7 @@
 from typing import Dict, Literal, Any, Self, Union
 from uuid import uuid4
+from line_profiler import profile
+from functools import reduce
 
 import dask
 from dask.delayed import Delayed
@@ -7,6 +9,7 @@ from dask.highlevelgraph import HighLevelGraph
 import dask.multiprocessing
 import dask.threaded
 import distributed
+from distributed.client import _get_global_client as get_client
 import dask.bag as db
 
 from dask.optimization import cull
@@ -38,11 +41,7 @@ class MetricGraph():
         return HighLevelGraph(self.graph, self.deps)
 
     def get_runner(self):
-        try:
-            c= distributed.get_client()
-        except:
-            c = None
-
+        c= get_client()
         if c is not None:
             # return dask.threaded.get
             return c.get
@@ -96,9 +95,9 @@ class MetricGraph():
         bag = db.Bag(dsk=hlg, name=str(u), npartitions=len(graph.keys()))
         return bag.persist()
 
-
     @staticmethod
-    def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None):
+    @profile
+    def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None) -> list[Delayed]:
 
         # identitity for this graph, can be created before or during this method
         # call, but needs to be the same across this graph, and unique compared
@@ -106,8 +105,13 @@ class MetricGraph():
         if uuid is None:
             uuid = uuid4()
 
-        if not isinstance(data, Delayed):
-            data = dask.delayed(data)
+        # don't duplicate future/delay
+        if not isinstance(data, Delayed) and not isinstance(data, distributed.Future):
+            c = get_client()
+            if c is not None:
+                data = c.scatter(data)
+            else:
+                data = dask.delayed(data)
 
         if isinstance(metrics, Metric):
             metrics = [ metrics ]
@@ -127,13 +131,14 @@ class MetricGraph():
         return seq
 
     @staticmethod
+    @profile
     def run_metrics(data, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
-        from functools import reduce
-
         graph = MetricGraph.get_methods(data, metrics)
 
-        computed_list = dask.compute(*graph)
+        # try returning just the graph and see if that can speed thigns up
+        # return graph
 
+        computed_list = dask.persist(*graph, optimize_graph=True)
 
         def merge(x, y):
             return x.merge(y, on=['xi','yi'])

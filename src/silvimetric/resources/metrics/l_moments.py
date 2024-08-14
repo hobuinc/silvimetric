@@ -10,10 +10,9 @@ import warnings
 warnings.filterwarnings(
     action='ignore',
     category=RuntimeWarning,
-    module='lmoments3.distr'
+    module='lmoments3'
 )
 
-@profile
 def lmom4(data):
     n = data.count()
     try:
@@ -31,23 +30,18 @@ def lmom4(data):
         return [data.mean(), np.nan, np.nan, np.nan]
 
 # L1 is same as mean...compute using np.mean for speed
-@profile
 def m_l1(data, *args):
     return args[0][0]
 
-@profile
 def m_l2(data, *args):
     return args[0][1]
 
-@profile
 def m_l3(data, *args):
     return args[0][2]
 
-@profile
 def m_l4(data, *args):
     return args[0][3]
 
-@profile
 def m_lcv(data, *args):
     l: tuple[float, float, float, float] = args[0]
 
@@ -56,7 +50,6 @@ def m_lcv(data, *args):
     except ZeroDivisionError as e:
         return np.nan
 
-@profile
 def m_lskewness(data, *args):
     l: tuple[float, float, float, float] = args[0]
     try:
@@ -64,7 +57,6 @@ def m_lskewness(data, *args):
     except ZeroDivisionError as e:
         return np.nan
 
-@profile
 def m_lkurtosis(data, *args):
     l: tuple[float, float, float, float] = args[0]
     try:
