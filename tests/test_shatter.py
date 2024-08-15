@@ -24,7 +24,7 @@ def write(x, y, val, s:Storage, attrs, dims, metrics):
 
 class Test_Shatter(object):
 
-    def test_one(self, shatter_config, storage: Storage, maxy):
+    def test_command(self, shatter_config, storage: Storage, maxy):
         shatter(shatter_config)
         with storage.open('r') as a:
             assert a[:,:]['Z'].shape[0] == 100

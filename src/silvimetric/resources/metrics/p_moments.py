@@ -19,11 +19,11 @@ def m_skewness(data, *args):
 def m_kurtosis(data, *args):
     return args[0][2]
 
-mean = Metric('mean', np.float32, m_mean)
-moment_base = Metric('moment_base', object, m_moments, [mean])
-variance = Metric('variance', np.float32, m_variance, [moment_base])
-skewness = Metric('skewness', np.float32, m_skewness, [moment_base])
-kurtosis = Metric('kurtosis', np.float32, m_kurtosis, [moment_base])
+mean = Metric(name='mean', dtype=np.float32, method=m_mean)
+moment_base = Metric(name='moment_base', dtype=object, method=m_moments, dependencies=[mean])
+variance = Metric(name='variance', dtype=np.float32, method=m_variance, dependencies=[moment_base])
+skewness = Metric(name='skewness', dtype=np.float32, method=m_skewness, dependencies=[moment_base])
+kurtosis = Metric(name='kurtosis', dtype=np.float32, method=m_kurtosis, dependencies=[moment_base])
 
 product_moments: dict[str, Metric] = dict(mean=mean,
     variance=variance,

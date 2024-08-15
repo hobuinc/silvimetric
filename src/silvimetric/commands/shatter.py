@@ -4,6 +4,7 @@ import datetime
 import copy
 from typing import Generator
 import pandas as pd
+import tiledb
 
 from dask.distributed import as_completed, futures_of, CancelledError
 from distributed.client import _get_global_client as get_client
@@ -12,7 +13,7 @@ import dask.array as da
 import dask.bag as db
 from dask.diagnostics import ProgressBar
 
-from .. import Extents, Storage, Data, ShatterConfig, MetricGraph
+from .. import Extents, Storage, Data, ShatterConfig, run_metrics
 
 def get_data(extents: Extents, filename: str, storage: Storage):
     """
@@ -48,12 +49,14 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     points = points.loc[points.X >= leaf.bounds.minx]
     points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
+    if points.size == 0:
+        return None
+
     points.loc[:, 'xi'] = da.floor(points.xi)
     # ceil for y because origin is at top left
     points.loc[:, 'yi'] = da.ceil(points.yi)
 
     return points
-
 
 def get_metrics(data_in, storage: Storage):
     """
@@ -62,7 +65,7 @@ def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
-    return MetricGraph.run_metrics(data_in, storage.config.metrics)
+    return run_metrics(data_in, storage.config.metrics)
 
 def agg_list(data_in):
     """
@@ -70,10 +73,22 @@ def agg_list(data_in):
     """
     if data_in is None:
         return None
-    grouped = data_in.groupby(['xi','yi'])
-    grouped = grouped.agg(list)
 
-    return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+    # grouped = data_in.groupby(['xi','yi'])
+    # grouped = grouped.agg(list)
+
+    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+
+    # # coerce datatypes to object so we can store np arrays as cell values
+    old_dtypes = data_in.dtypes
+    xyi_dtypes = { 'xi': np.float64, 'yi': np.float64 }
+    o = np.dtype('O')
+    col_dtypes = { a: o for a in data_in.columns if a not in ['xi','yi'] }
+
+
+    coerced = data_in.astype(col_dtypes | xyi_dtypes)
+    a = coerced.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
+    return a.assign(count=lambda x: [len(z) for z in a.Z])
 
 def join(list_data: pd.DataFrame, metric_data):
     """
@@ -85,7 +100,7 @@ def join(list_data: pd.DataFrame, metric_data):
     if isinstance(metric_data, Delayed):
         metric_data = metric_data.compute()
 
-    return list_data.join(metric_data)
+    return list_data.join(metric_data).reset_index()
 
 def write(data_in, storage, timestamp):
     """
@@ -96,27 +111,22 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    # TODO get this working at some point. Look at pandas extensions
-    # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+    # data_in = data_in.reset_index()
+    data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
 
-    # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
-    #         column_types=dict(data_in.dtypes),
-    #         varlen_types=[np.dtype('O')])
+    attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
+    xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
+    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
+    dtype_dict = attr_dict | xy_dict | metr_dict
 
-    if data_in is None or data_in.empty:
-        return 0
+    varlen_types = {a.dtype for a in storage.config.attrs}
 
-    with storage.open('w', timestamp=timestamp) as tdb:
-        idf = data_in.index.to_frame()
+    tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
+        dataframe=data_in, mode='append', timestamp=timestamp,
+        column_types=dtype_dict, varlen_types=varlen_types)
 
-        dx = idf['xi'].to_list()
-        dy = idf['yi'].to_list()
-        dt = lambda a: tdb.schema.attr(a).dtype
-        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
-
-        tdb[dx,dy] = dd
-        pc = dd['count'].sum().item()
-        p = copy.deepcopy(pc)
+    pc = data_in['count'].sum().item()
+    p = copy.deepcopy(pc)
 
     del pc, data_in
     return p
@@ -136,10 +146,16 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
             return all(one.disjoint_by_mbr(m) for m in config.mbr)
         leaf_bag = leaf_bag.filter(mbr_filter)
 
+    def pc_filter(d: pd.DataFrame):
+        if d is None:
+            return False
+        return not d.empty
+
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(MetricGraph.run_metrics, storage.config.metrics)
-    lists: db.Bag = arranged.map(agg_list)
+    filtered = arranged.filter(pc_filter)
+    metrics: db.Bag = filtered.map(run_metrics, storage.config.metrics)
+    lists: db.Bag = filtered.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 

@@ -72,12 +72,20 @@ class Data:
         reader._options['threads'] = self.reader_thread_count
         if self.bounds:
             reader._options['bounds'] = str(self.bounds)
-        class_zero = pdal.Filter.assign(value="Classification = 0")
-        rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
-        nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
+
+
+        return reader.pipeline()
+        ## TODO
+        ## Remove these filters.assign stages for now
+        ## Waiting for a pdal/pdal-python fix to this
+        ## https://github.com/PDAL/python/issues/174
+
+        # class_zero = pdal.Filter.assign(value="Classification = 0")
+        # rn = pdal.Filter.assign(value="ReturnNumber = 1 WHERE ReturnNumber < 1")
+        # nor = pdal.Filter.assign(value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
         # ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
 
-        return reader | class_zero | rn | nor
+        # return reader | class_zero | rn | nor
 
     def get_pipeline(self) -> pdal.Pipeline:
         """Fetch the pipeline for the instance

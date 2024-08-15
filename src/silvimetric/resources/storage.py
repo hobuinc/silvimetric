@@ -210,7 +210,6 @@ class Storage:
         else:
             raise Exception(f"Path {self.config.tdb_dir} does not exist")
 
-        # return tdb
         try:
             yield tdb
         finally:
@@ -326,7 +325,7 @@ class Storage:
 
         self.config.log.debug('Deleting fragments...')
         tiledb.Array.delete_fragments(self.config.tdb_dir,
-            timestamp_start=proc_num,timestamp_end=proc_num)
+            timestamp_start=proc_num, timestamp_end=proc_num)
         self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())

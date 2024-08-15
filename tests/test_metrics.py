@@ -1,14 +1,14 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, grid_metrics, MetricGraph
+from silvimetric import shatter, Storage, grid_metrics, run_metrics
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
 
 class TestMetrics():
 
     def test_metrics(self, metric_data):
-        ms: pd.DataFrame = MetricGraph.run_metrics(metric_data,
+        ms: pd.DataFrame = run_metrics(metric_data,
             list(grid_metrics.values())).compute()
         assert isinstance(ms, pd.DataFrame)
         adjusted = [k.split('_')[-1] for k in ms.keys()]
@@ -18,7 +18,7 @@ class TestMetrics():
 
     def test_intermediate_metric(self, metric_data):
         ms = list(l_moments.values())
-        computed = MetricGraph.run_metrics(metric_data, ms).compute()
+        computed = run_metrics(metric_data, ms).compute()
 
         assert computed.m_Z_l1.any()
         assert computed.m_Z_l2.any()
@@ -42,12 +42,10 @@ class TestMetrics():
         stddev.dependencies = [ median ]
         cv.dependencies = [ mean, stddev ]
 
-        # graph: MetricGraph = MetricGraph.make_graph(cv)
-        a = MetricGraph.get_methods(metric_data, [cv, mean])
-        b = dask.compute(*a)
+        b = run_metrics(metric_data, [cv, mean])
 
-        assert b[0].m_Z_cv.any()
-        assert b[1].m_Z_mean.any()
+        assert b.m_Z_cv.any()
+        assert b.m_Z_mean.any()
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):

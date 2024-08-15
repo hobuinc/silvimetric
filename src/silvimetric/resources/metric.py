@@ -1,7 +1,11 @@
 import json
+import base64
+
 from typing import Callable, Optional, Any, Union, List, Self
 from inspect import getsource
-import base64
+from uuid import uuid4
+from line_profiler import profile
+from functools import reduce
 
 from tiledb import Attr
 import numpy as np
@@ -9,8 +13,17 @@ import distributed
 import dill
 import pandas as pd
 
+import dask
+from dask.delayed import Delayed
+from distributed.client import _get_global_client as get_client
+from distributed import Future
+
+
 
 from .attribute import Attribute
+
+
+
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
@@ -97,7 +110,7 @@ class Metric():
         # the index columns are determined by where this data is coming from
         # if it has xi and yi, then it's coming from shatter
         # if it has X and Y, then it's coming from extract as a rerun of a cell
-        if isinstance(data, distributed.Future):
+        if isinstance(data, Future):
             data = data.result()
 
         idx = ['xi','yi']
@@ -203,3 +216,51 @@ class Metric():
 
     def __repr__(self) -> str:
         return f"Metric_{self.name}"
+
+def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None) -> list[Delayed]:
+
+    # identitity for this graph, can be created before or during this method
+    # call, but needs to be the same across this graph, and unique compared
+    # to other graphs
+    if uuid is None:
+        uuid = uuid4()
+
+    # don't duplicate future/delay
+    if not isinstance(data, Delayed) and not isinstance(data, Future):
+        c = get_client()
+        if c is not None:
+            data = c.scatter(data)
+        else:
+            data = dask.delayed(data)
+
+    if isinstance(metrics, Metric):
+        metrics = [ metrics ]
+
+    # iterate through metrics and their dependencies.
+    # uuid here will help guide metrics to use the same dependency method
+    # calls from dask
+    seq = []
+    for m in metrics:
+        if not isinstance(m, Metric):
+            continue
+        ddeps = get_methods(data, m.dependencies, uuid)
+        dd = dask.delayed(m.do)(data, *ddeps,
+            dask_key_name=f'{m.name}-{str(uuid)}')
+        seq.append(dd)
+
+    return seq
+
+@profile
+def run_metrics(data, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+    graph = get_methods(data, metrics)
+
+    # try returning just the graph and see if that can speed thigns up
+    # return graph
+
+    computed_list = dask.persist(*graph, optimize_graph=True)
+
+    def merge(x, y):
+        return x.merge(y, on=['xi','yi'])
+    merged = reduce(merge, computed_list)
+
+    return merged

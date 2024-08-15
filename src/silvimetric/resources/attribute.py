@@ -1,8 +1,8 @@
 import json
 import numpy as np
 import pdal
-from abc import ABC, abstractmethod
 from tiledb import Attr
+from .array_extensions import AttributeArray, AttributeDtype
 
 class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
@@ -11,8 +11,11 @@ class Attribute():
     def __init__(self, name: str, dtype: np.dtype) -> None:
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype =  np.dtype(dtype).str
-        """Numpy data type str."""
+        self.dtype = AttributeDtype(subtype=dtype)
+        """Numpy data type."""
+
+    def make_array(self, data, copy=False):
+        return AttributeArray(data=data, copy=copy)
 
     def entry_name(self) -> str:
         """Return TileDB attribute name."""
@@ -35,12 +38,12 @@ class Attribute():
         Create the tiledb schema for this attribute.
         :return: TileDB attribute schema
         """
-        return Attr(name=self.name, dtype=self.dtype, var=True)
+        return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
 
     def to_json(self) -> object:
         return {
             'name': self.name,
-            'dtype': self.dtype
+            'dtype': np.dtype(self.dtype.subtype).str
         }
 
     @staticmethod
