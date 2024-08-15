@@ -42,8 +42,7 @@ class TestMetrics():
         stddev.dependencies = [ median ]
         cv.dependencies = [ mean, stddev ]
 
-        b = run_metrics(metric_data, [cv, mean])
-
+        b = run_metrics(metric_data, [cv, mean]).compute()
         assert b.m_Z_cv.any()
         assert b.m_Z_mean.any()
 

@@ -8,10 +8,13 @@ class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
-    def __init__(self, name: str, dtype: np.dtype) -> None:
+    def __init__(self, name: str, dtype: np.dtype | AttributeDtype) -> None:
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype = AttributeDtype(subtype=dtype)
+        if isinstance(dtype, AttributeDtype):
+            self.dtype = dtype
+        else:
+            self.dtype = AttributeDtype(subtype=dtype)
         """Numpy data type."""
 
     def make_array(self, data, copy=False):

@@ -23,7 +23,7 @@ from .common import dask_handle, close_dask
 @click.option("--dasktype", default='processes', type=click.Choice(['threads',
         'processes']), help="What Dask uses for parallelization. For more"
         "information see here https://docs.dask.org/en/stable/scheduling.html#local-threads")
-@click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
+@click.option("--scheduler", default='local', type=click.Choice(['distributed',
         'local', 'single-threaded']), help="Type of dask scheduler. Both are "
         "local, but are run with different dask libraries. See more here "
         "https://docs.dask.org/en/stable/scheduling.html.")

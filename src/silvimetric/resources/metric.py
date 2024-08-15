@@ -217,8 +217,12 @@ class Metric():
     def __repr__(self) -> str:
         return f"Metric_{self.name}"
 
-def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None) -> list[Delayed]:
-
+def get_methods(data: pd.DataFrame | Delayed, metrics: Metric | list[Metric],
+        uuid=None) -> list[Delayed]:
+    """
+    Create Metric dependency graph by iterating through desired metrics and
+    their dependencies, creating Delayed objects that can be run later.
+    """
     # identitity for this graph, can be created before or during this method
     # call, but needs to be the same across this graph, and unique compared
     # to other graphs
@@ -226,12 +230,15 @@ def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None) -> list[D
         uuid = uuid4()
 
     # don't duplicate future/delay
-    if not isinstance(data, Delayed) and not isinstance(data, Future):
-        c = get_client()
-        if c is not None:
-            data = c.scatter(data)
-        else:
-            data = dask.delayed(data)
+    # if not isinstance(data, Delayed) and not isinstance(data, Future):
+    #     c = get_client()
+    #     if c is not None:
+    #         data = c.scatter(data)
+    #     else:
+    #         data = dask.delayed(data)
+
+    if not isinstance(data, Delayed):
+        data = dask.delayed(data)
 
     if isinstance(metrics, Metric):
         metrics = [ metrics ]
@@ -251,7 +258,10 @@ def get_methods(data, metrics: Union[Metric, list[Metric]], uuid=None) -> list[D
     return seq
 
 @profile
-def run_metrics(data, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+    """
+    Collect Metric dependency graph and run it, then merge the results together.
+    """
     graph = get_methods(data, metrics)
 
     # try returning just the graph and see if that can speed thigns up
