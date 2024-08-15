@@ -67,7 +67,14 @@ def get_metrics(data_in: pd.DataFrame, storage: Storage):
     if data_in is None:
         return None
 
-    exploded = data_in.agg(lambda x: x.explode())
+    def expl(x):
+        return x.explode()
+
+    attrs = [a.name for a in storage.config.attrs if a.name not in ['X','Y']]
+
+    # set index so we can apply to the whole dataset without needing to skip X and Y
+    # then reset in the index because that's what metric.do expects
+    exploded = data_in.set_index(['X','Y']).apply(expl)[attrs].reset_index()
     metric_data = dask.persist(*[ m.do(exploded) for m in storage.config.metrics ])
 
     data_out = data_in.set_index(['X','Y']).join([m for m in metric_data])

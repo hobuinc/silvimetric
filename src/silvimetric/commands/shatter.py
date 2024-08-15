@@ -1,18 +1,21 @@
 import dask.diagnostics
 import dask.distributed
+import dask.diagnostics
+import dask.distributed
 import numpy as np
 import signal
 import datetime
 import copy
 from typing import Generator
 import pandas as pd
+import tiledb
 
 import dask
 from dask.distributed import as_completed, futures_of, CancelledError
 import dask.array as da
 import dask.bag as db
 
-from .. import Extents, Storage, Data, ShatterConfig
+from .. import Extents, Storage, Data, ShatterConfig, AttributeArray, Attribute, AttributeDtype
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
     """
@@ -54,7 +57,6 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     return points
 
-
 def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
@@ -68,6 +70,9 @@ def get_metrics(data_in, storage: Storage):
     if data_in is None:
         return None
 
+    if data_in is None:
+        return None
+
     metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
     return metric_data
 
@@ -77,9 +82,13 @@ def agg_list(df: pd.DataFrame):
     """
     if df is None:
         return None
-    grouped = df.groupby(['xi','yi'])
-    grouped = grouped.agg(list)
-    return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+
+    # coerce datatypes to object so we can store np arrays as cell values
+    old_dtypes = df.dtypes
+    new_dtypes = {a: np.dtype('O') for a in df.columns if a not in ['xi','yi']} | {'xi': np.float64, 'yi': np.float64}
+    df = df.astype(new_dtypes)
+    a = df.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
+    return a.assign(count=lambda x: [len(z) for z in a.Z])
 
 def join(list_data, metric_data):
     """
@@ -98,27 +107,22 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    # TODO get this working at some point. Look at pandas extensions
-    # data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+    data_in = data_in.reset_index()
+    data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
 
-    # tiledb.from_pandas(uri='autzen_db', dataframe=data_in, mode='append',
-    #         column_types=dict(data_in.dtypes),
-    #         varlen_types=[np.dtype('O')])
+    attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
+    xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
+    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
+    dtype_dict = attr_dict | xy_dict | metr_dict
 
-    if data_in is None or data_in.empty:
-        return 0
+    varlen_types = {a.dtype for a in storage.config.attrs}
 
-    with storage.open('w', timestamp=timestamp) as tdb:
-        idf = data_in.index.to_frame()
+    tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
+        dataframe=data_in, mode='append', timestamp=timestamp,
+        column_types=dtype_dict, varlen_types=varlen_types)
 
-        dx = idf['xi'].to_list()
-        dy = idf['yi'].to_list()
-        dt = lambda a: tdb.schema.attr(a).dtype
-        dd = { d: np.fromiter([*[np.array(nd, dt(d)) for nd in data_in[d]], None], object)[:-1] for d in data_in }
-
-        tdb[dx,dy] = dd
-        pc = dd['count'].sum().item()
-        p = copy.deepcopy(pc)
+    pc = data_in['count'].sum().item()
+    p = copy.deepcopy(pc)
 
     del pc, data_in
     return p
