@@ -4,7 +4,6 @@ import base64
 from typing import Callable, Optional, Any, Union, List, Self
 from inspect import getsource
 from uuid import uuid4
-from line_profiler import profile
 from functools import reduce
 
 from tiledb import Attr
@@ -249,7 +248,6 @@ def get_methods(data: pd.DataFrame | Delayed, metrics: Metric | list[Metric],
 
     return seq
 
-@profile
 def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
     """
     Collect Metric dependency graph and run it, then merge the results together.

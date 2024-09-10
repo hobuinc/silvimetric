@@ -3,7 +3,6 @@ import numpy as np
 from .p_moments import mean
 from lmoments3 import lmom_ratios
 from lmoments3 import distr
-from line_profiler import profile
 
 import warnings
 # suppress warnings from dividing by 0, these are handled in the metric creation
