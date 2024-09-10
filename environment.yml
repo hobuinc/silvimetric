@@ -18,3 +18,4 @@ dependencies:
   - python-json-logger
   - dill
   - pandas
+  - lmoments3
