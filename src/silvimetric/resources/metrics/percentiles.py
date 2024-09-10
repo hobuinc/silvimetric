@@ -6,55 +6,55 @@ def percentile_base(data: pd.DataFrame):
     return np.percentile(data, range(100)).tolist()
 
 def m_p01(data: pd.DataFrame, *args):
-    return args[0][0]
+    return args[0][1]
 
 def m_p05(data: pd.DataFrame, *args):
-    return args[0][4]
-
-def m_p10(data: pd.DataFrame, *args):
-    return args[0][2]
-
-def m_p20(data: pd.DataFrame, *args):
-    return args[0][3]
-
-def m_p25(data: pd.DataFrame, *args):
-    return args[0][4]
-
-def m_p30(data: pd.DataFrame, *args):
     return args[0][5]
 
-def m_p40(data: pd.DataFrame, *args):
-    return args[0][6]
-
-def m_p50(data: pd.DataFrame, *args):
-    return args[0][7]
-
-def m_p60(data: pd.DataFrame, *args):
-    return args[0][8]
-
-def m_p70(data: pd.DataFrame, *args):
-    return args[0][9]
-
-def m_p75(data: pd.DataFrame, *args):
+def m_p10(data: pd.DataFrame, *args):
     return args[0][10]
 
+def m_p20(data: pd.DataFrame, *args):
+    return args[0][20]
+
+def m_p25(data: pd.DataFrame, *args):
+    return args[0][25]
+
+def m_p30(data: pd.DataFrame, *args):
+    return args[0][30]
+
+def m_p40(data: pd.DataFrame, *args):
+    return args[0][40]
+
+def m_p50(data: pd.DataFrame, *args):
+    return args[0][50]
+
+def m_p60(data: pd.DataFrame, *args):
+    return args[0][60]
+
+def m_p70(data: pd.DataFrame, *args):
+    return args[0][70]
+
+def m_p75(data: pd.DataFrame, *args):
+    return args[0][75]
+
 def m_p80(data: pd.DataFrame, *args):
-    return args[0][11]
+    return args[0][80]
 
 def m_p90(data: pd.DataFrame, *args):
-    return args[0][12]
+    return args[0][90]
 
 def m_p95(data: pd.DataFrame, *args):
-    return args[0][13]
+    return args[0][95]
 
 def m_p99(data: pd.DataFrame, *args):
-    return args[0][14]
+    return args[0][99]
 
 def m_90m10(data, *args):
-    return args[0][12] - args[0][2]
+    return args[0][90] - args[0][10]
 
 def m_95m05(data, *args):
-    return args[0][13] - args[0][1]
+    return args[0][95] - args[0][5]
 
 pct_base = Metric('pct_base', object, percentile_base)
 

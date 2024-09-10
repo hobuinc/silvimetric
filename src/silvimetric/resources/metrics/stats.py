@@ -2,6 +2,15 @@ import numpy as np
 from scipy import stats
 from ..metric import Metric
 from .p_moments import mean
+from .percentiles import pct_base
+
+import warnings
+# suppress warnings from dividing by 0, these are handled in the metric creation
+warnings.filterwarnings(
+    action='ignore',
+    category=RuntimeWarning,
+    module='lmoments3'
+)
 
 def m_mode(data):
     u, c = np.unique(data, return_counts=True)
@@ -23,24 +32,35 @@ def m_stddev(data, *args):
 
 def m_cv(data, *args):
     stddev, mean = args
+    if mean == 0:
+        return np.nan
     return stddev / mean
 
 # TODO check performance of other methods
 def m_abovemean(data, *args):
     mean = args[0]
-    return (data > mean).sum() / len(data)
+    l = len(data)
+    if l == 0:
+        return np.nan
+    return (data > mean).sum() / l
 
 # TODO check performance of other methods
 def m_abovemode(data, *args):
     mode = args[0]
-    return (data > mode).sum() / len(data)
+    l = len(data)
+    if l == 0:
+        return np.nan
+    return (data > mode).sum() / l
 
 def m_iq(data):
     return stats.iqr(data)
 
 def m_crr(data, *args):
     mean, minimum, maximum = args
-    return (mean - minimum) / (maximum - minimum)
+    den = (maximum - minimum)
+    if den == 0:
+        return np.nan
+    return (mean - minimum) / den
 
 def m_sqmean(data):
     return np.sqrt(np.mean(np.square(data)))
@@ -50,20 +70,20 @@ def m_cumean(data):
 
 def m_profilearea(data, *args):
     # sanity check...must have valid heights/elevations
-    dmax, dmin = args
+    dmax, dmin , p = args
     if dmax <= 0:
         return -9999.0
 
-    p = np.percentile(data, range(1, 100))
+    # p = np.percentile(data, range(1, 100))
     p0 = max(dmin, 0.0)
 
     # second sanity check...99th percentile must be > 0
-    if p[98] > 0.0:
+    p99 = p[99]
+    if p99 > 0.0:
         # compute area under normalized percentile height curve using composite trapeziod rule
-        pa = p0 / p[98]
-        for ip in p[:97]:
-            pa += 2.0 * ip / p[98]
-        pa += 1.0
+        pcts = np.array(p[:98])
+        areas = pcts * 2 / p99
+        pa = p0/p99 + areas.sum() + 1
 
         return pa * 0.5
     else:
@@ -88,7 +108,7 @@ iq = Metric('iq', np.float32, m_iq)
 crr = Metric('crr', np.float32, m_crr, [ mean, sm_min, sm_max ])
 sqmean = Metric('sqmean', np.float32, m_sqmean)
 cumean = Metric('cumean', np.float32, m_cumean)
-profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min ])
+profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min, pct_base ])
 
 statistics: dict[str, Metric] = dict(
     mode=mode,

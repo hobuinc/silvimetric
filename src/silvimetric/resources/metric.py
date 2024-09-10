@@ -163,7 +163,6 @@ class Metric():
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
             'dependencies': [d.to_json() for d in self.dependencies],
-            'method_str': getsource(self._method),
             'method': base64.b64encode(dill.dumps(self._method)).decode(),
             'filters': [base64.b64encode(dill.dumps(f)).decode() for f in self.filters],
             'attributes': [a.to_json() for a in self.attributes]
@@ -229,14 +228,7 @@ def get_methods(data: pd.DataFrame | Delayed, metrics: Metric | list[Metric],
     if uuid is None:
         uuid = uuid4()
 
-    # don't duplicate future/delay
-    # if not isinstance(data, Delayed) and not isinstance(data, Future):
-    #     c = get_client()
-    #     if c is not None:
-    #         data = c.scatter(data)
-    #     else:
-    #         data = dask.delayed(data)
-
+    # don't duplicate a delayed object
     if not isinstance(data, Delayed):
         data = dask.delayed(data)
 

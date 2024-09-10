@@ -6,7 +6,7 @@ from lmoments3 import distr
 from line_profiler import profile
 
 import warnings
-# suppress warnings from dividing by 0, results are the same
+# suppress warnings from dividing by 0, these are handled in the metric creation
 warnings.filterwarnings(
     action='ignore',
     category=RuntimeWarning,
