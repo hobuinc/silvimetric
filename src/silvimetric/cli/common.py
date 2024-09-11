@@ -101,7 +101,7 @@ class MetricParamType(click.ParamType):
                     else:
                         metrics.udpate(list(m))
             except Exception as e:
-                self.fail(f"{val!r} is not available in Metrics, {e}", param, ctx)
+                self.fail(f"{val!r} is not available in Metrics", param, ctx)
         return list(metrics)
 
 def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,

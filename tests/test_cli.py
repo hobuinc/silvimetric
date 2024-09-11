@@ -1,12 +1,17 @@
-import numpy as np
+from click.testing import CliRunner
 import os
+from datetime import datetime
+
+import numpy as np
+from pytest import TempPathFactory
 
 from silvimetric.cli import cli
 from silvimetric.commands import shatter, info
-from silvimetric import ShatterConfig
+from silvimetric import ShatterConfig, Bounds, StorageConfig, Storage, ExtractConfig
 
 class TestCli(object):
-    def test_cli_init(self, tmp_path_factory, runner, bounds):
+    def test_cli_init(self, tmp_path_factory: TempPathFactory,
+            runner: CliRunner, bounds: Bounds) -> None:
         path = tmp_path_factory.mktemp("test_tdb")
         p = os.path.abspath(path)
         res = runner.invoke(cli.cli, args=["-d", p, "--debug",
@@ -15,7 +20,8 @@ class TestCli(object):
                 catch_exceptions=False)
         assert res.exit_code == 0
 
-    def test_cli_metric_groups(self, tmp_path_factory, runner, bounds):
+    def test_cli_metric_groups(self, tmp_path_factory: TempPathFactory,
+            runner: CliRunner, bounds: Bounds) -> None:
         path = tmp_path_factory.mktemp("test_tdb")
         p = os.path.abspath(path)
         res = runner.invoke(cli.cli, args=["-d", p, "--debug", "--scheduler",
@@ -23,8 +29,35 @@ class TestCli(object):
                 "--bounds", str(bounds), "-m", "stats,p_moments"], catch_exceptions=False)
         assert res.exit_code == 0
 
-    def test_cli_shatter(self, runner, maxy, date, tdb_filepath,
-            copc_filepath, storage):
+    def test_cli_metric_file(self, tmp_path_factory: TempPathFactory,
+            runner: CliRunner, bounds: Bounds, date: datetime, copc_filepath: str) -> None:
+        # test that we can pass in a file containing metrics and then run shatter over it
+        path = tmp_path_factory.mktemp("test_tdb")
+        p = os.path.abspath(path)
+        fakes = os.path.abspath('tests/fixtures/fake_metrics.py')
+        res = runner.invoke(cli.cli, args=["-d", p, "--debug",
+                "--scheduler", "single-threaded", "initialize",
+                "--resolution", "10", "--crs", "EPSG:3857", "--bounds",
+                str(bounds), "-m", f"{fakes}"],
+                catch_exceptions=False)
+        assert res.exit_code == 0
+        res2 = runner.invoke(cli.cli, args=["-d", p,
+                "--scheduler", "single-threaded",
+                "shatter", copc_filepath,
+                "--date", date.isoformat()+'Z',
+                "--tilesize", '10'], catch_exceptions=False)
+        assert res2.exit_code == 0
+        storage = Storage.from_db(p)
+        with storage.open('r') as a:
+            exists_vals = a[:,:]['m_Z_exists']
+            assert all(exists_vals)
+            count_vals = a[:,:]['m_Z_count']
+            assert all(count_vals == 100)
+
+
+
+    def test_cli_shatter(self, runner: CliRunner, maxy: float, date: datetime,
+            tdb_filepath: str, copc_filepath: str, storage: shatter.Storage) -> None:
 
         res = runner.invoke(cli.cli, args=["-d", tdb_filepath,
                 "--scheduler", "single-threaded",
@@ -46,20 +79,26 @@ class TestCli(object):
                     a[xi, yi]['Z'][0].size == 900
                     # this should have all indices from 0 to 9 filled.
                     # if oob error, it's not this test's fault
-                    assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
+                    assert bool(np.all( a[xi, yi]['Z'][0] == (
+                        (maxy/storage.config.resolution) - (yi + 1)) ))
 
-    def test_cli_scan(self, runner, copc_filepath, storage_config):
+    def test_cli_scan(self, runner: CliRunner, copc_filepath: str,
+            storage_config: StorageConfig) -> None:
         tdb_dir = storage_config.tdb_dir
-        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler', 'single-threaded', 'scan', copc_filepath])
+        res = runner.invoke(cli.cli, args=['-d', tdb_dir, '--scheduler',
+            'single-threaded', 'scan', copc_filepath])
         print(res.output)
         assert res.exit_code == 0
 
-    def test_cli_info(self, tdb_filepath, runner, shatter_config):
+    def test_cli_info(self, tdb_filepath: str, runner: CliRunner,
+            shatter_config: ShatterConfig) -> None:
         shatter.shatter(shatter_config)
-        res = runner.invoke(cli.cli, args=['-d', tdb_filepath, '--scheduler', 'single-threaded', 'info'])
+        res = runner.invoke(cli.cli, args=['-d', tdb_filepath,
+            '--scheduler', 'single-threaded', 'info'])
         assert res.exit_code == 0
 
-    def test_cli_extract(self, runner, extract_config, storage):
+    def test_cli_extract(self, runner: CliRunner, extract_config: ExtractConfig,
+            storage: Storage):
         atts = []
         for a in extract_config.attrs:
             atts.append('-a')
@@ -76,7 +115,8 @@ class TestCli(object):
 
         assert res.exit_code == 0
 
-    def test_cli_delete(self, runner, shatter_config, pre_shatter):
+    def test_cli_delete(self, runner: CliRunner, shatter_config: ShatterConfig,
+            pre_shatter: int) -> None:
         i = shatter_config.name
         res = runner.invoke(cli.cli, ['-d', shatter_config.tdb_dir,
                 '--scheduler', 'single-threaded', 'delete', '--id', i])
@@ -85,7 +125,8 @@ class TestCli(object):
         i = info.info(shatter_config.tdb_dir)
         assert len(i['history']) == 0
 
-    def test_cli_restart(self, runner, shatter_config, pre_shatter):
+    def test_cli_restart(self, runner: CliRunner, shatter_config: ShatterConfig,
+            pre_shatter: int) -> None:
 
         i = shatter_config.name
         res = runner.invoke(cli.cli, ['-d', shatter_config.tdb_dir,
@@ -95,7 +136,8 @@ class TestCli(object):
         assert len(i['history']) == 1
         assert ShatterConfig.from_dict(i['history'][0])
 
-    def test_cli_resume(self, runner, shatter_config, pre_shatter):
+    def test_cli_resume(self, runner: CliRunner, shatter_config: ShatterConfig,
+            pre_shatter: int) -> None:
 
         i = shatter_config.name
         res = runner.invoke(cli.cli, ['-d', shatter_config.tdb_dir,

@@ -215,7 +215,7 @@ class Metric():
     def __repr__(self) -> str:
         return f"Metric_{self.name}"
 
-def get_methods(data: pd.DataFrame | Delayed, metrics: Metric | list[Metric],
+def get_methods(data: Union[pd.DataFrame, Delayed], metrics: Metric | list[Metric],
         uuid=None) -> list[Delayed]:
     """
     Create Metric dependency graph by iterating through desired metrics and

@@ -1,14 +1,15 @@
-Entry
-----------------------------------
-
-.. autoclass:: silvimetric.resources.entry.Entry
-
 Attribute
 ----------------------------------
 
-.. autoclass:: silvimetric.resources.entry.Attribute
+.. automodule:: silvimetric.resources.attribute
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 Metric
 ----------------------------------
 
-.. autoclass:: silvimetric.resources.metric.Metric
+.. automodule:: silvimetric.resources.metric
+   :members:
+   :undoc-members:
+   :show-inheritance:

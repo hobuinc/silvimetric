@@ -95,7 +95,7 @@ def extents(resolution, bounds) -> Generator[Extents, None, None]:
     yield Extents(bounds,resolution,bounds)
 
 @pytest.fixture(scope="function")
-def attrs(dims) -> Generator[list[str], None, None]:
+def attrs(dims) -> Generator[list[Attribute], None, None]:
     yield [Attribute(a, dims[a]) for a in
            ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']]
 

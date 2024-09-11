@@ -2,6 +2,7 @@ from pathlib import Path
 from itertools import chain
 
 
+from typing import Union
 from osgeo import gdal, osr
 import dask
 import numpy as np
@@ -54,7 +55,7 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
     tif.FlushCache()
     tif = None
 
-def get_metrics(data_in: pd.DataFrame, storage: Storage) -> None | pd.DataFrame:
+def get_metrics(data_in: pd.DataFrame, storage: Storage) -> Union[None, pd.DataFrame]:
     """
     Reruns a metric over this cell. Only called if there is overlapping data.
 

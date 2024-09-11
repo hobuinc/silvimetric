@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, grid_metrics, run_metrics
+from silvimetric import shatter, Storage, grid_metrics, run_metrics, Metric
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
+from silvimetric.resources.attribute import Attribute
 
 class TestMetrics():
 
@@ -29,10 +30,7 @@ class TestMetrics():
         assert computed.m_Z_lkurtosis.any()
 
     def test_dependencies(self, metric_data):
-        # should be able to create a dependency graph, use dask.get to retrieve
-        # the necessary keys, and those values should be dataframes.
-        import dask
-
+        # should be able to create a dependency graph
         cv = s['cv']
         mean = s['mean']
         stddev = s['stddev']
@@ -43,8 +41,12 @@ class TestMetrics():
         cv.dependencies = [ mean, stddev ]
 
         b = run_metrics(metric_data, [cv, mean]).compute()
+        # cv/mean should be there
         assert b.m_Z_cv.any()
         assert b.m_Z_mean.any()
+
+        #and median/stddev should not
+        assert not any(x in b.dtypes for x in  ['m_Z_median', 'm_Z_stddev'])
 
     def test_filter(self, metric_shatter_config, test_point_count, maxy,
             resolution):
@@ -79,6 +81,17 @@ class TestMetrics():
                     curr.size == 1
                     curr.iloc[0].size == 900
                     # this should have all indices from 0 to 9 filled.
-                    # if oob error, it's not this test's fault
+                    # if oob error, it's probably not this test's fault
                     assert bool(np.all( curr.iloc[0] == ((maxy/resolution) - (yi + 1)) ))
+
+    def test_custom(self, metric_data: pd.DataFrame, attrs: list[Attribute]) -> None:
+        def m_over500(data):
+            return data[data >= 500].count()
+        z_att = attrs[0]
+        m_cust = Metric(name='over500', dtype=np.float32, method=m_over500,
+            attributes=[z_att])
+        b = run_metrics(metric_data, [m_cust]).compute()
+
+        assert b.m_Z_over500.any()
+        assert b.m_Z_over500.values[0] == 3
 

@@ -8,14 +8,17 @@ class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
-    def __init__(self, name: str, dtype: np.dtype | AttributeDtype) -> None:
+    def __init__(self, name: str, dtype) -> None:
         self.name = name
         """Name of the attribute, eg. Intensity."""
+        self.dtype: AttributeDtype
+        """SilviMetric representation of array of numpy dtype"""
         if isinstance(dtype, AttributeDtype):
             self.dtype = dtype
-        else:
+        elif isinstance(dtype, np.dtype):
             self.dtype = AttributeDtype(subtype=dtype)
-        """Numpy data type."""
+        else:
+            raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}")
 
     def make_array(self, data, copy=False):
         return AttributeArray(data=data, copy=copy)
