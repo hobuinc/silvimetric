@@ -259,8 +259,7 @@ SilviMetric will take all the previously defined variables like the bounds,
 resolution, and our tile size, and it will split all data values up into their
 respective bins. From here, SilviMetric will perform each `Metric` previously
 defined in :ref:`initialize` over the data in each cell. At the end of all that,
-this data will be written to a `SparseArray` in `TileDB`, where it will be much
-easier to access.
+this data will be written to a `SparseArray` in `TileDB`, where it will be much easier to access.
 
 Usage:
 
