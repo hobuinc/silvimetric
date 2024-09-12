@@ -13,17 +13,10 @@ from dataclasses import dataclass, field
 
 from .log import Log
 from .extents import Bounds
-<<<<<<< HEAD
 from .metric import Metric
 from .metrics import grid_metrics
 from .attribute import Attribute, Attributes
 from .. import __version__
-=======
-from .metric import Metric, Metrics
-from .entry import Attribute, Attributes
-from . import constants
-from . import __version__
->>>>>>> metrics
 
 
 class SilviMetricJSONEncoder(json.JSONEncoder):
@@ -70,13 +63,9 @@ class StorageConfig(Config):
     root: Bounds
     """Root project bounding box"""
     crs: pyproj.CRS
-<<<<<<< HEAD
     """Coordinate reference system, same for all data in a project"""
     resolution: float = 30.0
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
-=======
-    resolution: float = DEFAULT_RESOLUTION
->>>>>>> metrics
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
