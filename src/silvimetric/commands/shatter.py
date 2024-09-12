@@ -106,6 +106,8 @@ def write(data_in, storage, timestamp):
     :param tdb: TileDB write stream.
     :return: Number of points written.
     """
+    if data_in is None:
+        return 0
 
     data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi':'X','yi':'Y'})

@@ -52,8 +52,16 @@ class Attribute(Entry):
         super().__init__()
         self.name = name
         """Name of the attribute, eg. Intensity."""
-        self.dtype = AttributeDtype(subtype=dtype)
-        """Numpy data type."""
+        self.dtype: AttributeDtype
+        """SilviMetric representation of array of numpy dtype"""
+        if isinstance(dtype, AttributeDtype):
+            self.dtype = dtype
+        else:
+            # AttributeDtype takes any dtype that can be passed to np.dtype
+            try:
+                self.dtype = AttributeDtype(subtype=dtype)
+            except Exception as e:
+                raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}") from e
 
     def make_array(self, data, copy=False):
         return AttributeArray(data=data, copy=copy)
