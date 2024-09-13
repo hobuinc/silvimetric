@@ -15,10 +15,12 @@ class Attribute():
         """SilviMetric representation of array of numpy dtype"""
         if isinstance(dtype, AttributeDtype):
             self.dtype = dtype
-        elif isinstance(dtype, np.dtype):
-            self.dtype = AttributeDtype(subtype=dtype)
         else:
-            raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}")
+            # AttributeDtype takes any dtype that can be passed to np.dtype
+            try:
+                self.dtype = AttributeDtype(subtype=dtype)
+            except Exception as e:
+                raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}") from e
 
     def make_array(self, data, copy=False):
         return AttributeArray(data=data, copy=copy)

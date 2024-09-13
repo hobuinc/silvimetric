@@ -54,6 +54,7 @@ class MetricParamType(click.ParamType):
         metrics: set[Metric] = set()
         for val in parsed_values:
             if '.py' in val:
+                # user imported metrics from external file
                 try:
                     import importlib.util
                     import os
@@ -77,31 +78,32 @@ class MetricParamType(click.ParamType):
                     if not isinstance(m, Metric):
                         self.fail(f"Invalid Metric supplied: {m}")
 
-                metrics.update(list(user_metrics.metrics().values()))
-
-            try:
-                if val == 'stats':
-                    metrics.update(list(statistics.values()))
-                elif val == 'p_moments':
-                    metrics.update(list(product_moments.values()))
-                elif val == 'l_moments':
-                    metrics.update(list(l_moments.values()))
-                elif val == 'percentiles':
-                    metrics.update(list(percentiles.values()))
-                elif val == 'aad':
-                    metrics.update(list(aad.aad.values()))
-                elif val == 'grid_metrics':
-                    metrics.update(list(grid_metrics.values()))
-                elif val == 'all':
-                    metrics.update(list(all_metrics.values()))
-                else:
-                    m = all_metrics[val]
-                    if isinstance(m, Metric):
-                        metrics.add(m)
+                metrics.update(list(user_metrics.metrics()))
+            else:
+                # SilviMetric defined metrics
+                try:
+                    if val == 'stats':
+                        metrics.update(list(statistics.values()))
+                    elif val == 'p_moments':
+                        metrics.update(list(product_moments.values()))
+                    elif val == 'l_moments':
+                        metrics.update(list(l_moments.values()))
+                    elif val == 'percentiles':
+                        metrics.update(list(percentiles.values()))
+                    elif val == 'aad':
+                        metrics.update(list(aad.aad.values()))
+                    elif val == 'grid_metrics':
+                        metrics.update(list(grid_metrics.values()))
+                    elif val == 'all':
+                        metrics.update(list(all_metrics.values()))
                     else:
-                        metrics.udpate(list(m))
-            except Exception as e:
-                self.fail(f"{val!r} is not available in Metrics", param, ctx)
+                        m = all_metrics[val]
+                        if isinstance(m, Metric):
+                            metrics.add(m)
+                        else:
+                            metrics.udpate(list(m))
+                except Exception as e:
+                    self.fail(f"{val!r} is not available in Metrics", param, ctx)
         return list(metrics)
 
 def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
