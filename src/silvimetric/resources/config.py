@@ -123,6 +123,7 @@ class StorageConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['root'] = self.root.to_json()
+
         return d
 
     @classmethod

@@ -44,15 +44,6 @@ class AttrParamType(click.ParamType):
             return Attributes[value]
         else:
             self.fail(f"{value!r} is of an invalid type, {e}", param, ctx)
-        if isinstance(value, list):
-            try:
-                return [Attributes[a] for a in value]
-            except Exception as e:
-                self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
-        elif isinstance(value, str):
-            return Attributes[value]
-        else:
-            self.fail(f"{value!r} is of an invalid type, {e}", param, ctx)
 
 class MetricParamType(click.ParamType):
     name="metrics"
