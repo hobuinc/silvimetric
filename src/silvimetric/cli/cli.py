@@ -16,14 +16,14 @@ from .common import dask_handle, close_dask
 @click.option("--debug", is_flag=True, default=False, help="Changes logging level from INFO to DEBUG.")
 @click.option("--log-dir", default=None, help="Directory for log output", type=str)
 @click.option("--progress", is_flag=True, default=True, type=bool, help="Report progress")
-@click.option("--workers", type=int, default=10, help="Number of workers for Dask")
-@click.option("--threads", type=int, default=4, help="Number of threads per worker for Dask")
+@click.option("--workers", type=int, help="Number of workers for Dask")
+@click.option("--threads", type=int, help="Number of threads per worker for Dask")
 @click.option("--watch", is_flag=True, default=False, type=bool,
         help="Open dask diagnostic page in default web browser.")
 @click.option("--dasktype", default='processes', type=click.Choice(['threads',
         'processes']), help="What Dask uses for parallelization. For more"
         "information see here https://docs.dask.org/en/stable/scheduling.html#local-threads")
-@click.option("--scheduler", default='distributed', type=click.Choice(['distributed',
+@click.option("--scheduler", default='local', type=click.Choice(['distributed',
         'local', 'single-threaded']), help="Type of dask scheduler. Both are "
         "local, but are run with different dask libraries. See more here "
         "https://docs.dask.org/en/stable/scheduling.html.")
@@ -133,14 +133,13 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
         help="Coordinate system of data")
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(),
         help="List of attributes to include in Database")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(),
-        help="List of metrics to include in Database")
+@click.option("--metrics", "-m", type=MetricParamType(), default=[],
+        help="List of metrics to include in output, eg. '-m stats,percentiles'")
 @click.option("--resolution", type=float, default=30.0,
         help="Summary pixel resolution")
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
         attributes: list[Attribute], resolution: float, metrics: list[Metric]):
-    import itertools
     """Initialize silvimetrics DATABASE"""
 
     storageconfig = StorageConfig(tdb_dir = app.tdb_dir,
@@ -205,8 +204,8 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 @cli.command('extract')
 @click.option("--attributes", "-a", multiple=True, type=AttrParamType(), default=[],
         help="List of attributes to include output")
-@click.option("--metrics", "-m", multiple=True, type=MetricParamType(), default=[],
-        help="List of metrics to include in output")
+@click.option("--metrics", "-m", type=MetricParamType(), default=[],
+        help="List of metrics to include in output, eg. '-m stats,percentiles'")
 @click.option("--bounds", type=BoundsParamType(), default=None,
         help="Bounds for data to include in output")
 @click.option("--outdir", "-o", type=click.Path(exists=False), required=True,

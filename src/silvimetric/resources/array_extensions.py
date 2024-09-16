@@ -15,10 +15,10 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
         self._subtype = np.dtype(subtype)
 
     def __str__(self) -> str:
-        return f'Attribute[{self.subtype}]'
+        return f'AttributeDtype[{self.subtype}]'
 
     def __repr__(self) -> str:
-        return f'Attribute[{self.subtype}]'
+        return f'AttributeDtype[{self.subtype}]'
 
     # TestDtypeTests
     def __hash__(self) -> int:
@@ -31,7 +31,7 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
 
     @property
     def name(self):
-        return f"Attribute[{self.subtype}]"
+        return f"AttributeDtype[{self.subtype}]"
 
     @classmethod
     def construct_array_type(cls):

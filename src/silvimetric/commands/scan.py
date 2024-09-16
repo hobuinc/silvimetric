@@ -47,15 +47,15 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
             cell_counts = extent_handle(extents, data, resolution, point_count,
                 depth, log)
 
-
+        num_cells = np.sum(cell_counts).item()
         std = np.std(cell_counts)
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
         pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
-                data_bounds=data.bounds.to_json(), count=dask.compute(count)))
-        tiling_info = dict(tile_info=dict(num_cells=len(cell_counts), mean=mean,
-                std_dev=std, recommended=rec))
+            data_bounds=data.bounds.to_json(), count=dask.compute(count)))
+        tiling_info = dict(tile_info=dict(num_cells=num_cells,
+            num_tiles=len(cell_counts), mean=mean, std_dev=std, recommended=rec))
 
         final_info = pc_info | tiling_info
         logger.info(json.dumps(final_info, indent=2))

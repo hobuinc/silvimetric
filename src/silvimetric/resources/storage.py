@@ -179,7 +179,8 @@ class Storage:
     def getDerivedNames(self) -> list[str]:
         # if no attributes are set in the metric, use all
         return [m.entry_name(a.name) for m in self.config.metrics
-                for a in self.config.attrs if not m.attributes or a in m.attributes]
+                for a in self.config.attrs if not m.attributes
+                or a.name in [ma.name for ma in m.attributes]]
 
     @contextlib.contextmanager
     def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
@@ -323,7 +324,8 @@ class Storage:
             sh_cfg.finished = False
 
         self.config.log.debug('Deleting fragments...')
-        tiledb.Array.delete_fragments(self.config.tdb_dir, timestamp_start=proc_num,timestamp_end=proc_num)
+        tiledb.Array.delete_fragments(self.config.tdb_dir,
+            timestamp_start=proc_num, timestamp_end=proc_num)
         self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())

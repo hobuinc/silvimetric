@@ -1,55 +1,14 @@
 import json
 import numpy as np
 import pdal
-from abc import ABC, abstractmethod
 from tiledb import Attr
-
 from .array_extensions import AttributeArray, AttributeDtype
 
-class Entry(ABC):
-    """Base class for Attribute and Metric. These represent entries into the
-    database."""
-
-    def __eq__(self, other):
-        return self.name == other.name and \
-            self.dtype == other.dtype
-
-    @abstractmethod
-    def entry_name(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def schema(self) -> Attr:
-        raise NotImplementedError
-
-    @abstractmethod
-    def to_json(self) -> object:
-        raise NotImplementedError
-
-    def toJSON(self) -> object:
-        return self.to_json()
-
-    @staticmethod
-    @abstractmethod
-    def from_dict(data: dict):
-        raise NotImplementedError
-
-    @staticmethod
-    @abstractmethod
-    def from_string(data: str):
-        raise NotImplementedError
-
-    @abstractmethod
-    def __repr__(self):
-        raise NotImplementedError
-
-
-class Attribute(Entry):
+class Attribute():
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
-    def __init__(self, name: str, dtype: np.dtype):
-        super().__init__()
+    def __init__(self, name: str, dtype) -> None:
         self.name = name
         """Name of the attribute, eg. Intensity."""
         self.dtype: AttributeDtype
@@ -70,6 +29,18 @@ class Attribute(Entry):
         """Return TileDB attribute name."""
         return self.name
 
+    def __eq__(self, other):
+        if self.dtype != other.dtype:
+            return False
+        elif self.name != other.name:
+            return False
+        else:
+            return True
+
+    def __hash__(self):
+        return hash(('name', self.name, 'dtype', self.dtype))
+
+
     def schema(self) -> Attr:
         """
         Create the tiledb schema for this attribute.
@@ -84,7 +55,7 @@ class Attribute(Entry):
         }
 
     @staticmethod
-    def from_dict(data: dict):
+    def from_dict(data: dict) -> "Attribute":
         """
         Make an Attribute from a JSON like object
         """
@@ -93,7 +64,7 @@ class Attribute(Entry):
         return Attribute(name, dtype)
 
     @staticmethod
-    def from_string(data: str):
+    def from_string(data: str) -> "Attribute":
         """
         Create Attribute from string or dict version of it.
 
@@ -105,7 +76,7 @@ class Attribute(Entry):
         return Attribute.from_dict(j)
 
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return json.dumps(self.to_json())
 
 # A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html

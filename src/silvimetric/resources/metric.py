@@ -1,38 +1,44 @@
 import json
-import numpy as np
-from typing import Callable, Optional, Any, Union, List
-from inspect import getsource
-from tiledb import Attr
-import dask
 import base64
+
+from typing import Callable, Optional, Any, Union, List, Self
+from uuid import uuid4
+from functools import reduce
+
+from tiledb import Attr
+import numpy as np
 import dill
 import pandas as pd
 
-from .entry import Attribute, Entry, Attributes
+import dask
+from dask.delayed import Delayed
+from distributed import Future
+from .attribute import Attribute
 
-MetricFn = Callable[[np.ndarray], np.ndarray]
-FilterFn = Callable[[np.ndarray, Optional[Union[Any, None]]], np.ndarray]
+MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
+FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
-class Metric(Entry):
+class Metric():
     """
-    A Metric is an Entry representing derived cell data. There is a base set of
+    A Metric is a TileDB entry representing derived cell data. There is a base set of
     metrics available through Silvimetric, or you can create your own. A Metric
     object has all the information necessary to facilitate the derivation of
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Entry]=[], filters: List[FilterFn]=[],
-            attributes: List[Attribute]=[]):
+            dependencies: list[Self]=[], filters: List[FilterFn]=[],
+            attributes: List[Attribute]=[]) -> None:
 
-        super().__init__()
+        #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
+
         self.name = name
         """Metric name. eg. mean"""
-        self.dtype = dtype
+        self.dtype = np.dtype(dtype).str
         """Numpy data type."""
         self.dependencies = dependencies
-        """Attributes/Metrics this is dependent on."""
+        """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
         self.filters = filters
@@ -41,7 +47,32 @@ class Metric(Entry):
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
 
-    def schema(self, attr: Attribute):
+    def __eq__(self, other):
+        if self.name != other.name:
+            return False
+        elif self.dtype != other.dtype:
+            return False
+        elif self.dependencies != other.dependencies:
+            return False
+        elif self._method != other._method:
+            return False
+        elif self.filters != other.filters:
+            return False
+        elif self.attributes != other.attributes:
+            return False
+        else:
+            return True
+
+    def __hash__(self):
+        return hash((
+            'name', self.name,
+            'dtype', self.dtype,
+            'dependencies', frozenset(self.dependencies),
+            'method', base64.b64encode(dill.dumps(self._method)).decode(),
+            'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
+            'attrs', frozenset(self.attributes)))
+
+    def schema(self, attr: Attribute) -> Any:
         """
         Create schema for TileDB creation.
 
@@ -55,8 +86,23 @@ class Metric(Entry):
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def do(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Run metric and filters."""
+    def sanitize_and_run(self, d, *args):
+        # args come in as a value wrapped in one index of a 2D dataframe
+        # we need to remove the wrapping and pass the values to the method
+        # to make things easier
+        a = tuple( a.values[0][0] for a in args)
+        return self._method(d, *a)
+
+    def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
+        """Run metric and filters. Use previously run metrics to avoid running
+        the same thing multiple times."""
+
+        # the index columns are determined by where this data is coming from
+        # if it has xi and yi, then it's coming from shatter
+        # if it has X and Y, then it's coming from extract as a rerun of a cell
+        if isinstance(data, Future):
+            data = data.result()
+
         idx = ['xi','yi']
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
@@ -68,32 +114,20 @@ class Metric(Entry):
         data = self.run_filters(data)
         gb = data.groupby(idx)
 
-        # try:
-        #     idx = ['xi','yi']
-        #     gb = data.groupby(idx)
-        # except Exception as e:
-        #     # coming from extract re-run
-        #     idx = ['X','Y']
-        #     gb = data.groupby(idx)
-
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
+        runner = lambda d: self.sanitize_and_run(d, *args)
 
         new_cols = {
-            c: [(self.entry_name(c), self._method)]
+            c: [ (self.entry_name(c), runner) ]
             for c in cols if c not in idx
         }
 
-        val = gb.agg(new_cols)
+        val = gb.aggregate(new_cols, args=args)
 
         #remove hierarchical columns
         val.columns = val.columns.droplevel(0)
         return val
-
-    @dask.delayed
-    def do_delayed(self, data: pd.DataFrame) -> pd.DataFrame:
-        """Run metric as a dask delayed method"""
-        return self.do(data)
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
@@ -119,14 +153,13 @@ class Metric(Entry):
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
             'dependencies': [d.to_json() for d in self.dependencies],
-            'method_str': getsource(self._method),
             'method': base64.b64encode(dill.dumps(self._method)).decode(),
             'filters': [base64.b64encode(dill.dumps(f)).decode() for f in self.filters],
             'attributes': [a.to_json() for a in self.attributes]
         }
 
     @staticmethod
-    def from_dict(data: dict):
+    def from_dict(data: dict) -> "Metric":
         name = data['name']
         dtype = np.dtype(data['dtype'])
         method = dill.loads(base64.b64decode(data['method'].encode()))
@@ -134,7 +167,7 @@ class Metric(Entry):
         if 'dependencies' in data.keys() and \
                 data['dependencies'] and \
                 data['dependencies'] is not None:
-            dependencies = [ Attribute.from_dict(d) for d in data['dependencies'] ]
+            dependencies = [ Metric.from_dict(d) for d in data['dependencies'] ]
         else:
             dependencies = [ ]
 
@@ -155,15 +188,11 @@ class Metric(Entry):
         return Metric(name, dtype, method, dependencies, filters, attributes)
 
     @staticmethod
-    def from_string(data: str):
+    def from_string(data: str) -> Self:
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def from_string(data: str):
-        j = json.loads(data)
-        return Metric.from_dict(j)
-
-    def __eq__(self, other):
+    def __eq__(self, other) -> tuple:
         return (self.name == other.name and
                 self.dtype == other.dtype and
                 self.dependencies == other.dependencies and
@@ -175,40 +204,54 @@ class Metric(Entry):
         return self.do(data)
 
     def __repr__(self) -> str:
-        return json.dumps(self.to_json())
+        return f"Metric_{self.name}"
 
-#TODO add all metrics from https://github.com/hobuinc/silvimetric/issues/5
+def get_methods(data: Union[pd.DataFrame, Delayed], metrics: Metric | list[Metric],
+        uuid=None) -> list[Delayed]:
+    """
+    Create Metric dependency graph by iterating through desired metrics and
+    their dependencies, creating Delayed objects that can be run later.
+    """
+    # identitity for this graph, can be created before or during this method
+    # call, but needs to be the same across this graph, and unique compared
+    # to other graphs
+    if uuid is None:
+        uuid = uuid4()
 
-def m_mean(data):
-    return np.mean(data)
+    # don't duplicate a delayed object
+    if not isinstance(data, Delayed):
+        data = dask.delayed(data)
 
-def m_mode(data):
-    u, c = np.unique(data, return_counts=True)
-    i = np.where(c == c.max())
-    v = u[i[0][0]]
-    return v
+    if isinstance(metrics, Metric):
+        metrics = [ metrics ]
 
-def m_median(data):
-    return np.median(data)
+    # iterate through metrics and their dependencies.
+    # uuid here will help guide metrics to use the same dependency method
+    # calls from dask
+    seq = []
+    for m in metrics:
+        if not isinstance(m, Metric):
+            continue
+        ddeps = get_methods(data, m.dependencies, uuid)
+        dd = dask.delayed(m.do)(data, *ddeps,
+            dask_key_name=f'{m.name}-{str(uuid)}')
+        seq.append(dd)
 
-def m_min(data):
-    return np.min(data)
+    return seq
 
-def m_max(data):
-    return np.max(data)
+def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+    """
+    Collect Metric dependency graph and run it, then merge the results together.
+    """
+    graph = get_methods(data, metrics)
 
-def m_stddev(data):
-    return np.std(data)
+    # try returning just the graph and see if that can speed thigns up
+    # return graph
 
-def f_2plus(data):
-    return data[data['HeightAboveGround'] > 2]
+    computed_list = dask.persist(*graph, optimize_graph=True)
 
-#TODO change to correct dtype
-Metrics = {
-    'mean' : Metric('mean', np.float32, m_mean),
-    'mode' : Metric('mode', np.float32, m_mode),
-    'median' : Metric('median', np.float32, m_median),
-    'min' : Metric('min', np.float32, m_min),
-    'max' : Metric('max', np.float32, m_max),
-    'stddev' : Metric('stddev', np.float32, m_stddev),
-}
+    def merge(x, y):
+        return x.merge(y, on=['xi','yi'])
+    merged = reduce(merge, computed_list)
+
+    return merged

@@ -1,7 +1,3 @@
-import dask.diagnostics
-import dask.distributed
-import dask.diagnostics
-import dask.distributed
 import numpy as np
 import signal
 import datetime
@@ -10,14 +6,16 @@ from typing import Generator
 import pandas as pd
 import tiledb
 
-import dask
 from dask.distributed import as_completed, futures_of, CancelledError
+from distributed.client import _get_global_client as get_client
+from dask.delayed import Delayed
 import dask.array as da
 import dask.bag as db
+from dask.diagnostics import ProgressBar
 
-from .. import Extents, Storage, Data, ShatterConfig, AttributeArray, Attribute, AttributeDtype
+from .. import Extents, Storage, Data, ShatterConfig, run_metrics
 
-def get_data(extents: Extents, filename: str, storage: Storage) -> np.ndarray:
+def get_data(extents: Extents, filename: str, storage: Storage):
     """
     Execute pipeline and retrieve point cloud data for this extent
 
@@ -51,6 +49,9 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     points = points.loc[points.X >= leaf.bounds.minx]
     points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
+    if points.size == 0:
+        return None
+
     points.loc[:, 'xi'] = da.floor(points.xi)
     # ceil for y because origin is at top left
     points.loc[:, 'yi'] = da.ceil(points.yi)
@@ -61,42 +62,45 @@ def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
     """
-    # TODO dependencies on other metrics:
-    # - Iterate through metrics and figure out which ones are being used as
-    #   dependencies
-    # - Remove those from the list and run them first
-    # - Then pass them to the metrics that require them as we get there?
-
     if data_in is None:
         return None
 
-    if data_in is None:
-        return None
+    return run_metrics(data_in, storage.config.metrics)
 
-    metric_data = dask.persist(*[ m.do(data_in) for m in storage.config.metrics ])
-    return metric_data
-
-def agg_list(df: pd.DataFrame):
+def agg_list(data_in):
     """
     Make variable-length point data attributes into lists
     """
-    if df is None:
+    if data_in is None:
         return None
 
-    # coerce datatypes to object so we can store np arrays as cell values
-    old_dtypes = df.dtypes
-    new_dtypes = {a: np.dtype('O') for a in df.columns if a not in ['xi','yi']} | {'xi': np.float64, 'yi': np.float64}
-    df = df.astype(new_dtypes)
-    a = df.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
+    # grouped = data_in.groupby(['xi','yi'])
+    # grouped = grouped.agg(list)
+
+    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
+
+    # # coerce datatypes to object so we can store np arrays as cell values
+    old_dtypes = data_in.dtypes
+    xyi_dtypes = { 'xi': np.float64, 'yi': np.float64 }
+    o = np.dtype('O')
+    col_dtypes = { a: o for a in data_in.columns if a not in ['xi','yi'] }
+
+
+    coerced = data_in.astype(col_dtypes | xyi_dtypes)
+    a = coerced.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
     return a.assign(count=lambda x: [len(z) for z in a.Z])
 
-def join(list_data, metric_data):
+def join(list_data: pd.DataFrame, metric_data):
     """
-    Join the list data and metric DataFrames together
+    Join the list data and metric DataFrames together.
     """
     if list_data is None or metric_data is None:
         return None
-    return list_data.join([m for m in metric_data])
+
+    if isinstance(metric_data, Delayed):
+        metric_data = metric_data.compute()
+
+    return list_data.join(metric_data).reset_index()
 
 def write(data_in, storage, timestamp):
     """
@@ -106,10 +110,8 @@ def write(data_in, storage, timestamp):
     :param tdb: TileDB write stream.
     :return: Number of points written.
     """
-    if data_in is None:
-        return 0
 
-    data_in = data_in.reset_index()
+    # data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
@@ -137,17 +139,23 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
     attrs = [a.name for a in config.attrs]
     timestamp = (config.time_slot, config.time_slot)
 
-    # remove any extents that have already been donem, only skip if full overlap
+    # remove any extents that have already been done, only skip if full overlap
     leaf_bag: db.Bag = db.from_sequence(leaves)
     if config.mbr:
         def mbr_filter(one: Extents):
             return all(one.disjoint_by_mbr(m) for m in config.mbr)
         leaf_bag = leaf_bag.filter(mbr_filter)
 
+    def pc_filter(d: pd.DataFrame):
+        if d is None:
+            return False
+        return not d.empty
+
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, storage)
-    lists: db.Bag = arranged.map(agg_list)
+    filtered = arranged.filter(pc_filter)
+    metrics: db.Bag = filtered.map(run_metrics, storage.config.metrics)
+    lists: db.Bag = filtered.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
@@ -165,7 +173,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     # Process kill handler. Make sure we write out a config even if we fail.
     def kill_gracefully(signum, frame):
-        client = dask.config.get('distributed.client')
+        client = get_client()
         if client is not None:
             client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
@@ -183,9 +191,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     processes = get_processes(leaves, config, storage)
 
-    ## If dask is distributed, use the futures feature
-    dc = dask.config.get('distributed.client')
-    if isinstance(dc, dask.distributed.Client):
+        ## If dask is distributed, use the futures feature
+    dc = get_client()
+    if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
@@ -198,10 +206,10 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-
-    ## Handle non-distributed dask scenarios
     else:
-        config.point_count = sum(processes)
+        # Handle non-distributed dask scenarios
+        with ProgressBar() as p:
+            config.point_count = sum(processes)
 
     # modify config to reflect result of shattter process
     config.mbr = storage.mbrs(config.time_slot)
@@ -233,9 +241,9 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug(f'Data: {str(data)}')
     config.log.debug(f'Extents: {str(extents)}')
 
-    if dask.config.get('distributed.client') is None:
+    if get_client() is None:
         config.log.warning("Selected scheduler type does not support"
-                "continuously updated config information.")
+            "continuously updated config information.")
 
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()

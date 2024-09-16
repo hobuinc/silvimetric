@@ -6,7 +6,8 @@ import copy
 from datetime import datetime
 from typing import Generator
 
-from silvimetric import Extents, Bounds, Metrics, Attribute, Storage
+from silvimetric import Extents, Bounds, Attribute, Storage
+from silvimetric import grid_metrics
 from silvimetric import Log, Metric, ShatterConfig, StorageConfig
 from silvimetric import ApplicationConfig, ExtractConfig
 from silvimetric import __version__ as svversion
@@ -82,7 +83,7 @@ def extract_config(tif_filepath, metrics, shatter_config, extract_attrs):
 
 @pytest.fixture(scope='function')
 def metrics() -> Generator[list[Metric], None, None]:
-    yield [copy.deepcopy(Metrics['mean']), copy.deepcopy(Metrics['median'])]
+    yield [copy.deepcopy(grid_metrics['mean']), copy.deepcopy(grid_metrics['median'])]
 
 @pytest.fixture(scope='function')
 def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
@@ -94,7 +95,7 @@ def extents(resolution, bounds) -> Generator[Extents, None, None]:
     yield Extents(bounds,resolution,bounds)
 
 @pytest.fixture(scope="function")
-def attrs(dims) -> Generator[list[str], None, None]:
+def attrs(dims) -> Generator[list[Attribute], None, None]:
     yield [Attribute(a, dims[a]) for a in
            ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']]
 
