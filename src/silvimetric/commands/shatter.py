@@ -1,6 +1,14 @@
+import dask.diagnostics
+import dask.distributed
+import dask.diagnostics
+import dask.distributed
 import numpy as np
 import signal
 import datetime
+import copy
+from typing import Generator
+import pandas as pd
+import tiledb
 import copy
 from typing import Generator
 import pandas as pd
@@ -26,7 +34,22 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     """
     data = Data(filename, storage.config, bounds = extents.bounds)
     p = data.pipeline
+    p = data.pipeline
     data.execute()
+    return p.get_dataframe(0)
+
+def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
+    """
+    Arrange data to fit key-value TileDB input format.
+
+    :param data: Tuple of indices and point data array (xis, yis, data).
+    :param leaf: :class:`silvimetric.resources.extents.Extent` being operated on.
+    :param attrs: List of attribute names.
+    :raises Exception: Missing attribute error.
+    :return: None if no work is done, or a tuple of indices and rearranged data.
+    """
+    if points is None:
+        return None
     return p.get_dataframe(0)
 
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
@@ -128,6 +151,7 @@ def write(data_in, storage, timestamp):
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
 
+
     del pc, data_in
     return p
 
@@ -179,7 +203,15 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
 
         storage.consolidate_shatter(config.time_slot)
+
+        storage.consolidate_shatter(config.time_slot)
         config.end_time = end_time
+        config.mbrs = storage.mbrs(config.time_slot)
+        config.finished=False
+        config.log.info('Saving config before quitting...')
+
+        storage.saveMetadata('shatter', str(config), config.time_slot)
+        config.log.info('Quitting.')
         config.mbrs = storage.mbrs(config.time_slot)
         config.finished=False
         config.log.info('Saving config before quitting...')
@@ -189,6 +221,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
+    processes = get_processes(leaves, config, storage)
     processes = get_processes(leaves, config, storage)
 
         ## If dask is distributed, use the futures feature
@@ -201,6 +234,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                     continue
                 for pc in pack:
                     config.point_count = config.point_count + pc
+                    del pc
                     del pc
 
         end_time = datetime.datetime.now().timestamp() * 1000
@@ -240,6 +274,10 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug(f'Shatter Config: {config}')
     config.log.debug(f'Data: {str(data)}')
     config.log.debug(f'Extents: {str(extents)}')
+    config.log.info('Beginning shatter process...')
+    config.log.debug(f'Shatter Config: {config}')
+    config.log.debug(f'Data: {str(data)}')
+    config.log.debug(f'Extents: {str(extents)}')
 
     if get_client() is None:
         config.log.warning("Selected scheduler type does not support"
@@ -247,10 +285,19 @@ def shatter(config: ShatterConfig) -> int:
 
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()
+    if not config.time_slot: # defaults to 0, which is reserved for storage cfg
+        config.time_slot = storage.reserve_time_slot()
 
     if config.bounds is None:
         config.bounds = extents.bounds
+    if config.bounds is None:
+        config.bounds = extents.bounds
 
+    config.log.debug('Grabbing leaf nodes...')
+    if config.tile_size is not None:
+        leaves = extents.get_leaf_children(config.tile_size)
+    else:
+        leaves = extents.chunk(data, 100)
     config.log.debug('Grabbing leaf nodes...')
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
@@ -260,7 +307,13 @@ def shatter(config: ShatterConfig) -> int:
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
     pc = run(leaves, config, storage)
+    # Begin main operations
+    config.log.debug('Fetching and arranging data...')
+    pc = run(leaves, config, storage)
 
+    #consolidate the fragments in this time slot down to just one
+    storage.consolidate_shatter(config.time_slot)
+    return pc
     #consolidate the fragments in this time slot down to just one
     storage.consolidate_shatter(config.time_slot)
     return pc
