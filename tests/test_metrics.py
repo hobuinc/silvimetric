@@ -1,90 +1,97 @@
-import os
-import pytest
 import numpy as np
 import pandas as pd
-import dask
 
-from silvimetric.resources import Metrics, Log, ShatterConfig, StorageConfig
-from silvimetric.resources import Storage, Bounds, Extents
-from silvimetric.commands import shatter
-from silvimetric import __version__ as svversion
+from silvimetric import shatter, Storage, grid_metrics, run_metrics, Metric
+from silvimetric import all_metrics as s
+from silvimetric import l_moments
+from silvimetric.resources.attribute import Attribute
 
-@pytest.fixture(scope='function')
-def metric_input():
-    # randomly generated int array
-    yield np.array([54, 64, 54, 18, 76, 82, 85, 12,  7, 32, 89, 79, 78, 58, 17,  5, 77,
-        20, 63, 87, 37, 27,  7, 22, 34, 61, 52, 64, 65, 90, 76, 88,  0, 98,
-        78, 26, 88, 44, 78, 54, 38, 28, 94, 74, 90, 84, 30,  7, 81, 75, 22,
-        12, 67, 10, 46, 62, 79, 52, 24, 88,  4, 73, 75, 35, 75, 16, 66, 43,
-        28, 72, 15, 80, 53,  1, 28, 70, 20, 42, 83, 80, 82,  2, 41, 38, 23,
-        17, 18, 19, 43, 30, 88, 41, 60, 29, 93, 27,  1, 13, 93, 82], np.int32)
+class TestMetrics():
 
-@pytest.fixture(scope='session')
-def autzen_filepath() -> str:
-    path = os.path.join(os.path.dirname(__file__), "data",
-            "autzen-small.copc.laz")
-    assert os.path.exists(path)
-    yield os.path.abspath(path)
+    def test_metrics(self, metric_data):
+        ms: pd.DataFrame = run_metrics(metric_data,
+            list(grid_metrics.values())).compute()
+        assert isinstance(ms, pd.DataFrame)
+        adjusted = [k.split('_')[-1] for k in ms.keys()]
 
-@pytest.fixture(scope='function')
-def autzen_bounds():
-    yield Bounds(635579.2, 848884.83, 639003.73, 853536.21)
+        assert all(a in grid_metrics.keys() for a in adjusted)
 
-@pytest.fixture(scope='function')
-def metric_st_config(tdb_filepath, autzen_bounds, resolution, crs, attrs, metrics):
-    log = Log(20)
-    yield StorageConfig(tdb_dir = tdb_filepath,
-                        log = log,
-                        crs = crs,
-                        root = autzen_bounds,
-                        resolution = resolution,
-                        attrs = attrs,
-                        version = svversion)
 
-@pytest.fixture(scope='function')
-def metric_shatter(tdb_filepath, autzen_filepath, metric_st_config, autzen_bounds, app_config, date):
-    log = Log(20) # INFO
-    Storage.create(metric_st_config)
-    e = Extents(autzen_bounds, 30, autzen_bounds)
-    e1 = e.split()[1]
-    s = ShatterConfig(tdb_dir = tdb_filepath,
-                      log=log,
-                      filename=autzen_filepath,
-                      attrs=metric_st_config.attrs,
-                      metrics=metric_st_config.metrics,
-                      bounds=e1.bounds,
-                      debug=True,
-                      date=date,
-                      tile_size=700)
+    def test_intermediate_metric(self, metric_data):
+        ms = list(l_moments.values())
+        computed = run_metrics(metric_data, ms).compute()
 
-    yield s
+        assert computed.m_Z_l1.any()
+        assert computed.m_Z_l2.any()
+        assert computed.m_Z_l3.any()
+        assert computed.m_Z_l4.any()
+        assert computed.m_Z_lcv.any()
+        assert computed.m_Z_lskewness.any()
+        assert computed.m_Z_lkurtosis.any()
 
-class Test_Metrics(object):
+    def test_dependencies(self, metric_data):
+        # should be able to create a dependency graph
+        cv = s['cv']
+        mean = s['mean']
+        stddev = s['stddev']
+        median = s['median']
 
-    def test_input_output(self, metric_input):
-        for m in Metrics:
-            try:
-                out = Metrics[m]._method(metric_input)
-                msg = f"Metric {Metrics[m].name} does not output a valid data type."\
-                        f" Interpretted type: {type(out)}"
-                assert not any([
-                    isinstance(out, np.ndarray),
-                    isinstance(out, list),
-                    isinstance(out, tuple),
-                    isinstance(out, pd.Series),
-                    isinstance(out, pd.DataFrame),
-                    isinstance(out, str)
-                ]), msg
-                assert any((
-                    isinstance(out, np.number),
-                    isinstance(out, int),
-                    isinstance(out, float),
-                    isinstance(out, complex),
-                    isinstance(out, bool)
-                )), msg
-            except:
-                print('yi')
+        mean.dependencies = [ median ]
+        stddev.dependencies = [ median ]
+        cv.dependencies = [ mean, stddev ]
 
-    def test_metric_shatter(self, metric_shatter):
-        dask.config.set(scheduler='processes')
-        shatter.shatter(metric_shatter)
+        b = run_metrics(metric_data, [cv, mean]).compute()
+        # cv/mean should be there
+        assert b.m_Z_cv.any()
+        assert b.m_Z_mean.any()
+
+        #and median/stddev should not
+        assert not any(x in b.dtypes for x in  ['m_Z_median', 'm_Z_stddev'])
+
+    def test_filter(self, metric_shatter_config, test_point_count, maxy,
+            resolution):
+
+        m = metric_shatter_config.metrics[0]
+        assert len(m.filters) == 1
+
+        pc = shatter(metric_shatter_config)
+        assert pc == test_point_count
+
+        s = Storage.from_db(metric_shatter_config.tdb_dir)
+        with s.open('r') as a:
+            q = a.query(coords=False, use_arrow=False).df
+
+            nor_mean = q[:]['m_NumberOfReturns_mean']
+            nor = q[:]['NumberOfReturns']
+            assert not nor_mean.isna().any()
+            assert nor.notna().any()
+
+            assert a[:,:]['Z'].shape[0] == 100
+            xdom = a.schema.domain.dim('X').domain[1]
+            ydom = a.schema.domain.dim('Y').domain[1]
+            assert xdom == 10
+            assert ydom == 10
+
+            data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
+            data = data.set_index(['X','Y'])
+
+            for xi in range(xdom):
+                for yi in range(ydom):
+                    curr = data.loc[xi,yi]
+                    curr.size == 1
+                    curr.iloc[0].size == 900
+                    # this should have all indices from 0 to 9 filled.
+                    # if oob error, it's probably not this test's fault
+                    assert bool(np.all( curr.iloc[0] == ((maxy/resolution) - (yi + 1)) ))
+
+    def test_custom(self, metric_data: pd.DataFrame, attrs: list[Attribute]) -> None:
+        def m_over500(data):
+            return data[data >= 500].count()
+        z_att = attrs[0]
+        m_cust = Metric(name='over500', dtype=np.float32, method=m_over500,
+            attributes=[z_att])
+        b = run_metrics(metric_data, [m_cust]).compute()
+
+        assert b.m_Z_over500.any()
+        assert b.m_Z_over500.values[0] == 3
+

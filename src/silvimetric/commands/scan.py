@@ -3,17 +3,41 @@ import logging
 import dask.bag as db
 import dask
 import math
+import json
 
-from ..resources import Storage, Data, Extents, Bounds
+from .. import Storage, Data, Extents, Bounds, Log
 
-def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
-        depth=6, filter=False):
+def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, resolution:float=100,
+        depth:int=6, filter:bool=False, log: Log=None):
+    """
+    Scan pointcloud and determine appropriate tile sizes.
 
-    logger = logging.getLogger('silvimetric')
+    :param tdb_dir: TileDB database directory.
+    :param pointcloud: Path to point cloud.
+    :param bounds: Bounding box to filter by.
+    :param point_count: Point count threshold., defaults to 600000
+    :param resolution: Resolution threshold., defaults to 100
+    :param depth: Tree depth threshold., defaults to 6
+    :param filter: Remove empty Extents. This takes longer, but is more accurage., defaults to False
+    :return: Returns list of point counts.
+    """
+
+    # TODO Scan should output other information about a file like bounds, pc, avg points per cell
     with Storage.from_db(tdb_dir) as tdb:
 
+
+        if log is None:
+            logger = logging.getLogger('silvimetric')
+        else:
+            logger = log
         data = Data(pointcloud, tdb.config, bounds)
+
+        thresholds = dict(thresholds=dict(resolution=resolution, point_count=point_count, depth=depth))
+        logger.debug(json.dumps(thresholds, indent=2))
+
         extents = Extents.from_sub(tdb_dir, data.bounds)
+        count = dask.delayed(data.estimate_count)(extents.bounds).persist()
+
 
         if filter:
             chunks = extents.chunk(data, resolution, point_count, depth)
@@ -21,22 +45,42 @@ def scan(tdb_dir, pointcloud, bounds, point_count=600000, resolution=100,
 
         else:
             cell_counts = extent_handle(extents, data, resolution, point_count,
-                depth)
+                depth, log)
 
+        num_cells = np.sum(cell_counts).item()
         std = np.std(cell_counts)
         mean = np.mean(cell_counts)
         rec = int(mean + std)
 
-        logger.info(f'Tiling information:')
-        logger.info(f'  Mean tile size: {mean}')
-        logger.info(f'  Std deviation: {std}')
-        logger.info(f'  Recommended split size: {rec}')
+        pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
+            data_bounds=data.bounds.to_json(), count=dask.compute(count)))
+        tiling_info = dict(tile_info=dict(num_cells=num_cells,
+            num_tiles=len(cell_counts), mean=mean, std_dev=std, recommended=rec))
 
-        return rec
+        final_info = pc_info | tiling_info
+        logger.info(json.dumps(final_info, indent=2))
+
+        return final_info
 
 
-def extent_handle(extent: Extents, data: Data, res_threshold=100,
-        pc_threshold=600000, depth_threshold=6):
+def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
+        pc_threshold:int=600000, depth_threshold:int=6, log: Log = None) -> list[int]:
+    """
+    Recurisvely iterate through quad tree of this Extents object with given
+    threshold parameters.
+
+    :param extent: Current Extent.
+    :param data: Data object created from point cloud file.
+    :param res_threshold: Resolution threshold., defaults to 100
+    :param pc_threshold: Point count threshold., defaults to 600000
+    :param depth_threshold: Tree depth threshold., defaults to 6
+    :return: Returns list of Extents that fit thresholds.
+    """
+
+    if log is None:
+        logger = logging.getLogger('silvimetric')
+    else:
+        logger = log
 
     if extent.root is not None:
         bminx, bminy, bmaxx, bmaxy = extent.root.get()
@@ -58,12 +102,12 @@ def extent_handle(extent: Extents, data: Data, res_threshold=100,
 
     curr = db.from_delayed(tile_info(chunk, data, res_threshold, pc_threshold,
             depth_threshold))
-    logger = logging.getLogger('silvimetric')
     a = [ ]
 
     curr_depth = 0
     while curr.npartitions > 0:
-        logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
+        logger = logging.getLogger('silvimetric')
+        logger.debug(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
         n = curr.compute()
         to_add = [ x for x in n if isinstance(x, int) ]
         a = a + to_add
@@ -77,9 +121,20 @@ def extent_handle(extent: Extents, data: Data, res_threshold=100,
 
 
 @dask.delayed
-def tile_info(extent: Extents, data: Data, res_threshold=100,
-        pc_threshold=600000, depth_threshold=6, depth=0):
+def tile_info(extent: Extents, data: Data, res_threshold:int=100,
+        pc_threshold:int=600000, depth_threshold:int=6, depth:int=0):
+    """
+    Recursively explore current extents, use thresholds to determine when to
+    stop searching.
 
+    :param extent: Current Extent.
+    :param data: Data object created from point cloud file.
+    :param res_threshold: Resolution threshold., defaults to 100
+    :param pc_threshold: Point count threshold., defaults to 600000
+    :param depth_threshold: Tree depth threshold., defaults to 6
+    :param depth: Current Tree depth., defaults to 0
+    :return: Returns list of Extents that fit thresholds.
+    """
 
     pc = data.estimate_count(extent.bounds)
     target_pc = pc_threshold

@@ -189,7 +189,7 @@ Example:
     $ METRIC_PATH="./path/to/python_metrics.py"
     $ silvimetric --database $DB_NAME initialize --bounds "$BOUNDS" \
           --crs "EPSG:$EPSG" \
-          -m $METRIC_PATH -m min -m max -m mean
+          -m "${METRIC_PATH},min,max,mean"
 
 .. warning::
 

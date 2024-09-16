@@ -1,160 +1,234 @@
 import numpy as np
-import gc
-import copy
 import signal
 import datetime
+import copy
+from typing import Generator
+import pandas as pd
+import tiledb
 
-import dask
-from dask.distributed import Client, as_completed, futures_of, CancelledError
+from dask.distributed import as_completed, futures_of, CancelledError
+from distributed.client import _get_global_client as get_client
+from dask.delayed import Delayed
 import dask.array as da
 import dask.bag as db
+from dask.diagnostics import ProgressBar
 
-from tiledb import SparseArray
-
-from ..resources import Extents, Storage, ShatterConfig, Data
+from .. import Extents, Storage, Data, ShatterConfig, run_metrics
 
 def get_data(extents: Extents, filename: str, storage: Storage):
-    #TODO look at making a record array here
+    """
+    Execute pipeline and retrieve point cloud data for this extent
+
+    :param extents: :class:`silvimetric.resources.extents.Extents` being operated on.
+    :param filename: Path to either PDAL pipeline or point cloud.
+    :param storage: :class:`silvimetric.resources.storage.Storage` database object.
+    :return: Point data array from PDAL.
+    """
     data = Data(filename, storage.config, bounds = extents.bounds)
+    p = data.pipeline
     data.execute()
-    return data.array
+    return p.get_dataframe(0)
 
-def cell_indices(xpoints, ypoints, x, y):
-    return da.logical_and(xpoints == x, ypoints == y)
+def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
+    """
+    Arrange data to fit key-value TileDB input format.
 
-def get_atts(points: np.ndarray, leaf: Extents, attrs: list[str]):
+    :param data: Tuple of indices and point data array (xis, yis, data).
+    :param leaf: :class:`silvimetric.resources.extents.Extent` being operated on.
+    :param attrs: List of attribute names.
+    :raises Exception: Missing attribute error.
+    :return: None if no work is done, or a tuple of indices and rearranged data.
+    """
+    if points is None:
+        return None
     if points.size == 0:
         return None
 
-    xis = da.floor(points[['xi']]['xi'])
-    yis = da.floor(points[['yi']]['yi'])
+    points = points.loc[points.Y < leaf.bounds.maxy]
+    points = points.loc[points.Y >= leaf.bounds.miny]
+    points = points.loc[points.X >= leaf.bounds.minx]
+    points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
 
-    att_view = points[:][attrs]
-    idx = leaf.get_indices()
-    l = [att_view[cell_indices(xis, yis, x, y)] for x,y in idx]
-    return l
-
-def arrange(data: tuple[np.ndarray, np.ndarray, np.ndarray], leaf: Extents, attrs):
-    if data is None:
+    if points.size == 0:
         return None
 
-    di = data
-    dd = {}
-    for att in attrs:
-        try:
-            dd[att] = np.fromiter([*[np.array(col[att], col[att].dtype) for col in di], None], dtype=object)[:-1]
-        except Exception as e:
-            raise Exception(f"Missing attribute {att}: {e}")
-    counts = np.array([z.size for z in dd['Z']], np.int32)
+    points.loc[:, 'xi'] = da.floor(points.xi)
+    # ceil for y because origin is at top left
+    points.loc[:, 'yi'] = da.ceil(points.yi)
 
-    ## remove empty indices
-    empties = np.where(counts == 0)[0]
-    dd['count'] = counts
-    idx = leaf.get_indices()
-    if bool(empties.size):
-        for att in dd:
-            dd[att] = np.delete(dd[att], empties)
-        idx = np.delete(idx, empties)
+    return points
 
-    dx = idx['x']
-    dy = idx['y']
-    return (dx, dy, dd)
-
-def get_metrics(data_in, attrs: list[str], storage: Storage):
+def get_metrics(data_in, storage: Storage):
+    """
+    Run DataFrames through metric processes
+    """
     if data_in is None:
         return None
 
-    ## data comes in as [dx, dy, { 'att': [data] }]
-    dx, dy, data = data_in
+    return run_metrics(data_in, storage.config.metrics)
 
-    # make sure it's not empty. No empty writes
-    if not np.any(data['count']):
+def agg_list(data_in):
+    """
+    Make variable-length point data attributes into lists
+    """
+    if data_in is None:
         return None
 
-    # doing dask compute inside the dict array because it was too fine-grained
-    # when it was outside
-    metric_data = {
-        f'{m.entry_name(attr)}': [m(cell_data) for cell_data in data[attr]]
-        for attr in attrs for m in storage.config.metrics
-    }
-    data_out = data | metric_data
-    return (dx, dy, data_out)
+    # grouped = data_in.groupby(['xi','yi'])
+    # grouped = grouped.agg(list)
 
-def write(data_in, tdb):
+    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
 
-    if data_in is None:
-        return 0
+    # # coerce datatypes to object so we can store np arrays as cell values
+    old_dtypes = data_in.dtypes
+    xyi_dtypes = { 'xi': np.float64, 'yi': np.float64 }
+    o = np.dtype('O')
+    col_dtypes = { a: o for a in data_in.columns if a not in ['xi','yi'] }
 
-    dx, dy, dd = data_in
-    tdb[dx,dy] = dd
-    pc = int(dd['count'].sum())
+
+    coerced = data_in.astype(col_dtypes | xyi_dtypes)
+    a = coerced.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
+    return a.assign(count=lambda x: [len(z) for z in a.Z])
+
+def join(list_data: pd.DataFrame, metric_data):
+    """
+    Join the list data and metric DataFrames together.
+    """
+    if list_data is None or metric_data is None:
+        return None
+
+    if isinstance(metric_data, Delayed):
+        metric_data = metric_data.compute()
+
+    return list_data.join(metric_data).reset_index()
+
+def write(data_in, storage, timestamp):
+    """
+    Write cell data to database
+
+    :param data_in: Data to be written to database.
+    :param tdb: TileDB write stream.
+    :return: Number of points written.
+    """
+
+    # data_in = data_in.reset_index()
+    data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
+
+    attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
+    xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
+    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
+    dtype_dict = attr_dict | xy_dict | metr_dict
+
+    varlen_types = {a.dtype for a in storage.config.attrs}
+
+    tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
+        dataframe=data_in, mode='append', timestamp=timestamp,
+        column_types=dtype_dict, varlen_types=varlen_types)
+
+    pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
-    del pc, data_in
 
+    del pc, data_in
     return p
 
-def run(leaves: db.Bag, config: ShatterConfig, storage: Storage,
-        tdb: SparseArray):
-
-    start_time = config.start_time
-    ## Handle a kill signal
-    def kill_gracefully(signum, frame):
-        client = dask.config.get('distributed.client')
-        if client is not None:
-            client.close()
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        with storage.open(timestamp=(start_time, end_time)) as a:
-            config.nonempty_domain = a.nonempty_domain()
-            config.finished=False
-
-            config.log.info('Saving config before quitting...')
-            tdb.meta['shatter'] = str(config)
-            config.log.info('Quitting.')
-
-    signal.signal(signal.SIGINT, kill_gracefully)
+Leaves = Generator[Extents, None, None]
+def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db.Bag:
+    """ Create dask bags and the order of operations.  """
 
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in config.attrs]
+    timestamp = (config.time_slot, config.time_slot)
 
+    # remove any extents that have already been done, only skip if full overlap
     leaf_bag: db.Bag = db.from_sequence(leaves)
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    att_data: db.Bag = points.map(get_atts, leaf_bag, attrs)
-    arranged: db.Bag = att_data.map(arrange, leaf_bag, attrs)
-    metrics: db.Bag = arranged.map(get_metrics, attrs, storage)
-    writes: db.Bag = metrics.map(write, tdb)
+    if config.mbr:
+        def mbr_filter(one: Extents):
+            return all(one.disjoint_by_mbr(m) for m in config.mbr)
+        leaf_bag = leaf_bag.filter(mbr_filter)
 
-    ## If dask is distributed, use the futures feature
-    if dask.config.get('scheduler') == 'distributed':
-        pc_futures = futures_of(writes.persist())
+    def pc_filter(d: pd.DataFrame):
+        if d is None:
+            return False
+        return not d.empty
+
+    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
+    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
+    filtered = arranged.filter(pc_filter)
+    metrics: db.Bag = filtered.map(run_metrics, storage.config.metrics)
+    lists: db.Bag = filtered.map(agg_list)
+    joined: db.Bag = lists.map(join, metrics)
+    writes: db.Bag = joined.map(write, storage, timestamp)
+
+    return writes
+
+def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
+    """
+    Coordinate running of shatter process and handle any interruptions
+
+    :param leaves: Generator of Leaf nodes.
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`
+    :param storage: :class:`silvimetric.resources.storage.Storage`
+    :return: Number of points processed.
+    """
+
+    # Process kill handler. Make sure we write out a config even if we fail.
+    def kill_gracefully(signum, frame):
+        client = get_client()
+        if client is not None:
+            client.close()
+        end_time = datetime.datetime.now().timestamp() * 1000
+
+        storage.consolidate_shatter(config.time_slot)
+        config.end_time = end_time
+        config.mbrs = storage.mbrs(config.time_slot)
+        config.finished=False
+        config.log.info('Saving config before quitting...')
+
+        storage.saveMetadata('shatter', str(config), config.time_slot)
+        config.log.info('Quitting.')
+
+    signal.signal(signal.SIGINT, kill_gracefully)
+
+    processes = get_processes(leaves, config, storage)
+
+        ## If dask is distributed, use the futures feature
+    dc = get_client()
+    if dc is not None:
+        pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
                 if isinstance(pack, CancelledError):
                     continue
                 for pc in pack:
                     config.point_count = config.point_count + pc
+                    del pc
 
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
-        a = storage.open(timestamp=(start_time, end_time))
-        return config.point_count
+    else:
+        # Handle non-distributed dask scenarios
+        with ProgressBar() as p:
+            config.point_count = sum(processes)
 
-    ## Handle non-distributed dask scenarios
-    pc = sum(writes)
-    end_time = datetime.datetime.now().timestamp() * 1000
-    with storage.open(timestamp=(start_time, end_time)) as a:
+    # modify config to reflect result of shattter process
+    config.mbr = storage.mbrs(config.time_slot)
+    config.log.debug('Saving shatter metadata')
+    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.finished = True
 
-        config.end_time = end_time
-        config.finished=True
-        config.point_count = pc
-        config.nonempty_domain = a.nonempty_domain()
-        tdb.meta['shatter'] = str(config)
+    storage.saveMetadata('shatter', str(config), config.time_slot)
+    return config.point_count
 
-    return pc
+def shatter(config: ShatterConfig) -> int:
+    """
+    Handle setup and running of shatter process.
+    Will look for a config that has already been run before and needs to be
+    resumed.
 
-
-def shatter(config: ShatterConfig):
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`.
+    :return: Number of points processed.
+    """
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb
@@ -162,27 +236,31 @@ def shatter(config: ShatterConfig):
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
+    config.log.info('Beginning shatter process...')
+    config.log.debug(f'Shatter Config: {config}')
+    config.log.debug(f'Data: {str(data)}')
+    config.log.debug(f'Extents: {str(extents)}')
 
-    with storage.open('w') as tdb:
+    if get_client() is None:
+        config.log.warning("Selected scheduler type does not support"
+            "continuously updated config information.")
 
-        ## shatter should still output a config if it's interrupted
-        # TODO add slices yet to be finished so we can pick up this process
-        # in the future
+    if not config.time_slot: # defaults to 0, which is reserved for storage cfg
+        config.time_slot = storage.reserve_time_slot()
 
-        if config.bounds is None:
-            config.bounds = extents.bounds
+    if config.bounds is None:
+        config.bounds = extents.bounds
 
-        config.log.debug('Grabbing leaf nodes...')
-        if config.tile_size is not None:
-            leaves = extents.get_leaf_children(config.tile_size)
-        else:
-            leaves = extents.chunk(data, 100)
+    config.log.debug('Grabbing leaf nodes...')
+    if config.tile_size is not None:
+        leaves = extents.get_leaf_children(config.tile_size)
+    else:
+        leaves = extents.chunk(data, 100)
 
-        # Begin main operations
-        config.log.debug('Fetching and arranging data...')
-        pc = run(leaves, config, storage, tdb)
-        config.point_count = int(pc)
+    # Begin main operations
+    config.log.debug('Fetching and arranging data...')
+    pc = run(leaves, config, storage)
 
-        config.log.debug('Saving shatter metadata')
-        tdb.meta['shatter'] = str(config)
-        return config.point_count
+    #consolidate the fragments in this time slot down to just one
+    storage.consolidate_shatter(config.time_slot)
+    return pc

@@ -1,40 +1,28 @@
-import pytest
-import json
-import os
-import dataclasses
-
-
-from silvimetric.resources import StorageConfig, Bounds, Log, Metric
-
-@pytest.fixture(scope='function')
-def tdb_filepath(tmp_path_factory) -> str:
-    path = tmp_path_factory.mktemp("test_tdb")
-    yield os.path.abspath(path)
-
-@pytest.fixture(scope="function")
-def config(tdb_filepath, resolution, attrs, minx, maxx, miny, maxy,
-           crs) -> StorageConfig:
-
-    b = Bounds(minx, miny, maxx, maxy)
-    log = Log(20)
-    config = StorageConfig(tdb_dir = tdb_filepath,
-                           log = log,
-                           root = b,
-                           resolution = resolution,
-                           crs = crs,
-                           attrs = attrs)
-    yield config
-
+from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 
 class Test_Configuration(object):
 
-    def test_serialization(self, config: StorageConfig):
-
-        j = str(config)
+    def test_serialization(self, storage_config, shatter_config, extract_config):
+        # storage
+        j = str(storage_config)
         c = StorageConfig.from_string(j)
+
         mean = [ m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1
 
-        assert int(mean[0]([2,2,2,2])) == 2
-        assert config == c
+        assert int(mean[0]._method([2,2,2,2])) == 2
+        cd = c.to_json()
+        scd = storage_config.to_json()
+        cd.pop('log')
+        scd.pop('log')
+        assert scd == cd
 
+        # shatter
+        sh_str = str(shatter_config)
+        sh_cfg = ShatterConfig.from_string(sh_str)
+        assert shatter_config == sh_cfg
+
+        # extract
+        ex_str = str(extract_config)
+        ex_cfg = ExtractConfig.from_string(ex_str)
+        assert extract_config == ex_cfg

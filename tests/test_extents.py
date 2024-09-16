@@ -1,11 +1,13 @@
 import numpy as np
-import dask
-import pdal
-import pytest
 import datetime
 
-from silvimetric.resources import Extents
+from silvimetric import Extents
 from silvimetric.commands.shatter import run
+
+def check_for_overlap(leaves: list[Extents], chunk: Extents):
+    idx = [i for l in leaves for i in l.get_indices() ]
+    u, c = np.unique(idx, return_counts=True)
+    assert not np.any(np.where(c > 1))
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):
     ind = np.array([], dtype=chunk.get_indices().dtype)
@@ -83,19 +85,13 @@ def check_indexing(extents: Extents, leaf_list):
 
 
 class TestExtents(object):
-    @pytest.fixture(scope='function', autouse=True)
-    def filtered(self, copc_data, extents: Extents):
-        return list(extents.chunk(copc_data, 1))
-
-    @pytest.fixture(scope='function')
-    def unfiltered(self, extents: Extents):
-        return list(extents.get_leaf_children(30))
-
     def test_indexing(self, extents, filtered, unfiltered):
         check_indexing(extents, filtered)
         check_for_holes(filtered, extents)
+        check_for_overlap(filtered, extents)
         check_indexing(extents, unfiltered)
         check_for_holes(unfiltered, extents)
+        check_for_overlap(unfiltered, extents)
 
     # def test_cells(self, copc_filepath, unfiltered, resolution):
     #     flag = False
@@ -122,8 +118,8 @@ class TestExtents(object):
 
         with storage.open('w') as tdb:
             shatter_config.start_time = datetime.datetime.now().timestamp() * 1000
-            fc = run(filtered, shatter_config, storage, tdb)
-            ufc = run(unfiltered, shatter_config, storage, tdb)
+            fc = run(filtered, shatter_config, storage)
+            ufc = run(unfiltered, shatter_config, storage)
 
             assert fc == ufc, f"""
                 Filtered and unfiltered point counts don't match.

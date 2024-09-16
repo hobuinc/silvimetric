@@ -1,6 +1,6 @@
 import pdal
 import numpy as np
-from math import sqrt, ceil
+from math import sqrt, floor
 
 
 # Create a pointcloud dataset that follows expected paramters for data testing
@@ -28,10 +28,10 @@ maxy = maxx
 diff_maker = 0
 
 x_pos = np.arange(minx, maxx, interval, dtype=np.float32)
-y_pos = np.arange(maxy, miny, -1*interval, dtype=np.float32)
+y_pos = np.arange(miny, maxy, interval, dtype=np.float32)
 # positions = pos[np.where(pos % cell_size != 0)]
 
-alg = lambda y: ceil(y/cell_size) + diff_maker
+alg = lambda y: floor(y/cell_size) + diff_maker
 
 data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
                   for x in x_pos for y in y_pos],

@@ -3,7 +3,9 @@ channels:
   - conda-forge
 dependencies:
   - python
+  - pip
   - tiledb-py
+  - pdal
   - python-pdal
   - numpy
   - shapely
@@ -15,5 +17,5 @@ dependencies:
   - websocket-client
   - python-json-logger
   - dill
-  - pip:
-    - line-profiler
+  - pandas
+  - lmoments3
