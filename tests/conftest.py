@@ -3,10 +3,7 @@ import os
 import pdal
 import copy
 
-import copy
-
 from datetime import datetime
-from typing import Generator
 from typing import Generator
 
 from silvimetric import Extents, Bounds, Attribute, Storage
@@ -27,18 +24,6 @@ pytest_plugins=[
 @pytest.fixture(scope='function')
 def tdb_filepath(storage_config) -> Generator[str, None, None]:
     yield storage_config.tdb_dir
-# pull together fixtures
-pytest_plugins=[
-    'fixtures.shatter_fixtures', 'fixtures.extract_fixtures',
-    'fixtures.command_fixtures', 'fixtures.chunk_fixtures',
-    'fixtures.western_fixtures', 'fixtures.data_fixtures',
-    'fixtures.cli_fixtures', 'fixtures.fusion_fixtures',
-    'fixtures.metric_fixtures', 'fixtures.dask_fixtures'
-]
-
-@pytest.fixture(scope='function')
-def tdb_filepath(storage_config) -> Generator[str, None, None]:
-    yield storage_config.tdb_dir
 
 @pytest.fixture(scope='function')
 def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, None]:
@@ -46,19 +31,8 @@ def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, N
     app = ApplicationConfig(tdb_dir = tdb_filepath,
                             log = log)
     yield app
-def app_config(tdb_filepath, debug=True) -> Generator[ApplicationConfig, None, None]:
-    log = Log(20) # INFO
-    app = ApplicationConfig(tdb_dir = tdb_filepath,
-                            log = log)
-    yield app
 
 @pytest.fixture(scope='function')
-def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
-    path = tmp_path_factory.mktemp("test_tdb")
-    p = os.path.abspath(path)
-    log = Log('DEBUG')
-
-    sc =  StorageConfig(tdb_dir = p,
 def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
@@ -74,19 +48,12 @@ def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics) ->
                         version = svversion)
     Storage.create(sc)
     yield sc
-    Storage.create(sc)
-    yield sc
 
 @pytest.fixture(scope='function')
 def storage(storage_config):
     yield Storage.from_db(storage_config.tdb_dir)
-def storage(storage_config):
-    yield Storage.from_db(storage_config.tdb_dir)
 
 @pytest.fixture(scope='function')
-def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[ShatterConfig, None, None]:
-    log = Log('INFO') # INFO
-    s = ShatterConfig(tdb_dir = storage_config.tdb_dir,
 def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[ShatterConfig, None, None]:
     log = Log('INFO') # INFO
     s = ShatterConfig(tdb_dir = storage_config.tdb_dir,
@@ -95,9 +62,7 @@ def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[Sha
                       attrs = storage_config.attrs,
                       metrics = storage_config.metrics,
                       bounds = bounds,
-                      bounds = bounds,
                       debug = True,
-                      date = date, tile_size=10)
                       date = date, tile_size=10)
 
     yield s
@@ -107,18 +72,7 @@ def extract_config(tif_filepath, metrics, shatter_config, extract_attrs):
     from silvimetric.commands import shatter
     tdb_dir = shatter_config.tdb_dir
     shatter.shatter(shatter_config)
-def extract_config(tif_filepath, metrics, shatter_config, extract_attrs):
-    from silvimetric.commands import shatter
-    tdb_dir = shatter_config.tdb_dir
-    shatter.shatter(shatter_config)
     log = Log(20)
-    c =  ExtractConfig(tdb_dir = tdb_dir,
-                       log = log,
-                       out_dir = tif_filepath,
-                       attrs = extract_attrs,
-                       metrics = metrics)
-    yield c
-
     c =  ExtractConfig(tdb_dir = tdb_dir,
                        log = log,
                        out_dir = tif_filepath,
@@ -133,12 +87,9 @@ def metrics() -> Generator[list[Metric], None, None]:
 
 @pytest.fixture(scope='function')
 def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
-def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
     b =  Bounds(minx, miny, maxx, maxy)
     yield b
 
-@pytest.fixture(scope='function')
-def extents(resolution, bounds) -> Generator[Extents, None, None]:
 @pytest.fixture(scope='function')
 def extents(resolution, bounds) -> Generator[Extents, None, None]:
     yield Extents(bounds,resolution,bounds)
@@ -150,53 +101,36 @@ def attrs(dims) -> Generator[list[Attribute], None, None]:
 
 @pytest.fixture(scope="session")
 def dims() -> Generator[dict, None, None]:
-def dims() -> Generator[dict, None, None]:
     yield { d['name']: d['dtype'] for d in pdal.dimensions }
 
-@pytest.fixture(scope='session')
-def resolution() -> Generator[int, None, None]:
 @pytest.fixture(scope='session')
 def resolution() -> Generator[int, None, None]:
     yield 30
 
 @pytest.fixture(scope='session')
 def test_point_count() -> Generator[int, None, None]:
-@pytest.fixture(scope='session')
-def test_point_count() -> Generator[int, None, None]:
     yield 90000
 
 @pytest.fixture(scope='session')
 def minx() -> Generator[float, None, None]:
-@pytest.fixture(scope='session')
-def minx() -> Generator[float, None, None]:
     yield 300
 
-@pytest.fixture(scope='session')
-def miny() -> Generator[float, None, None]:
 @pytest.fixture(scope='session')
 def miny() -> Generator[float, None, None]:
     yield 300
 
 @pytest.fixture(scope='session')
 def maxx() -> Generator[float, None, None]:
-@pytest.fixture(scope='session')
-def maxx() -> Generator[float, None, None]:
     yield 600
 
 @pytest.fixture(scope='session')
 def maxy() -> Generator[float, None, None]:
-@pytest.fixture(scope='session')
-def maxy() -> Generator[float, None, None]:
     yield 600
 
-@pytest.fixture(scope='session')
-def crs() -> Generator[str, None, None]:
 @pytest.fixture(scope='session')
 def crs() -> Generator[str, None, None]:
     yield "EPSG:5070"
 
-@pytest.fixture(scope='session')
-def date() -> Generator[datetime, None, None]:
 @pytest.fixture(scope='session')
 def date() -> Generator[datetime, None, None]:
     yield datetime(2011, 1, 1)
