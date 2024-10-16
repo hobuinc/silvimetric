@@ -114,10 +114,10 @@ need a bounds and a coordinate reference system.
 
     .. code-block:: shell-session
 
-        silvimetric autzen-smdb.tdb \
+        silvimetric -d autzen-smdb.tdb \
             initialize \
-            '{"maxx":639003.73,"maxy":853536.21,"maxz":615.26,"minx":635579.2,"miny":848884.83,"minz":406.46}' \
-            EPSG:2992
+            --bounds '{"maxx":639003.73,"maxy":853536.21,"maxz":615.26,"minx":635579.2,"miny":848884.83,"minz":406.46}' \
+            --crs EPSG:2992
 
 .. note::
 
