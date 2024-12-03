@@ -1,5 +1,5 @@
 import pytest
-from typing import Generator
+from typing_extensions import Generator
 from click.testing import CliRunner
 
 from silvimetric.commands import shatter

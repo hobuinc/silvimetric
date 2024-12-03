@@ -9,8 +9,7 @@ import logging
 import pathlib
 import sys
 
-from typing import Any
-from typing import Dict
+from typing_extensions import Any, Dict
 
 try:
     import websocket

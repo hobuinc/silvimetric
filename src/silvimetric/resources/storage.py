@@ -6,7 +6,7 @@ import pathlib
 import contextlib
 import json
 import urllib
-from typing import Generator
+from typing_extensions import Generator
 
 from math import floor
 

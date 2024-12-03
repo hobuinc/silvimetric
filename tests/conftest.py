@@ -4,7 +4,7 @@ import pdal
 import copy
 
 from datetime import datetime
-from typing import Generator
+from typing_extensions import Generator
 
 from silvimetric import Extents, Bounds, Attribute, Storage
 from silvimetric import grid_metrics

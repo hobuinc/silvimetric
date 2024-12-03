@@ -1,6 +1,6 @@
 import os
 import pytest
-from typing import Generator
+from typing_extensions import Generator
 import pandas as pd
 import numpy as np
 

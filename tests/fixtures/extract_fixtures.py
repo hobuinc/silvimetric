@@ -2,7 +2,7 @@ import pytest
 import os
 import copy
 import uuid
-from typing import Generator
+from typing_extensions import Generator
 
 from silvimetric.commands.shatter import shatter
 from silvimetric import Attribute, ExtractConfig, Log, Bounds
