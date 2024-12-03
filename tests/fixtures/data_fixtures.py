@@ -1,6 +1,6 @@
 import pytest
 import os
-from typing import Generator
+from typing_extensions import Generator
 
 @pytest.fixture(scope='session')
 def no_cell_line_pc() -> Generator[int, None, None]:

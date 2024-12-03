@@ -6,7 +6,7 @@ import numpy as np
 
 from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import Union, Tuple
+from typing_extensions import Union, Tuple
 from datetime import datetime
 
 from dataclasses import dataclass, field

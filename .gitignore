@@ -4,11 +4,17 @@ __pycache__/
 build/
 dist/
 stats/
-.env
 
 *.html
 **/html/**
 **/_build/**
+
+# local conda environment
+# conda env create --prefix .conda/ -f environment.yml
+.conda/**
+
+# environment variables for pytest
+.env
 
 #tiledb
 **/__fragments/**

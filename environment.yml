@@ -2,9 +2,9 @@ name: silvimetric
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python>=3.10
   - pip
-  - tiledb-py
+  - tiledb-py>=0.32.5
   - pdal
   - python-pdal
   - numpy
@@ -19,3 +19,4 @@ dependencies:
   - dill
   - pandas
   - lmoments3
+  - typing_extensions

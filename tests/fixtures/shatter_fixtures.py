@@ -1,5 +1,5 @@
 import pytest
-from typing import Generator
+from typing_extensions import Generator
 from uuid import uuid4
 import os
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from typing import Union
+from typing_extensions import Union
 
 from .. import Storage, Bounds
 

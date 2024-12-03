@@ -2,7 +2,7 @@ import numpy as np
 import signal
 import datetime
 import copy
-from typing import Generator
+from typing_extensions import Generator
 import pandas as pd
 import tiledb
 

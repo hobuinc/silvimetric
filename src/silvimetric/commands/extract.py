@@ -2,7 +2,7 @@ from pathlib import Path
 from itertools import chain
 
 
-from typing import Union
+from typing_extensions import Union
 from osgeo import gdal, osr
 import dask
 import numpy as np

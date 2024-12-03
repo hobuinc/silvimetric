@@ -1,7 +1,7 @@
 import os
 import pytest
 
-from typing import Generator, List
+from typing_extensions import Generator, List
 
 from silvimetric import Extents, Data
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence
+from typing_extensions import Sequence
 
 import re
 

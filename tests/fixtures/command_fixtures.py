@@ -2,7 +2,7 @@ import uuid
 import pytest
 
 from time import sleep
-from typing import List, Generator
+from typing_extensions import List, Generator
 from datetime import datetime
 
 from silvimetric.commands import shatter

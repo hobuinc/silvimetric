@@ -1,7 +1,8 @@
 import json
 import base64
 
-from typing import Callable, Optional, Any, Union, List, Self
+from typing_extensions import Self, Callable, Optional, Any, Union, List
+
 from uuid import uuid4
 from functools import reduce
 

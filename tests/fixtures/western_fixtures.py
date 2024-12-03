@@ -1,5 +1,5 @@
 import tempfile
-from typing import Generator
+from typing_extensions import Generator
 
 from silvimetric import Storage, ShatterConfig, Log, Bounds, StorageConfig
 from silvimetric import __version__ as svversion

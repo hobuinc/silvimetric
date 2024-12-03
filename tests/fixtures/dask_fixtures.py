@@ -1,6 +1,6 @@
 import pytest
 import os
-from typing import Generator
+from typing_extensions import Generator
 import dask
 
 @pytest.fixture(scope="session", autouse=True)
