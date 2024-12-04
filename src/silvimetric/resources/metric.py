@@ -10,6 +10,7 @@ from tiledb import Attr
 import numpy as np
 import dill
 import pandas as pd
+from copy import deepcopy
 
 import dask
 from dask.delayed import Delayed
@@ -87,12 +88,37 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, *args):
-        # args come in as a value wrapped in one index of a 2D dataframe
-        # we need to remove the wrapping and pass the values to the method
-        # to make things easier
-        a = tuple( a.values[0][0] for a in args)
-        return self._method(d, *a)
+    def sanitize_and_run(self, d, locs, args):
+        # Args are the return values of previous DataFrame aggregations.
+        # In order to access the correct location, we need a map of groupby
+        # indices to their locations
+
+        attr = d.name
+        attrs = [a.entry_name(attr) for a in self.dependencies]
+
+        if isinstance(args, pd.DataFrame) and any(args.any()):
+            # check that all xi yi values are the same
+            # TODO change this section to be more efficient, though possibly
+            # less safe? Just use the index from the first location and go from
+            # there. This method is way too inefficient as it is.
+            idx = locs.loc[d.index[0]]
+            pass_args = args.loc[idx.xi,idx.yi][attrs].values
+            # if not all(idx[['xi','yi']].eq(idx[['xi','yi']].iloc[0]).all()):
+            #     raise ValueError("Multiple indices matching.")
+            # xi = idx.iloc[0]['xi']
+            # yi = idx.iloc[0]['yi']
+            # pass_args = args.where(args.xi==idx.xi).where(args.yi==idx.yi).dropna()
+            # pass_args = pass_args[attrs].iloc[0].values
+        else:
+            pass_args = args
+
+
+
+        # for l in locs.values():
+        #     print(all(l.size == d.index.size and l == d.index))
+
+
+        return self._method(d, *pass_args)
 
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
@@ -114,17 +140,30 @@ class Metric():
 
         data = self.run_filters(data)
         gb = data.groupby(idx)
+        gb_idx = gb.indices
+
+        def merge(left, right):
+            return left.merge(right, on=idx)
+        if len(args) > 1:
+            merged_args = reduce(merge, args)
+        elif len(args) == 1:
+            merged_args = args[0]
+        else:
+            merged_args = args
+
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
-        runner = lambda d: self.sanitize_and_run(d, *args)
+        runner = lambda d: self.sanitize_and_run(d, data[idx], merged_args)
+
+        prev_cols = [col for col in cols if col not in idx]
 
         new_cols = {
-            c: [ (self.entry_name(c), runner) ]
-            for c in cols if c not in idx
+            c: [( self.entry_name(c), runner )]
+            for c in prev_cols
         }
 
-        val = gb.aggregate(new_cols, args=args)
+        val = gb.aggregate(new_cols)
 
         #remove hierarchical columns
         val.columns = val.columns.droplevel(0)
