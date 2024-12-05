@@ -100,10 +100,10 @@ def depless_crr():
 @pytest.fixture
 def dep_crr():
     def m_crr_2(data, *args):
-        mean, minimum, maximum = args
-        den = (maximum - minimum)
+        m, mi, ma = args
+        den = (ma- mi)
         if den == 0:
             return np.nan
-        return (mean - minimum) / den
+        return (m - mi) / den
 
     return Metric('deps_crr', np.float32, m_crr_2, [mean, sm_min, sm_max])
