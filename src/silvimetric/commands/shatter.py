@@ -12,9 +12,11 @@ from dask.delayed import Delayed
 import dask.array as da
 import dask.bag as db
 from dask.diagnostics import ProgressBar
+from line_profiler import profile
 
 from .. import Extents, Storage, Data, ShatterConfig, run_metrics
 
+@profile
 def get_data(extents: Extents, filename: str, storage: Storage):
     """
     Execute pipeline and retrieve point cloud data for this extent
@@ -29,6 +31,7 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     data.execute()
     return p.get_dataframe(0)
 
+@profile
 def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     """
     Arrange data to fit key-value TileDB input format.
@@ -58,6 +61,7 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     return points
 
+@profile
 def get_metrics(data_in, storage: Storage):
     """
     Run DataFrames through metric processes
@@ -67,6 +71,7 @@ def get_metrics(data_in, storage: Storage):
 
     return run_metrics(data_in, storage.config.metrics)
 
+@profile
 def agg_list(data_in):
     """
     Make variable-length point data attributes into lists
@@ -90,6 +95,7 @@ def agg_list(data_in):
     a = coerced.groupby(['xi','yi']).agg(lambda x: np.array(x, old_dtypes[x.name]))
     return a.assign(count=lambda x: [len(z) for z in a.Z])
 
+@profile
 def join(list_data: pd.DataFrame, metric_data):
     """
     Join the list data and metric DataFrames together.
@@ -102,6 +108,7 @@ def join(list_data: pd.DataFrame, metric_data):
 
     return list_data.join(metric_data).reset_index()
 
+@profile
 def write(data_in, storage, timestamp):
     """
     Write cell data to database

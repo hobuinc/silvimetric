@@ -16,6 +16,7 @@ import dask
 from dask.delayed import Delayed
 from distributed import Future
 from .attribute import Attribute
+from line_profiler import profile
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
@@ -88,38 +89,29 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
+    @profile
     def sanitize_and_run(self, d, locs, args):
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
-        # indices to their locations
+        # indices to their locations and then grab the correct index from args
 
         attr = d.name
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
-        if isinstance(args, pd.DataFrame) and any(args.any()):
-            # check that all xi yi values are the same
-            # TODO change this section to be more efficient, though possibly
-            # less safe? Just use the index from the first location and go from
-            # there. This method is way too inefficient as it is.
+        if isinstance(args, pd.DataFrame):
             idx = locs.loc[d.index[0]]
-            pass_args = args.loc[idx.xi,idx.yi][attrs].values
+            # check that all xi yi values are the same
             # if not all(idx[['xi','yi']].eq(idx[['xi','yi']].iloc[0]).all()):
             #     raise ValueError("Multiple indices matching.")
-            # xi = idx.iloc[0]['xi']
-            # yi = idx.iloc[0]['yi']
-            # pass_args = args.where(args.xi==idx.xi).where(args.yi==idx.yi).dropna()
-            # pass_args = pass_args[attrs].iloc[0].values
+            xi = idx.xi
+            yi = idx.yi
+            pass_args = [args.at[(xi,yi), a] for a in attrs]
         else:
             pass_args = args
 
-
-
-        # for l in locs.values():
-        #     print(all(l.size == d.index.size and l == d.index))
-
-
         return self._method(d, *pass_args)
 
+    @profile
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
         the same thing multiple times."""
@@ -140,7 +132,6 @@ class Metric():
 
         data = self.run_filters(data)
         gb = data.groupby(idx)
-        gb_idx = gb.indices
 
         def merge(left, right):
             return left.merge(right, on=idx)
@@ -150,7 +141,6 @@ class Metric():
             merged_args = args[0]
         else:
             merged_args = args
-
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
@@ -287,7 +277,6 @@ def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.
 
     # try returning just the graph and see if that can speed thigns up
     # return graph
-
     computed_list = dask.persist(*graph, optimize_graph=True)
 
     def merge(x, y):

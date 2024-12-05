@@ -1,10 +1,13 @@
 import click
 import pyproj
 import webbrowser
+from contextlib import nullcontext
 
 import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
+from distributed.client import _get_global_client as get_client
+
 from ..resources.metrics import l_moments, percentiles, statistics, product_moments
 from ..resources.metrics import aad, grid_metrics, all_metrics
 

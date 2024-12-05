@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.stats import moment
+from line_profiler import profile
 
 from ..metric import Metric
 
@@ -7,6 +8,7 @@ def m_moments(data, *args):
     mean = args[0]
     return moment(data, center=mean, order=[2,3,4], nan_policy='omit').tolist()
 
+@profile
 def m_mean(data, *args):
     return np.mean(data)
 

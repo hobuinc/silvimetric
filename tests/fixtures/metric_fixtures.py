@@ -4,7 +4,10 @@ from typing_extensions import Generator
 import pandas as pd
 import numpy as np
 
-from silvimetric import Log, StorageConfig, ShatterConfig, Storage, Data, Bounds
+from silvimetric import (Log, StorageConfig, ShatterConfig, Storage, Data,
+    Bounds, Metric)
+from silvimetric.resources.metrics.stats import sm_max, sm_min
+from silvimetric.resources.metrics.p_moments import mean
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
@@ -79,3 +82,28 @@ def metric_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, bound
             debug=True,
             date=date)
     yield sh_config
+
+@pytest.fixture
+def depless_crr():
+    def m_crr_1(data, *args):
+        mean = data.mean()
+        mi = data.min()
+        ma = data.max()
+        d = (ma - mi)
+        if d == 0:
+            return np.nan
+
+        return (mean - mi) / d
+
+    return Metric('depless_crr', np.float32, m_crr_1)
+
+@pytest.fixture
+def dep_crr():
+    def m_crr_2(data, *args):
+        mean, minimum, maximum = args
+        den = (maximum - minimum)
+        if den == 0:
+            return np.nan
+        return (mean - minimum) / den
+
+    return Metric('deps_crr', np.float32, m_crr_2, [mean, sm_min, sm_max])
