@@ -4,8 +4,6 @@ from ..metric import Metric
 from .p_moments import mean
 from .percentiles import pct_base
 
-from line_profiler import profile
-
 import warnings
 # suppress warnings from dividing by 0, these are handled in the metric creation
 warnings.filterwarnings(
@@ -23,11 +21,9 @@ def m_mode(data):
 def m_median(data, *args):
     return np.median(data)
 
-@profile
 def m_min(data, *args):
     return np.min(data)
 
-@profile
 def m_max(data, *args):
     return np.max(data)
 

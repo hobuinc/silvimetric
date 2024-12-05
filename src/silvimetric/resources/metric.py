@@ -16,7 +16,6 @@ import dask
 from dask.delayed import Delayed
 from distributed import Future
 from .attribute import Attribute
-from line_profiler import profile
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
@@ -89,7 +88,6 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    @profile
     def sanitize_and_run(self, d, locs, args):
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
@@ -111,7 +109,6 @@ class Metric():
 
         return self._method(d, *pass_args)
 
-    @profile
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
         the same thing multiple times."""
