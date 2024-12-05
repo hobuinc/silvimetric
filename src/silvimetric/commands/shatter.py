@@ -241,10 +241,6 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug(f'Data: {str(data)}')
     config.log.debug(f'Extents: {str(extents)}')
 
-    if get_client() is None:
-        config.log.warning("Selected scheduler type does not support"
-            "continuously updated config information.")
-
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()
 

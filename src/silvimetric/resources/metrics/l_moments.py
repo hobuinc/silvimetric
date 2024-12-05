@@ -1,32 +1,27 @@
 from ..metric import Metric
 import numpy as np
-from .p_moments import mean
-from lmoments3 import lmom_ratios
 from lmoments3 import distr
 
 import warnings
-# suppress warnings from dividing by 0, these are handled in the metric creation
-warnings.filterwarnings(
-    action='ignore',
-    category=RuntimeWarning,
-    module='lmoments3'
-)
 
 def lmom4(data):
-    n = data.count()
-    try:
-        paras = distr.gam.lmom_fit(data)
-        if n < 1:
-            return [np.nan, np.nan, np.nan, np.nan]
-        elif n < 2:
-            return [data.mean, np.nan, np.nan, np.nan]
-        elif n < 3:
-            return [*distr.gam.lmom(nmom=2, **paras), np.nan, np.nan, np.nan]
-        elif n < 4:
-            return [*distr.gam.lmom(nmom=3, **paras), np.nan, np.nan, np.nan]
-        return [*distr.gam.lmom(nmom=4, **paras)]
-    except:
-        return [data.mean(), np.nan, np.nan, np.nan]
+    # suppress warnings from dividing by 0, these are handled in the metric creation
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        n = data.count()
+        try:
+            paras = distr.gam.lmom_fit(data)
+            if n < 1:
+                return [np.nan, np.nan, np.nan, np.nan]
+            elif n < 2:
+                return [data.mean, np.nan, np.nan, np.nan]
+            elif n < 3:
+                return [*distr.gam.lmom(nmom=2, **paras), np.nan, np.nan, np.nan]
+            elif n < 4:
+                return [*distr.gam.lmom(nmom=3, **paras), np.nan, np.nan, np.nan]
+            return [*distr.gam.lmom(nmom=4, **paras)]
+        except:
+            return [data.mean(), np.nan, np.nan, np.nan]
 
 # L1 is same as mean...compute using np.mean for speed
 def m_l1(data, *args):

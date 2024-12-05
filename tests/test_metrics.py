@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 from silvimetric import shatter, Storage, grid_metrics, run_metrics, Metric
-from silvimetric.resources.metrics.stats import crr
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
 from silvimetric.resources.attribute import Attribute

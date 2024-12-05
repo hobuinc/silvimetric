@@ -2,15 +2,14 @@ import json
 import base64
 
 from typing_extensions import Self, Callable, Optional, Any, Union, List
-
 from uuid import uuid4
 from functools import reduce
+from threading import Lock
 
 from tiledb import Attr
 import numpy as np
 import dill
 import pandas as pd
-from copy import deepcopy
 
 import dask
 from dask.delayed import Delayed
@@ -19,6 +18,7 @@ from .attribute import Attribute
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
+mutex = Lock()
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
@@ -98,12 +98,10 @@ class Metric():
 
         if isinstance(args, pd.DataFrame):
             idx = locs.loc[d.index[0]]
-            # check that all xi yi values are the same
-            # if not all(idx[['xi','yi']].eq(idx[['xi','yi']].iloc[0]).all()):
-            #     raise ValueError("Multiple indices matching.")
             xi = idx.xi
             yi = idx.yi
-            pass_args = [args.at[(xi,yi), a] for a in attrs]
+            with mutex:
+                pass_args = [args.at[(xi,yi), a] for a in attrs]
         else:
             pass_args = args
 
