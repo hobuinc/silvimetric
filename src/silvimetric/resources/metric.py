@@ -131,6 +131,7 @@ class Metric():
             data = data[attrs]
 
         data = self.run_filters(data)
+        idxer = data[idx]
         gb = data.groupby(idx)
 
         def merge(left, right):
@@ -144,7 +145,7 @@ class Metric():
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
-        runner = lambda d: self.sanitize_and_run(d, data[idx], merged_args)
+        runner = lambda d: self.sanitize_and_run(d, idxer, merged_args)
 
         prev_cols = [col for col in cols if col not in idx]
 
