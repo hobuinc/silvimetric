@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   test:
+    name: ${{ matrix.os }} py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
     environment: testing
     timeout-minutes: 30
@@ -26,20 +27,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: mamba-org/setup-micromamba@v2
         with:
-          miniforge-version: latest
-          miniforge-variant: Mambaforge
-          environment-file: environment.yml
-          auto-update-conda: false
-          python-version: "3.11"
-          use-mamba: true
-          activate-environment: silvimetric
+          init-shell: bash
+          environment-file: "environment.yml"
+          environment-name: "silvimetric"
+          create-args: >-
+            python=${{ matrix.python-version }}
       - name: "Install Test Framework"
-        run: pip install pytest pytest-click
+        run: pip install pytest pytest-click awscli
       - name: "Install Package"
         run: pip install .
       - name: "Debug Info"
@@ -48,7 +48,7 @@ jobs:
           echo python version: `python --version`
           echo pytest location: `which pytest`
           echo installed packages
-          conda list
+          micromamba list
           pip list
       - name: Run Tests
         env:
@@ -68,15 +68,11 @@ jobs:
           uses: actions/checkout@v4
           with:
             fetch-depth: 2
-        - uses: conda-incubator/setup-miniconda@v2
+        - uses: mamba-org/setup-micromamba@v2
           with:
-            miniforge-version: latest
-            miniforge-variant: Mambaforge
-            environment-file: environment.yml
-            auto-update-conda: false
-            python-version: "3.11"
-            use-mamba: true
-            activate-environment: silvimetric
+            init-shell: bash
+            environment-file: "environment.yml"
+            environment-name: "silvimetric"
         - name: Config CodeQL
           run: |
             echo "CODEQL_PYTHON=$(which python)" >> $GITHUB_ENV

@@ -229,6 +229,11 @@ def shatter(config: ShatterConfig) -> int:
     :param config: :class:`silvimetric.resources.config.ShatterConfig`.
     :return: Number of points processed.
     """
+
+    if get_client() is not None:
+        raise AttributeError("Dask distributed scheduler is currently disabled "
+            "for SilviMetric. Use a different scheduler to continue.")
+
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
     # set up tiledb
@@ -240,10 +245,6 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug(f'Shatter Config: {config}')
     config.log.debug(f'Data: {str(data)}')
     config.log.debug(f'Extents: {str(extents)}')
-
-    if get_client() is None:
-        config.log.warning("Selected scheduler type does not support"
-            "continuously updated config information.")
 
     if not config.time_slot: # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()

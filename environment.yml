@@ -2,18 +2,17 @@ name: silvimetric
 channels:
   - conda-forge
 dependencies:
-  - python>=3.10
+  - python>=3.10, <3.13
   - pip
   - tiledb-py>=0.32.5
   - pdal
   - python-pdal
   - numpy
   - shapely
-  - dask
+  - dask>=2024.11.2
   - pyproj
   - gdal
   - scipy
-  - awscli
   - websocket-client
   - python-json-logger
   - dill

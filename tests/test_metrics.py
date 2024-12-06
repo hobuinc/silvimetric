@@ -95,3 +95,7 @@ class TestMetrics():
         assert b.m_Z_over500.any()
         assert b.m_Z_over500.values[0] == 3
 
+    def test_dependency_passing(self, dep_crr, depless_crr, metric_data):
+        nd1 = run_metrics(metric_data, depless_crr).compute()
+        nd2 = run_metrics(metric_data, dep_crr).compute()
+        assert all(nd2.m_Z_deps_crr == nd1.m_Z_depless_crr)

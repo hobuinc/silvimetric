@@ -2,9 +2,9 @@ import json
 import base64
 
 from typing_extensions import Self, Callable, Optional, Any, Union, List
-
 from uuid import uuid4
 from functools import reduce
+from threading import Lock
 
 from tiledb import Attr
 import numpy as np
@@ -18,6 +18,7 @@ from .attribute import Attribute
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
+mutex = Lock()
 
 # Derived information about a cell of points
 ## TODO should create list of metrics as classes that derive from Metric?
@@ -87,12 +88,27 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, *args):
-        # args come in as a value wrapped in one index of a 2D dataframe
-        # we need to remove the wrapping and pass the values to the method
-        # to make things easier
-        a = tuple( a.values[0][0] for a in args)
-        return self._method(d, *a)
+    def sanitize_and_run(self, d, locs, args):
+        # Args are the return values of previous DataFrame aggregations.
+        # In order to access the correct location, we need a map of groupby
+        # indices to their locations and then grab the correct index from args
+
+        attr = d.name
+        attrs = [a.entry_name(attr) for a in self.dependencies]
+
+        if isinstance(args, pd.DataFrame):
+            try:
+                with mutex:
+                    idx = locs.loc[d.index[0]]
+                    xi = idx.xi
+                    yi = idx.yi
+                    pass_args = [args.at[(xi,yi), a] for a in attrs]
+            except KeyError as e:
+                print(e)
+        else:
+            pass_args = args
+
+        return self._method(d, *pass_args)
 
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
@@ -112,21 +128,37 @@ class Metric():
             attrs = [*[a.name for a in self.attributes],*idx]
             data = data[attrs]
 
+        # run metric filters over the data first
         data = self.run_filters(data)
+        idxer = data[idx]
         gb = data.groupby(idx)
+
+        # Arguments come in as separate dataframes returned from previous
+        # metrics deemed dependencies. If there are dependencies for this metric,
+        # we'll merge the outputs from those here so they're easier to work with.
+        def merge(left, right):
+            return left.merge(right, on=idx)
+        if len(args) > 1:
+            merged_args = reduce(merge, args)
+        elif len(args) == 1:
+            merged_args = args[0]
+        else:
+            merged_args = args
+
+        # lambda method for use in dataframe aggregator
+        runner = lambda d: self.sanitize_and_run(d, idxer, merged_args)
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
-        runner = lambda d: self.sanitize_and_run(d, *args)
-
+        prev_cols = [col for col in cols if col not in idx]
         new_cols = {
-            c: [ (self.entry_name(c), runner) ]
-            for c in cols if c not in idx
+            c: [( self.entry_name(c), runner )]
+            for c in prev_cols
         }
 
-        val = gb.aggregate(new_cols, args=args)
+        val = gb.aggregate(new_cols)
 
-        #remove hierarchical columns
+        # remove hierarchical columns
         val.columns = val.columns.droplevel(0)
         return val
 
@@ -248,7 +280,6 @@ def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.
 
     # try returning just the graph and see if that can speed thigns up
     # return graph
-
     computed_list = dask.persist(*graph, optimize_graph=True)
 
     def merge(x, y):

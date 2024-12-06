@@ -161,6 +161,7 @@ def extract(config: ExtractConfig) -> None:
     final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
 
     # output metric data to tifs
+    config.log.info(f"Writing rasters to {config.out_dir}")
     for ma in ma_list:
         # TODO should output in sections so we don't run into memory problems
         m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)

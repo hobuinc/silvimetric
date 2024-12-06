@@ -102,8 +102,6 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
         return
 
 
-
-
 @cli.command("scan")
 @click.argument("pointcloud", type=str)
 @click.option("--resolution", type=float, default=100,
@@ -228,25 +226,22 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
     extract.extract(config)
 
 @cli.command('delete')
-@click.option('--id', type=click.UUID, required=True,
-    help="Shatter Task UUID.")
+@click.option('--id', type=click.UUID, required=True, help="Shatter Task UUID.")
 @click.pass_obj
 def delete_cmd(app, id):
-    manage.delete(app.tdb_dir, id)
+    manage.delete(tdb_dir=app.tdb_dir, name=id, log=app.log)
 
 @cli.command('restart')
-@click.option('--id', type=click.UUID, required=True,
-    help="Shatter Task UUID.")
+@click.option('--id', type=click.UUID, required=True, help="Shatter Task UUID.")
 @click.pass_obj
 def restart_cmd(app, id):
-    manage.restart(tdb_dir=app.tdb_dir, name=id)
+    manage.restart(tdb_dir=app.tdb_dir, name=id, log=app.log)
 
 @cli.command('resume')
-@click.option('--id', type=click.UUID, required=True,
-    help="Shatter Task UUID.")
+@click.option('--id', type=click.UUID, required=True, help="Shatter Task UUID.")
 @click.pass_obj
 def resume_cmd(app, id):
-    manage.resume(tdb_dir=app.tdb_dir, name=id)
+    manage.resume(tdb_dir=app.tdb_dir, name=id, log=app.log)
 
 if __name__ == "__main__":
     cli()

@@ -105,6 +105,10 @@ options will always be first.
                                     heduling.html.
     --help                          Show this message and exit.
 
+.. note::
+
+    Dask distributed scheduler is currently disabled for SilviMetric
+
 Initialize
 ................................................................................
 
@@ -241,15 +245,6 @@ Example:
     $ FILEPATH="https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
     $ silvimetric -d $DB_NAME --watch scan $FILEPATH
 
-Output:
-
-.. code-block:: console
-
-    2024-02-05 17:29:21,464 - silvimetric - INFO - scan:24 - Tiling information:
-    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:25 -   Mean tile size: 447.98609121670717
-    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:26 -   Std deviation: 38695.06897023395
-    2024-02-05 17:29:21,465 - silvimetric - INFO - scan:27 -   Recommended split size: 39143
-
 
 Shatter
 ................................................................................
@@ -283,10 +278,9 @@ Example:
 
     $ BOUNDS='[-12317431.810079003, 5623829.111356639, -12304931.810082098, 5642881.670239899]'
     $ silvimetric -d $DB_NAME \
-          --watch shatter $FILEPATH \
+          shatter $FILEPATH \
           --tilesize 100 \
           --date 2024-02-05 \
-          --report \
           --bounds $BOUNDS
 
 Info
@@ -413,12 +407,13 @@ that you can set up on your own as well.
     import numpy as np
     import pdal
     import json
-    from dask.distributed import Client
-    import webbrowser
+    import datetime
+    from shutil import rmtree
 
-    from silvimetric.resources import Storage, Metric, Metrics, Bounds, Pdal_Attributes
-    from silvimetric.resources import StorageConfig, ShatterConfig, ExtractConfig
-    from silvimetric.commands import scan, shatter, extract
+    from silvimetric import Storage, Metric, Bounds, Pdal_Attributes
+    from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
+    from silvimetric import scan, extract, shatter
+    from silvimetric.resources.metrics.stats import sm_min, sm_max, mean
 
     ########## Setup #############
 
@@ -429,9 +424,9 @@ that you can set up on your own as well.
     filename = "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
     db_dir_path = Path(curpath  / "western_us.tdb")
 
-    db_dir = str(db_dir_path)
-    out_dir = str(curpath / "westsern_us_tifs")
-    resolution = 10 # 10 meter resolution
+    db_dir = db_dir_path.as_posix()
+    out_dir = (curpath / "westsern_us_tifs").as_posix()
+    resolution = 30 # 30 meter resolution
 
     # we'll use PDAL python bindings to find the srs of our data, and the bounds
     reader = pdal.Reader(filename)
@@ -461,15 +456,21 @@ that you can set up on your own as well.
         perc_75 = make_metric()
         attrs = [
             Pdal_Attributes[a]
-            for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
+            for a in ['Z', 'Intensity']
         ]
-        metrics = [
-            Metrics[m]
-            for m in ['mean', 'min', 'max']
-        ]
+        metrics = [ mean, sm_max, sm_min ]
         metrics.append(perc_75)
-        st_config = StorageConfig(db_dir, bounds, resolution, srs, attrs, metrics)
+        st_config = StorageConfig(root=bounds, resolution=resolution, crs=srs,
+            attrs=attrs, metrics=metrics, tdb_dir=db_dir)
         storage = Storage.create(st_config)
+
+    ####### Perform Scan #######
+    # The Scan step will perform a search down the resolution tree of the COPC or
+    # EPT file you've supplied and will provide a best guess of how many cells per
+    # tile you should use for this dataset.
+
+    def sc(b):
+        return scan(tdb_dir=db_dir, pointcloud=filename, bounds=b)
 
     ###### Perform Shatter #####
     # The shatter process will pull the config from the database that was previously
@@ -477,12 +478,10 @@ that you can set up on your own as well.
     # Metrics to perform from there. This will split the data into cells, perform
     # the metric method over each cell, and then output that information to TileDB
 
-    def sh():
-        sh_config = ShatterConfig(db_dir, filename, tile_size=200)
-        with Client(n_workers=10, threads_per_worker=3, timeout=100000) as client:
-            webbrowser.open(client.cluster.dashboard_link)
-            shatter(sh_config, client)
-
+    def sh(b, tile_size):
+        sh_config = ShatterConfig(tdb_dir=db_dir, date=datetime.datetime.now(),
+            filename=filename, tile_size=tile_size, bounds=b)
+        shatter(sh_config)
 
     ###### Perform Extract #####
     # The Extract step will pull data from the database for each metric/attribute combo
@@ -491,22 +490,29 @@ that you can set up on your own as well.
     # to the output directory, but you can limit this by defining which Metric names
     # you would like
     def ex():
-        ex_config = ExtractConfig(db_dir, out_dir)
+        ex_config = ExtractConfig(tdb_dir=db_dir, out_dir=out_dir)
         extract(ex_config)
 
-    ####### Perform Scan #######
-    # The Scan step will perform a search down the resolution tree of the COPC or
-    # EPT file you've supplied and will provide a best guess of how many cells per
-    # tile you should use for this dataset.
-
-    def sc():
-        scan.scan()
 
 
     if __name__ == "__main__":
+        rmtree(db_dir)
         make_metric()
         db()
-        sh()
+
+        # this is a large dataset, and silvimetric supports incremental insertion
+        # so we'll be splitting up our bounds and shattering them that way.
+        for b2 in bounds.bisect():
+            for b1 in b2.bisect():
+                print(f"Processing bounds: {b1}")
+                scan_info = sc(b1)
+                # grab the tile size for this chunk so we can operate at an apropriate rate
+                # the variance in tile density leads to a large standard deviation,
+                # so we'll just use the mean for this scenario
+                tile_size = int(scan_info['tile_info']['mean'])
+                sh(b1, tile_size)
+                print(f"Finished bounds: {b1}\n")
+
         ex()
 
 .. include:: ./substitutions.txt

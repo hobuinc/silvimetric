@@ -1,10 +1,13 @@
 import click
 import pyproj
 import webbrowser
+from contextlib import nullcontext
 
 import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
+from distributed.client import _get_global_client as get_client
+
 from ..resources.metrics import l_moments, percentiles, statistics, product_moments
 from ..resources.metrics import aad, grid_metrics, all_metrics
 
@@ -125,19 +128,25 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
             p.register()
 
     elif scheduler == 'distributed':
-        dask_config['scheduler'] = scheduler
-        if dasktype == 'processes':
-            cluster = LocalCluster(processes=True, n_workers=workers, threads_per_worker=threads)
-        elif dasktype == 'threads':
-            cluster = LocalCluster(processes=False, n_workers=workers, threads_per_worker=threads)
-        else:
-            raise ValueError(f"Invalid value for 'dasktype', {dasktype}")
+        raise Exception("Dask distributed scheduler is currently disabled. "
+            "Please select another scheduler ('single-threaded' or 'local')")
 
-        client = Client(cluster)
-        client.get_versions(check=True)
-        dask_config['distributed.client'] = client
-        if watch:
-            webbrowser.open(client.cluster.dashboard_link)
+        # TODO: this is disabled for now. Distributed dask keeps crashing when
+        # used for shatter.
+
+        # dask_config['scheduler'] = scheduler
+        # if dasktype == 'processes':
+        #     cluster = LocalCluster(processes=True, n_workers=workers, threads_per_worker=threads)
+        # elif dasktype == 'threads':
+        #     cluster = LocalCluster(processes=False, n_workers=workers, threads_per_worker=threads)
+        # else:
+        #     raise ValueError(f"Invalid value for 'dasktype', {dasktype}")
+
+        # client = Client(cluster)
+        # client.get_versions(check=True)
+        # dask_config['distributed.client'] = client
+        # if watch:
+        #     webbrowser.open(client.cluster.dashboard_link)
 
     elif scheduler == 'single-threaded':
         dask_config['scheduler'] = scheduler

@@ -1,11 +1,17 @@
 import numpy as np
 from scipy.stats import moment
+import warnings
 
 from ..metric import Metric
 
+
 def m_moments(data, *args):
     mean = args[0]
-    return moment(data, center=mean, order=[2,3,4], nan_policy='omit').tolist()
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', category=RuntimeWarning)
+        m = moment(data, center=mean, order=[2,3,4], nan_policy='propagate').tolist()
+
+    return m
 
 def m_mean(data, *args):
     return np.mean(data)
