@@ -113,11 +113,13 @@ need a bounds and a coordinate reference system.
 3. With bounds and CRS in hand, we can now initialize the database
 
     .. code-block:: shell-session
-
-        silvimetric -d autzen-smdb.tdb \
+        crs="EPSG:2992"
+        bounds='{"maxx":639003.73,"maxy":853536.21,"maxz":615.26,"minx":635579.2,"miny":848884.83,"minz":406.46}'
+        db_name="autzen-smdb.tdb"
+        silvimetric -d ${db_name} \
             initialize \
-            --bounds '{"maxx":639003.73,"maxy":853536.21,"maxz":615.26,"minx":635579.2,"miny":848884.83,"minz":406.46}' \
-            --crs EPSG:2992
+            --bounds ${bounds} \
+            --crs ${crs}
 
 .. note::
 
@@ -132,7 +134,7 @@ to the database we already created, including a best guess at the correct number
 of cells per tile, or `tile size`.
 
     .. code-block:: shell-session
-
+        pointcloud="https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz"
         silvimetric -d ${db_name} scan ${pointcloud}
 
 
@@ -141,14 +143,32 @@ of 185.
 
 ::
 
-    silvimetric - INFO - info:156 - Pointcloud information:
-    silvimetric - INFO - info:156 -   Storage Bounds: [635579.2, 848884.83, 639003.73, 853536.21]
-    silvimetric - INFO - info:156 -   Pointcloud Bounds: [635577.79, 848882.15, 639003.73, 853537.66]
-    silvimetric - INFO - info:156 -   Point Count: 10653336
-    silvimetric - INFO - info:156 - Tiling information:
-    silvimetric - INFO - info:156 -   Mean tile size: 91.51758793969849
-    silvimetric - INFO - info:156 -   Std deviation: 94.31396536316173
-    silvimetric - INFO - info:156 -   Recommended split size: 185
+    2024-12-06 09:08:07,124 - silvimetric - INFO - info:155 - {
+        "pc_info": {
+            "storage_bounds": [
+                635550.0,
+                848880.0,
+                639030.0,
+                853560.0
+            ],
+            "data_bounds": [
+                635550.0,
+                848880.0,
+                639030.0,
+                853560.0
+            ],
+            "count": [
+                10653336
+            ]
+        },
+        "tile_info": {
+            "num_cells": 18096,
+            "num_tiles": 220,
+            "mean": 82.25454545454545,
+            "std_dev": 94.76295175221901,
+            "recommended": 177
+        }
+    }
 
 Shatter
 --------------------------------------------------------------------------------
@@ -161,27 +181,27 @@ but will filter out the tiles that have no data in them.
 
    .. code-block:: shell-session
 
-     silvimetric -d autzen-smdb.tdb \
-        --threads 4 \
-        --workers 4 \
-        --watch \
+     silvimetric -d ${db_name} \
         shatter \
         --date 2008-12-01 \
-        https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz
+        ${pointcloud}
 
 If we grab the tile size from the `scan` that we ran earlier, we'll skip the
 filtering step.
 
    .. code-block:: shell-session
 
-     silvimetric -d autzen-smdb.tdb \
-        --threads 4 \
-        --workers 4 \
-        --watch \
+     silvimetric -d ${db_name} \
         shatter \
         --tilesize 185 \
         --date 2008-12-01 \
-        https://s3.amazonaws.com/hobu-lidar/autzen-classified.copc.laz
+        ${pointcloud}
+
+   .. code-block:: text
+
+     2024-12-06 10:36:59,605 - silvimetric - INFO - info:155 - Beginning shatter process...
+     [########################################] | 100% Completed | 62.31 s
+     2024-12-06 10:38:05,076 - silvimetric - INFO - info:155 - Consolidated time slot 1.
 
 Extract
 --------------------------------------------------------------------------------
@@ -195,7 +215,12 @@ max, each cell will contain values for `min_Intensity`, `max_Intensity`,
 
    .. code-block:: shell-session
 
-     silvimetric -d autzen-smdb.tdb extract -o output-directory
+        silvimetric -d ${db_name} extract -o output-directory
+
+   .. code-block:: text
+
+        2024-12-06 10:42:21,767 - silvimetric - INFO - info:155 - Collecting database information...
+        2024-12-06 10:42:23,399 - silvimetric - INFO - info:155 - Writing rasters to output-directory
 
 Info
 --------------------------------------------------------------------------------
@@ -205,7 +230,7 @@ Info call.
 
     .. code-block:: shell-session
 
-        silvimetric -d autzen-smdb.tdb info --history
+        silvimetric -d ${db_name} info --history
 
 This will print out a JSON object containing information about the current state
 of the database. We can find the `name` key here, which necessary for

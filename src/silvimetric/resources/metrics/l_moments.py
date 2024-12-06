@@ -4,6 +4,8 @@ from lmoments3 import distr
 
 import warnings
 
+# TODO: provide link to documentation on L-Moments
+
 def lmom4(data):
     # suppress warnings from dividing by 0, these are handled in the metric creation
     with warnings.catch_warnings():
@@ -23,7 +25,7 @@ def lmom4(data):
         except:
             return [data.mean(), np.nan, np.nan, np.nan]
 
-# L1 is same as mean...compute using np.mean for speed
+# L1 is same as mean...computed using np.mean in L-moment base for speed
 def m_l1(data, *args):
     return args[0][0]
 

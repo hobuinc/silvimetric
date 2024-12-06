@@ -5,6 +5,8 @@ import dask
 import math
 import json
 
+from dask.diagnostics import ProgressBar
+
 from .. import Storage, Data, Extents, Bounds, Log
 
 def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, resolution:float=100,
@@ -22,9 +24,7 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
     :return: Returns list of point counts.
     """
 
-    # TODO Scan should output other information about a file like bounds, pc, avg points per cell
     with Storage.from_db(tdb_dir) as tdb:
-
 
         if log is None:
             logger = logging.getLogger('silvimetric')
@@ -35,32 +35,34 @@ def scan(tdb_dir: str, pointcloud: str, bounds: Bounds, point_count:int=600000, 
         thresholds = dict(thresholds=dict(resolution=resolution, point_count=point_count, depth=depth))
         logger.debug(json.dumps(thresholds, indent=2))
 
-        extents = Extents.from_sub(tdb_dir, data.bounds)
-        count = dask.delayed(data.estimate_count)(extents.bounds).persist()
+        with ProgressBar():
+            extents = Extents.from_sub(tdb_dir, data.bounds)
+            logger.info("Gathering initial chunks...")
+            count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
 
-        if filter:
-            chunks = extents.chunk(data, resolution, point_count, depth)
-            cell_counts = [ch.cell_count for ch in chunks]
+            if filter:
+                chunks = extents.chunk(data, resolution, point_count, depth)
+                cell_counts = [ch.cell_count for ch in chunks]
 
-        else:
-            cell_counts = extent_handle(extents, data, resolution, point_count,
-                depth, log)
+            else:
+                cell_counts = extent_handle(extents, data, resolution, point_count,
+                    depth, log)
 
-        num_cells = np.sum(cell_counts).item()
-        std = np.std(cell_counts)
-        mean = np.mean(cell_counts)
-        rec = int(mean + std)
+            num_cells = np.sum(cell_counts).item()
+            std = np.std(cell_counts)
+            mean = np.mean(cell_counts)
+            rec = int(mean + std)
 
-        pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
-            data_bounds=data.bounds.to_json(), count=dask.compute(count)))
-        tiling_info = dict(tile_info=dict(num_cells=num_cells,
-            num_tiles=len(cell_counts), mean=mean, std_dev=std, recommended=rec))
+            pc_info = dict(pc_info=dict(storage_bounds=tdb.config.root.to_json(),
+                data_bounds=data.bounds.to_json(), count=dask.compute(count)))
+            tiling_info = dict(tile_info=dict(num_cells=num_cells,
+                num_tiles=len(cell_counts), mean=mean, std_dev=std, recommended=rec))
 
-        final_info = pc_info | tiling_info
-        logger.info(json.dumps(final_info, indent=2))
+            final_info = pc_info | tiling_info
+            logger.info(json.dumps(final_info, indent=2))
 
-        return final_info
+            return final_info
 
 
 def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
@@ -106,8 +108,7 @@ def extent_handle(extent: Extents, data: Data, res_threshold:int=100,
 
     curr_depth = 0
     while curr.npartitions > 0:
-        logger = logging.getLogger('silvimetric')
-        logger.debug(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
+        logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
         n = curr.compute()
         to_add = [ x for x in n if isinstance(x, int) ]
         a = a + to_add

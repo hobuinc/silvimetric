@@ -97,11 +97,14 @@ class Metric():
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
         if isinstance(args, pd.DataFrame):
-            idx = locs.loc[d.index[0]]
-            xi = idx.xi
-            yi = idx.yi
-            with mutex:
-                pass_args = [args.at[(xi,yi), a] for a in attrs]
+            try:
+                with mutex:
+                    idx = locs.loc[d.index[0]]
+                    xi = idx.xi
+                    yi = idx.yi
+                    pass_args = [args.at[(xi,yi), a] for a in attrs]
+            except KeyError as e:
+                print(e)
         else:
             pass_args = args
 
@@ -125,10 +128,14 @@ class Metric():
             attrs = [*[a.name for a in self.attributes],*idx]
             data = data[attrs]
 
+        # run metric filters over the data first
         data = self.run_filters(data)
         idxer = data[idx]
         gb = data.groupby(idx)
 
+        # Arguments come in as separate dataframes returned from previous
+        # metrics deemed dependencies. If there are dependencies for this metric,
+        # we'll merge the outputs from those here so they're easier to work with.
         def merge(left, right):
             return left.merge(right, on=idx)
         if len(args) > 1:
@@ -138,12 +145,12 @@ class Metric():
         else:
             merged_args = args
 
-        # create map of current column name to tuple of new column name and metric method
-        cols = data.columns
+        # lambda method for use in dataframe aggregator
         runner = lambda d: self.sanitize_and_run(d, idxer, merged_args)
 
+        # create map of current column name to tuple of new column name and metric method
+        cols = data.columns
         prev_cols = [col for col in cols if col not in idx]
-
         new_cols = {
             c: [( self.entry_name(c), runner )]
             for c in prev_cols
@@ -151,7 +158,7 @@ class Metric():
 
         val = gb.aggregate(new_cols)
 
-        #remove hierarchical columns
+        # remove hierarchical columns
         val.columns = val.columns.droplevel(0)
         return val
 

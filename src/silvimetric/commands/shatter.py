@@ -230,9 +230,9 @@ def shatter(config: ShatterConfig) -> int:
     :return: Number of points processed.
     """
 
-    if get_client() is None:
-        config.log.logger.error("Dask distributed scheduler is currently disabled"
-            "for SilviMetric.")
+    if get_client() is not None:
+        raise AttributeError("Dask distributed scheduler is currently disabled "
+            "for SilviMetric. Use a different scheduler to continue.")
 
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
