@@ -97,14 +97,11 @@ class Metric():
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
         if isinstance(args, pd.DataFrame):
-            try:
-                with mutex:
-                    idx = locs.loc[d.index[0]]
-                    xi = idx.xi
-                    yi = idx.yi
-                    pass_args = [args.at[(xi,yi), a] for a in attrs]
-            except KeyError as e:
-                print(e)
+            with mutex:
+                idx = locs.loc[d.index[0]]
+                xi = idx.xi
+                yi = idx.yi
+                pass_args = [args.at[(xi,yi), a] for a in attrs]
         else:
             pass_args = args
 
@@ -280,10 +277,10 @@ def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.
 
     # try returning just the graph and see if that can speed thigns up
     # return graph
-    computed_list = dask.persist(*graph, optimize_graph=True)
+    computed_list = dask.compute(*graph, optimize_graph=True, scheduler='single-threaded')
 
     def merge(x, y):
         return x.merge(y, on=['xi','yi'])
-    merged = reduce(merge, computed_list)
+    merged = reduce(merge, graph)
 
     return merged

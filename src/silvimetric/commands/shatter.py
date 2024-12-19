@@ -11,9 +11,11 @@ from distributed.client import _get_global_client as get_client
 from dask.delayed import Delayed
 import dask.array as da
 import dask.bag as db
+import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
 
 from .. import Extents, Storage, Data, ShatterConfig, run_metrics
+from ..resources.taskgraph import Graph
 
 def get_data(extents: Extents, filename: str, storage: Storage):
     """
@@ -58,14 +60,13 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
 
     return points
 
-def get_metrics(data_in, storage: Storage):
+def run_graph(data_in, metrics):
     """
     Run DataFrames through metric processes
     """
-    if data_in is None:
-        return None
+    graph = Graph(metrics)
 
-    return run_metrics(data_in, storage.config.metrics)
+    return graph.run(data_in)
 
 def agg_list(data_in):
     """
@@ -74,12 +75,6 @@ def agg_list(data_in):
     if data_in is None:
         return None
 
-    # grouped = data_in.groupby(['xi','yi'])
-    # grouped = grouped.agg(list)
-
-    # return grouped.assign(count=lambda x: [len(z) for z in grouped.Z])
-
-    # # coerce datatypes to object so we can store np arrays as cell values
     old_dtypes = data_in.dtypes
     xyi_dtypes = { 'xi': np.float64, 'yi': np.float64 }
     o = np.dtype('O')
@@ -131,6 +126,24 @@ def write(data_in, storage, timestamp):
     del pc, data_in
     return p
 
+# def run_one(leaf: Extents, config: ShatterConfig, storage: Storage):
+#     attrs = [a.name for a in config.attrs]
+#     timestamp = (config.time_slot, config.time_slot)
+
+#     points: pd.DataFrame = get_data(leaf, config.filename, storage)
+#     arranged: pd.DataFrame = arrange(points, leaf, attrs)
+#     if arranged is None or arranged.empty:
+#         return 0
+
+#     graph = Graph(storage.config.metrics).init()
+#     metric_data = graph.run(arranged)
+#     # metric_data = run_metrics(arranged, storage.config.metrics)
+#     list_data = agg_list(arranged)
+#     joined = join(list_data, metric_data)
+#     point_count = write(joined, storage, timestamp)
+
+#     return point_count
+
 Leaves = Generator[Extents, None, None]
 def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db.Bag:
     """ Create dask bags and the order of operations.  """
@@ -151,10 +164,13 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
             return False
         return not d.empty
 
+    graph = Graph(storage.config.metrics).init()
+
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     filtered = arranged.filter(pc_filter)
-    metrics: db.Bag = filtered.map(run_metrics, storage.config.metrics)
+    # metrics: db.Bag = filtered.map(run_metrics, storage.config.metrics)
+    metrics = filtered.map(run_graph, storage.config.metrics)
     lists: db.Bag = filtered.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
@@ -191,13 +207,14 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     processes = get_processes(leaves, config, storage)
 
-        ## If dask is distributed, use the futures feature
+    ## If dask is distributed, use the futures feature
     dc = get_client()
     if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
                 if isinstance(pack, CancelledError):
+                    print('asdfasdf')
                     continue
                 for pc in pack:
                     config.point_count = config.point_count + pc
@@ -230,9 +247,9 @@ def shatter(config: ShatterConfig) -> int:
     :return: Number of points processed.
     """
 
-    if get_client() is not None:
-        raise AttributeError("Dask distributed scheduler is currently disabled "
-            "for SilviMetric. Use a different scheduler to continue.")
+    # if get_client() is not None:
+    #     raise AttributeError("Dask distributed scheduler is currently disabled "
+    #         "for SilviMetric. Use a different scheduler to continue.")
 
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000

@@ -5,8 +5,24 @@ from silvimetric import shatter, Storage, grid_metrics, run_metrics, Metric
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
 from silvimetric.resources.attribute import Attribute
+from silvimetric.resources.taskgraph import Graph
 
 class TestMetrics():
+
+    def test_dag(self, metric_data, metric_data_results):
+        metrics = list(l_moments.values())
+        g = Graph(metrics).init()
+        assert g.initialized
+        assert all(n.initialized for n in g.nodes.values())
+        assert list(g.nodes.keys()) == ['l1', 'l2', 'l3', 'l4', 'lcv', 'lskewness', 'lkurtosis', 'lmombase']
+        g.run(metric_data)
+        for node in g.nodes.values():
+            assert isinstance(node.results, pd.DataFrame)
+            assert bool(all(node.results.any()))
+
+
+        assert all(g.results == metric_data_results)
+
 
     def test_metrics(self, metric_data):
         ms: pd.DataFrame = run_metrics(metric_data,
