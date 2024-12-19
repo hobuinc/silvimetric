@@ -51,26 +51,26 @@ class TestCommands(object):
         h = info.info(tdb_dir=tdb_filepath)
         assert not bool(h['history'])
 
-    def test_distributed_fail(self, shatter_config, dask_proc_client):
-        # make sure we handle when a distributed dask is passed to shatter
-        match_str = ("Dask distributed scheduler is currently disabled for "
-            "SilviMetric. Use a different scheduler to continue.")
-        with pytest.raises(AttributeError, match=match_str):
-            shatter.shatter(shatter_config)
+    # def test_distributed_fail(self, shatter_config, dask_proc_client):
+    #     # make sure we handle when a distributed dask is passed to shatter
+    #     match_str = ("Dask distributed scheduler is currently disabled for "
+    #         "SilviMetric. Use a different scheduler to continue.")
+    #     with pytest.raises(AttributeError, match=match_str):
+    #         shatter.shatter(shatter_config)
 
     # TODO: reactivate when dask distributed is no longer disabled
-    # def test_311_failure(self, shatter_config, dask_proc_client):
-    #     # make sure we handle tiledb contexts correctly within dask
+    def test_311_failure(self, shatter_config, dask_proc_client):
+        # make sure we handle tiledb contexts correctly within dask
 
-    #     tdb_dir = shatter_config.tdb_dir
-    #     shatter.shatter(shatter_config)
+        tdb_dir = shatter_config.tdb_dir
+        shatter.shatter(shatter_config)
 
-    #     i = info.info(tdb_dir)
-    #     history = i['history'][-1]
+        i = info.info(tdb_dir)
+        history = i['history'][-1]
 
-    #     finished_config = ShatterConfig.from_dict(history)
-    #     sh_id = finished_config.name
-    #     manage.delete(tdb_dir, sh_id)
+        finished_config = ShatterConfig.from_dict(history)
+        sh_id = finished_config.name
+        manage.delete(tdb_dir, sh_id)
 
     def test_restart(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]

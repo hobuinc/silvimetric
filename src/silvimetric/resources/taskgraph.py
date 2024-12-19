@@ -2,9 +2,9 @@ from .metric import Metric
 from functools import reduce
 
 class Graph():
-    def __init__(self, metrics: list[Metric]):
-        if metrics is None:
-            raise ValueError()
+    def __init__(self, metrics: list[Metric] | Metric):
+        if isinstance(metrics, Metric):
+            metrics = [metrics]
 
         self.metrics = metrics
         self.nodes: dict[str, Node] = { }

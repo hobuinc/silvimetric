@@ -236,51 +236,51 @@ class Metric():
     def __repr__(self) -> str:
         return f"Metric_{self.name}"
 
-def get_methods(data: Union[pd.DataFrame, Delayed], metrics: Metric | list[Metric],
-        uuid=None) -> list[Delayed]:
-    """
-    Create Metric dependency graph by iterating through desired metrics and
-    their dependencies, creating Delayed objects that can be run later.
-    """
-    # identitity for this graph, can be created before or during this method
-    # call, but needs to be the same across this graph, and unique compared
-    # to other graphs
-    if uuid is None:
-        uuid = uuid4()
+# def get_methods(data: Union[pd.DataFrame, Delayed], metrics: Metric | list[Metric],
+#         uuid=None) -> list[Delayed]:
+#     """
+#     Create Metric dependency graph by iterating through desired metrics and
+#     their dependencies, creating Delayed objects that can be run later.
+#     """
+#     # identitity for this graph, can be created before or during this method
+#     # call, but needs to be the same across this graph, and unique compared
+#     # to other graphs
+#     if uuid is None:
+#         uuid = uuid4()
 
-    # don't duplicate a delayed object
-    if not isinstance(data, Delayed):
-        data = dask.delayed(data)
+#     # don't duplicate a delayed object
+#     if not isinstance(data, Delayed):
+#         data = dask.delayed(data)
 
-    if isinstance(metrics, Metric):
-        metrics = [ metrics ]
+#     if isinstance(metrics, Metric):
+#         metrics = [ metrics ]
 
-    # iterate through metrics and their dependencies.
-    # uuid here will help guide metrics to use the same dependency method
-    # calls from dask
-    seq = []
-    for m in metrics:
-        if not isinstance(m, Metric):
-            continue
-        ddeps = get_methods(data, m.dependencies, uuid)
-        dd = dask.delayed(m.do)(data, *ddeps,
-            dask_key_name=f'{m.name}-{str(uuid)}')
-        seq.append(dd)
+#     # iterate through metrics and their dependencies.
+#     # uuid here will help guide metrics to use the same dependency method
+#     # calls from dask
+#     seq = []
+#     for m in metrics:
+#         if not isinstance(m, Metric):
+#             continue
+#         ddeps = get_methods(data, m.dependencies, uuid)
+#         dd = dask.delayed(m.do)(data, *ddeps,
+#             dask_key_name=f'{m.name}-{str(uuid)}')
+#         seq.append(dd)
 
-    return seq
+#     return seq
 
-def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
-    """
-    Collect Metric dependency graph and run it, then merge the results together.
-    """
-    graph = get_methods(data, metrics)
+# def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
+#     """
+#     Collect Metric dependency graph and run it, then merge the results together.
+#     """
+#     graph = get_methods(data, metrics)
 
-    # try returning just the graph and see if that can speed thigns up
-    # return graph
-    computed_list = dask.compute(*graph, optimize_graph=True, scheduler='single-threaded')
+#     # try returning just the graph and see if that can speed thigns up
+#     # return graph
+#     computed_list = dask.compute(*graph, optimize_graph=True, scheduler='single-threaded')
 
-    def merge(x, y):
-        return x.merge(y, on=['xi','yi'])
-    merged = reduce(merge, graph)
+#     def merge(x, y):
+#         return x.merge(y, on=['xi','yi'])
+#     merged = reduce(merge, graph)
 
-    return merged
+#     return merged
