@@ -150,8 +150,8 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
 
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    filtered = arranged.filter(pc_filter)
-    metrics = filtered.map(run_graph, storage.config.metrics)
+    filtered: db.Bag = arranged.filter(pc_filter)
+    metrics: db.Bag = filtered.map(run_graph, storage.config.metrics)
     lists: db.Bag = filtered.map(agg_list)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
@@ -227,10 +227,6 @@ def shatter(config: ShatterConfig) -> int:
     :param config: :class:`silvimetric.resources.config.ShatterConfig`.
     :return: Number of points processed.
     """
-
-    # if get_client() is not None:
-    #     raise AttributeError("Dask distributed scheduler is currently disabled "
-    #         "for SilviMetric. Use a different scheduler to continue.")
 
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000

@@ -3,6 +3,11 @@ from functools import reduce
 
 class Graph():
     def __init__(self, metrics: list[Metric] | Metric):
+        """
+        Task graph for Metrics.
+        """
+
+        # TODO: add mutex to Graph so it can be run in parallel
         if isinstance(metrics, Metric):
             metrics = [metrics]
 
@@ -33,13 +38,12 @@ class Graph():
         m_names = [ m.name for m in self.metrics ]
         res = [n.run(data_in) for k, n in self.nodes.items() if k in m_names]
 
-        def join(x, y):
-            return x.join(y, on=['xi','yi'])
-        self.results = reduce(join, res)
+        self.results = res[0].join(res[1:])
         return self.results
 
 
 class Node():
+    # TODO add mutex to Node so it can be run in parallel
     def __init__(self, metric, graph):
         self.metric = metric
         self.graph = graph
