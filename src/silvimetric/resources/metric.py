@@ -11,8 +11,6 @@ import numpy as np
 import dill
 import pandas as pd
 
-import dask
-from dask.delayed import Delayed
 from distributed import Future
 from .attribute import Attribute
 
@@ -20,8 +18,6 @@ MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 mutex = Lock()
 
-# Derived information about a cell of points
-## TODO should create list of metrics as classes that derive from Metric?
 class Metric():
     """
     A Metric is a TileDB entry representing derived cell data. There is a base set of
@@ -89,6 +85,7 @@ class Metric():
         return f'm_{attr}_{self.name}'
 
     def sanitize_and_run(self, d, locs, args):
+        """Sanitize arguments, find the indices """
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
         # indices to their locations and then grab the correct index from args
@@ -176,7 +173,6 @@ class Metric():
                         f'Type detected: {type(ndf)}')
             data = ndf
         return data
-
 
     def to_json(self) -> dict[str, any]:
         return {
