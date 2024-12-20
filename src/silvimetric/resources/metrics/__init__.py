@@ -7,11 +7,10 @@ from .l_moments import l_moments
 from .stats import statistics
 from .p_moments import product_moments
 
-#TODO make each one of these have a version with the NumberOfReturns>2 filter
-
 all_metrics: dict[str, Metric] = dict(percentiles | l_moments | statistics |
         product_moments)
 
+#TODO make each one of these have a version with the NumberOfReturns>2 filter
 
 gr_perc = copy.deepcopy(percentiles)
 gr_l_moments = copy.deepcopy(l_moments)

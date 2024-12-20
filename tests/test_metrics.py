@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from silvimetric import shatter, Storage, grid_metrics, Metric
+from silvimetric import shatter, Storage, Metric
 from silvimetric import all_metrics as s
 from silvimetric import l_moments
 from silvimetric.resources.attribute import Attribute
@@ -25,13 +25,13 @@ class TestMetrics():
 
 
     def test_metrics(self, metric_data, metric_data_results):
-        metrics = list(grid_metrics.values())
+        metrics = list(s.values())
         graph = Graph(metrics)
         metrics = graph.run(metric_data)
         assert isinstance(metrics, pd.DataFrame)
         adjusted = [k.split('_')[-1] for k in metrics.keys()]
 
-        assert all(a in grid_metrics.keys() for a in adjusted)
+        assert all(a in s.keys() for a in adjusted)
         assert all(metrics == metric_data_results)
 
     def test_dependencies(self, metric_data):
