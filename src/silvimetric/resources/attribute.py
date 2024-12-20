@@ -23,6 +23,7 @@ class Attribute():
                 raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}") from e
 
     def make_array(self, data, copy=False):
+        """Create Pandas Extension array for TileDB compatibility."""
         return AttributeArray(data=data, copy=copy)
 
     def entry_name(self) -> str:

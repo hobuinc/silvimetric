@@ -13,7 +13,7 @@ from typing_extensions import Any, Dict
 
 try:
     import websocket
-    from pythonjsonlogger import jsonlogger
+    from pythonjsonlogger import json as jsonlogger
 except ImportError:
     WebSocketHandler = None
     pass
