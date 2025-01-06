@@ -1,0 +1,23 @@
+channels:
+  - conda-forge
+dependencies:
+  - jupyter-book
+  - sphinx > 6
+  - sphinx-notfound-page
+  - python>=3.10, <3.13
+  - pip
+  - tiledb-py>=0.32.5
+  - pdal
+  - python-pdal
+  - numpy
+  - shapely
+  - dask>=2024.11.2
+  - pyproj
+  - gdal
+  - scipy
+  - websocket-client
+  - python-json-logger
+  - dill
+  - pandas
+  - lmoments3
+  - typing_extensions

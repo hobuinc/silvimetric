@@ -1,0 +1,42 @@
+# Table of contents
+# Learn more at https://jupyterbook.org/customize/toc.html
+
+format: jb-book
+root: index
+parts:
+- caption: Getting Started
+  chapters:
+  - file: about
+  - file: quickstart
+- caption: CLI
+  chapters:
+  - file: cli/extract
+  - file: cli/info
+  - file: cli/initialize
+  - file: cli/scan
+  - file: cli/shatter
+- caption: Commands
+  chapters:
+  - file: api/commands/delete
+  - file: api/commands/extract
+  - file: api/commands/info
+  - file: api/commands/initialize
+  - file: api/commands/restart
+  - file: api/commands/resume
+  - file: api/commands/scan
+  - file: api/commands/shatter
+
+- caption: Resources
+  chapters:
+  - file: api/resources/bounds
+  - file: api/resources/config
+  - file: api/resources/data
+  - file: api/resources/entry
+  - file: api/resources/extents
+  - file: api/resources/log
+  - file: api/resources/storage
+- caption: Development
+  chapters:
+  - file: development
+  - file: tutorial
+
