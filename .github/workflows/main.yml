@@ -16,6 +16,7 @@ concurrency:
 
 jobs:
   env_vars:
+    runs-on: ubuntu-latest
     name: bogus_env_vars
     environment: testing
     steps:
