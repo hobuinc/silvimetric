@@ -4,7 +4,7 @@ import pytest
 import os
 import copy
 
-from silvimetric import Storage, grid_metrics, Attribute, Attributes, StorageConfig, Log
+from silvimetric import Storage, all_metrics, Attribute, Attributes, StorageConfig, Log
 from silvimetric import __version__ as svversion
 
 class Test_Storage(object):
@@ -72,9 +72,9 @@ class Test_Storage(object):
         with storage.open('r') as st:
             s: tiledb.ArraySchema = st.schema
             for m in m_list:
-                assert m.name in grid_metrics.keys()
+                assert m.name in all_metrics.keys()
                 def e_name(att):
                     return s.attr(m.entry_name(att.name))
                 def schema(att):
-                    return grid_metrics[m.name].schema(att)
+                    return all_metrics[m.name].schema(att)
                 assert all([e_name(a) == schema(a) for a in a_list])

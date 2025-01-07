@@ -11,8 +11,6 @@ import numpy as np
 import dill
 import pandas as pd
 
-import dask
-from dask.delayed import Delayed
 from distributed import Future
 from .attribute import Attribute
 
@@ -20,8 +18,6 @@ MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 mutex = Lock()
 
-# Derived information about a cell of points
-## TODO should create list of metrics as classes that derive from Metric?
 class Metric():
     """
     A Metric is a TileDB entry representing derived cell data. There is a base set of
@@ -89,6 +85,7 @@ class Metric():
         return f'm_{attr}_{self.name}'
 
     def sanitize_and_run(self, d, locs, args):
+        """Sanitize arguments, find the indices """
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
         # indices to their locations and then grab the correct index from args
@@ -97,14 +94,11 @@ class Metric():
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
         if isinstance(args, pd.DataFrame):
-            try:
-                with mutex:
-                    idx = locs.loc[d.index[0]]
-                    xi = idx.xi
-                    yi = idx.yi
-                    pass_args = [args.at[(xi,yi), a] for a in attrs]
-            except KeyError as e:
-                print(e)
+            with mutex:
+                idx = locs.loc[d.index[0]]
+                xi = idx.xi
+                yi = idx.yi
+                pass_args = [args.at[(xi,yi), a] for a in attrs]
         else:
             pass_args = args
 
@@ -180,7 +174,6 @@ class Metric():
             data = ndf
         return data
 
-
     def to_json(self) -> dict[str, any]:
         return {
             'name': self.name,
@@ -238,52 +231,3 @@ class Metric():
 
     def __repr__(self) -> str:
         return f"Metric_{self.name}"
-
-def get_methods(data: Union[pd.DataFrame, Delayed], metrics: Metric | list[Metric],
-        uuid=None) -> list[Delayed]:
-    """
-    Create Metric dependency graph by iterating through desired metrics and
-    their dependencies, creating Delayed objects that can be run later.
-    """
-    # identitity for this graph, can be created before or during this method
-    # call, but needs to be the same across this graph, and unique compared
-    # to other graphs
-    if uuid is None:
-        uuid = uuid4()
-
-    # don't duplicate a delayed object
-    if not isinstance(data, Delayed):
-        data = dask.delayed(data)
-
-    if isinstance(metrics, Metric):
-        metrics = [ metrics ]
-
-    # iterate through metrics and their dependencies.
-    # uuid here will help guide metrics to use the same dependency method
-    # calls from dask
-    seq = []
-    for m in metrics:
-        if not isinstance(m, Metric):
-            continue
-        ddeps = get_methods(data, m.dependencies, uuid)
-        dd = dask.delayed(m.do)(data, *ddeps,
-            dask_key_name=f'{m.name}-{str(uuid)}')
-        seq.append(dd)
-
-    return seq
-
-def run_metrics(data: pd.DataFrame, metrics: Union[Metric, list[Metric]]) -> pd.DataFrame:
-    """
-    Collect Metric dependency graph and run it, then merge the results together.
-    """
-    graph = get_methods(data, metrics)
-
-    # try returning just the graph and see if that can speed thigns up
-    # return graph
-    computed_list = dask.persist(*graph, optimize_graph=True)
-
-    def merge(x, y):
-        return x.merge(y, on=['xi','yi'])
-    merged = reduce(merge, computed_list)
-
-    return merged
