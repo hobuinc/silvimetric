@@ -1,5 +1,12 @@
 channels:
   - conda-forge
+
+source:
+  path: ..
+
+build:
+  script: python -m pip install --no-deps --ignore-installed .
+
 dependencies:
   - jupyter-book
   - sphinx > 6
