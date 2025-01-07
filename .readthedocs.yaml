@@ -10,6 +10,8 @@ build:
   tools:
     python: "mambaforge-latest"
   jobs:
+    pre_install:
+      pip install .
     pre_build:
       # Generate on-the-fly Sphinx configuration from Jupyter Book's _config.yml
       - "jupyter-book config sphinx docs/"
@@ -25,6 +27,3 @@ conda:
 
 formats: all
 
-python:
-  install:
-    - requirements: docs/requirements.txt
