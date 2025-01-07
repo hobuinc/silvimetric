@@ -16,9 +16,12 @@ concurrency:
 
 jobs:
   env_vars:
+    name: bogus_env_vars
     environment: testing
-    run: |
-      echo "${{ secrets.SAUCE }}"
+    steps:
+      - name: bogus test
+        run: |
+          echo "${{ secrets.SAUCE }}"
 
   test:
     name: ${{ matrix.os }} py${{ matrix.python-version }}
