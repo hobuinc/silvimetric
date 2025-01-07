@@ -21,6 +21,7 @@ dependencies:
   - dask>=2024.11.2
   - pyproj
   - gdal
+  - typing_extensions
   - scipy
   - websocket-client
   - python-json-logger

@@ -6,4 +6,5 @@ sphinx-notfound-page
 numpy
 tiledb
 dask
+typing-extensions
 .
