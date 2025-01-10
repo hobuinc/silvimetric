@@ -123,6 +123,8 @@ class StorageConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['root'] = self.root.to_json()
+        d['next_time_slot'] = self.next_time_slot
+
         return d
 
     @classmethod
@@ -150,7 +152,8 @@ class StorageConfig(Config):
                 crs = crs,
                 metrics = ms,
                 capacity = x['capacity'],
-                version = x['version'])
+                version = x['version'],
+                next_time_slot=x['next_time_slot'])
 
         return n
 
@@ -252,6 +255,19 @@ class ShatterConfig(Config):
             self.metrics = s.getMetrics()
 
         del s
+
+    def history_json(self):
+        # removing a attrs and metrics, since they'll be in the storage log
+        # removing mbr because it's too big to do json pretty printing with
+        # could add a custom json logger to handle mbr logging in the future
+        if isinstance(self.date, tuple):
+            date = [ dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
+        else:
+            date = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        d = dict(filename=self.filename, name=str(self.name), time_slot=self.time_slot, bounds=self.bounds.to_json(),
+                date=date)
+
+        return d
 
     def to_json(self):
         d = super().to_json()
