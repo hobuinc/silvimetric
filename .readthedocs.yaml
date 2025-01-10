@@ -14,7 +14,7 @@ build:
       - pip install .
     pre_build:
       # Generate on-the-fly Sphinx configuration from Jupyter Book's _config.yml
-      - "jupyter-book config sphinx docs/"
+      - "jupyter-book config sphinx docs/source"
 
 sphinx:
   builder: html
