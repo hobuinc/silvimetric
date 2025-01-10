@@ -13,14 +13,19 @@ GitHub hosts the project at https://github.com/hobuinc/silvimetric
 ### Installation
 These scripts will install `Silvimetric` dependencies as python libraries to the conda environment silvimetric.
 
-`Silvimetric` requires that we install some packages from `conda` (`TileDB`, and `PDAL`) so it's usually easier to use only `conda` to handle your environment. If this is unavailable to you, you will need to install `TileDB` and `PDAL` from source before installing the python packages that are dependent on those (`python-pdal` and `tiledb-py`).
+`Silvimetric` requires that we install some packages from `conda` (`TileDB`, `GDAL`, and `PDAL`) so it's usually easier to use only `conda` to handle your environment. If this is unavailable to you, you will need to install `TileDB`, `GDAL`, and `PDAL` from source before installing the python packages that are dependent on those (`python-pdal`, `gdal`, `tiledb-py`).
 
-##### Pip and Conda
+##### Pip
 
 ```
-conda env create -f https://raw.githubusercontent.com/hobuinc/silvimetric/main/environment.yml
-conda activate silvimetric
+conda install silvimetric --only-deps
 pip install silvimetric
+```
+
+##### Conda
+
+```
+conda install silvimetric
 ```
 
 ##### Source
