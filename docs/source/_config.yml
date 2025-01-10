@@ -43,7 +43,7 @@ html:
 sphinx:
   config:
     html_show_copyright: false
-    latex_logo: "./_static/logo/pdal_logo_only.png"
+    latex_logo: "./_static/logo/silvimetric_logo.png"
     latex_use_parts: false
     latex_show_urls: "inline"
     latex_elements:
