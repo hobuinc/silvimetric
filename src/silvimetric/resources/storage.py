@@ -237,7 +237,7 @@ class Storage:
         return time
 
     def get_history(self, start_time: datetime, end_time: datetime,
-                    bounds: Bounds, name:str=None):
+                    bounds: Bounds, name:str=None, concise:bool=False):
         """
         Retrieve history of the database at current point in time.
 
@@ -245,9 +245,13 @@ class Storage:
         :param end_time: Query parameter, ending datetime of process.
         :param bounds: Query parameter, bounds to query by.
         :param name: Query paramter, shatter process uuid., by default None
+        :param concise: Whether or not to give shortened version of history.
         :return: Returns list of array fragments that meet query parameters.
         """
 
+        # Get metadata configs from each timestamp that contains array fragments
+        # In future may want to collect all configs regardless, since they're
+        # still being stored there.
         af = tiledb.array_fragments(self.config.tdb_dir, True)
         m = [ ]
         for idx in range(len(af)):
@@ -280,7 +284,11 @@ class Storage:
                 if s.date < start_time or s.date > end_time:
                     continue
 
-            m.append(s.to_json())
+            if concise:
+                h = s.history_json()
+            else:
+                h = s.to_json()
+            m.append(h)
 
         return m
 

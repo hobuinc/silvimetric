@@ -84,7 +84,7 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
     end_date = dates[1] if dates else date
 
     i = info.info(app.tdb_dir, bounds=bounds, start_time=start_date,
-        end_time=end_date, name=name)
+        end_time=end_date, name=name, concise=True)
 
     if any([history, metadata, attributes]):
         filtered = { }

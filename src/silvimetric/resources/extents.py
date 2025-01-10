@@ -125,7 +125,7 @@ class Extents(object):
             self.root = chunk.bounds
 
         filtered = []
-        curr = db.from_delayed([ch.filter(data, res_threshold, pc_threshold,
+        curr = db.from_delayed([dask.delayed(ch.filter)(data, res_threshold, pc_threshold,
             depth_threshold, 1) for ch in chunk.split()])
         curr_depth = 1
 
@@ -166,7 +166,6 @@ class Extents(object):
         ]
         return exts
 
-    @dask.delayed
     def filter(self, data: Data, res_threshold=100, pc_threshold=600000, depth_threshold=6, depth=0):
         """
         Creates quad tree of chunks for this bounds, runs pdal quickinfo over
@@ -207,7 +206,7 @@ class Extents(object):
 
                 return self.get_leaf_children(cell_estimate)
             else:
-                return [ ch.filter(data, res_threshold, pc_threshold, depth_threshold, depth=depth+1) for ch in self.split() ]
+                return [ dask.delayed(ch.filter)(data, res_threshold, pc_threshold, depth_threshold, depth=depth+1) for ch in self.split() ]
 
 
     def _find_dims(self, tile_size):

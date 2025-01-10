@@ -48,17 +48,12 @@ class TestCommands(object):
             idx = i - 1
             manage.delete(tdb_filepath, ids[idx])
 
+        s = Storage.from_db(tdb_filepath)
+        assert s.config.next_time_slot==5
+
         h = info.info(tdb_dir=tdb_filepath)
-        assert not bool(h['history'])
+        assert len(h['history']) == 0
 
-    # def test_distributed_fail(self, shatter_config, dask_proc_client):
-    #     # make sure we handle when a distributed dask is passed to shatter
-    #     match_str = ("Dask distributed scheduler is currently disabled for "
-    #         "SilviMetric. Use a different scheduler to continue.")
-    #     with pytest.raises(AttributeError, match=match_str):
-    #         shatter.shatter(shatter_config)
-
-    # TODO: reactivate when dask distributed is no longer disabled
     def test_311_failure(self, shatter_config, dask_proc_client):
         # make sure we handle tiledb contexts correctly within dask
 
