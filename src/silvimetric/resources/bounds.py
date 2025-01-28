@@ -134,14 +134,30 @@ class Bounds(dict): #for JSON serializing
         ymaxdif = self.maxy % resolution
         ymindif = self.miny % resolution
 
-        if xmindif:
-            self.minx = self.minx - xmindif
-        if xmaxdif:
-            self.maxx = self.maxx + (resolution - xmaxdif)
-        if ymindif:
-            self.miny = self.miny - ymindif
-        if ymaxdif:
-            self.maxy = self.maxy + (resolution - ymaxdif)
+        if xmindif > resolution / 2.0:
+            self.minx -= (xmindif - resolution / 2.0)
+        elif xmindif < resolution / 2.0:
+            self.minx -= (xmindif + resolution / 2.0)
+        else:
+            pass
+        if ymindif > resolution / 2.0:
+            self.miny -= (ymindif - resolution / 2.0)
+        elif ymindif < resolution / 2.0:
+            self.miny -= (ymindif + resolution / 2.0)
+        else:
+            pass
+        if xmaxdif > resolution / 2.0:
+            self.maxx += resolution / 2.0 + (resolution - xmaxdif)
+        elif xmaxdif < resolution / 2.0:
+            self.maxx += resolution / 2.0 - xmaxdif
+        else:
+            pass
+        if ymaxdif > resolution / 2.0:
+            self.maxy += resolution / 2.0 + (resolution - ymaxdif)
+        elif ymaxdif < resolution / 2.0:
+            self.maxy += resolution / 2.0 - ymaxdif
+        else:
+            pass
 
     @staticmethod
     def shared_bounds(first, second):
