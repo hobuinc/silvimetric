@@ -159,6 +159,15 @@ class Bounds(dict): #for JSON serializing
         else:
             pass
 
+        # if xmindif:
+        #     self.minx = self.minx - xmindif
+        # if xmaxdif:
+        #     self.maxx = self.maxx + (resolution - xmaxdif)
+        # if ymindif:
+        #     self.miny = self.miny - ymindif
+        # if ymaxdif:
+        #     self.maxy = self.maxy + (resolution - ymaxdif)
+
     @staticmethod
     def shared_bounds(first, second):
         """Find the Bounds that is shared between two Bounds.
