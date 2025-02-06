@@ -128,7 +128,15 @@ class Bounds(dict): #for JSON serializing
             return True
         return False
 
-    def adjust_to_cell_lines(self, resolution):
+    def adjust_alignment(self, resolution, alignment):
+        if alignment.lower() == "pixel_is_cell":
+            adjust_to_cell_lines(self, resolution)
+        elif alignment.lower() == "pixel_is_point":
+            adjust_to_cell_centers(self, resolution)
+        else:
+            raise Exception(f"Invalid pixel alignment: {alignment}")
+
+    def adjust_to_cell_centers(self, resolution):
         xmindif = self.minx % resolution
         xmaxdif = self.maxx % resolution
         ymaxdif = self.maxy % resolution
@@ -159,14 +167,20 @@ class Bounds(dict): #for JSON serializing
         else:
             pass
 
-        # if xmindif:
-        #     self.minx = self.minx - xmindif
-        # if xmaxdif:
-        #     self.maxx = self.maxx + (resolution - xmaxdif)
-        # if ymindif:
-        #     self.miny = self.miny - ymindif
-        # if ymaxdif:
-        #     self.maxy = self.maxy + (resolution - ymaxdif)
+    def adjust_to_cell_lines(self, resolution):
+        xmindif = self.minx % resolution
+        xmaxdif = self.maxx % resolution
+        ymaxdif = self.maxy % resolution
+        ymindif = self.miny % resolution
+
+        if xmindif:
+            self.minx = self.minx - xmindif
+        if xmaxdif:
+            self.maxx = self.maxx + (resolution - xmaxdif)
+        if ymindif:
+            self.miny = self.miny - ymindif
+        if ymaxdif:
+            self.maxy = self.maxy + (resolution - ymaxdif)
 
     @staticmethod
     def shared_bounds(first, second):

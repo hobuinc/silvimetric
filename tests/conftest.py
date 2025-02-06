@@ -91,8 +91,8 @@ def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
     yield b
 
 @pytest.fixture(scope='function')
-def extents(resolution, bounds) -> Generator[Extents, None, None]:
-    yield Extents(bounds,resolution,bounds)
+def extents(resolution, alignment, bounds) -> Generator[Extents, None, None]:
+    yield Extents(bounds,resolution,alignment,bounds)
 
 @pytest.fixture(scope="function")
 def attrs(dims) -> Generator[list[Attribute], None, None]:

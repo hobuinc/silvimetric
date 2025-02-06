@@ -32,7 +32,7 @@ class Data:
             self.bounds = Data.get_bounds(self.reader)
 
         # adjust bounds if necessary
-        self.bounds.adjust_to_cell_lines(storageconfig.resolution)
+        self.bounds.adjust_alignment(storageconfig.resolution, storageconfig.alignment)
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
 
         self.storageconfig = storageconfig

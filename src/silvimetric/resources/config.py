@@ -66,6 +66,8 @@ class StorageConfig(Config):
     """Coordinate reference system, same for all data in a project"""
     resolution: float = 30.0
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
+    alignment: str = 'pixel_is_point'
+    """Alignment of pixels in database, same for all data in a project, options: 'pixel_is_cell' or 'pixel_is_point', defaults to 'pixel_is_point'"""
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
@@ -148,6 +150,7 @@ class StorageConfig(Config):
                 root = root,
                 log = Log(**x['log']),
                 resolution = x['resolution'],
+                alignment = x['alignment'],
                 attrs = attrs,
                 crs = crs,
                 metrics = ms,
