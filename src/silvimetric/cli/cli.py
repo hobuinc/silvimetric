@@ -135,7 +135,7 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
         help="List of metrics to include in output, eg. '-m stats,percentiles'")
 @click.option("--resolution", type=float, default=30.0,
         help="Summary pixel resolution")
-@click.option("--alignment", type=str, default='pixel_is_point',
+@click.option("--alignment", type=str, default='pixel_is_cell',
         help="Pixel alignment: 'pixel_is_point' or 'pixel_is_cell'")
 @click.pass_obj
 def initialize_cmd(app: ApplicationConfig, bounds: Bounds, crs: pyproj.CRS,
