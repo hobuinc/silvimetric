@@ -122,7 +122,7 @@ class Extents(object):
         miny = bmaxy - (self.y2 * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
-        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.alignment, self.alignment, r)
+        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.alignment, r)
 
         if self.bounds == self.root:
             self.root = chunk.bounds
