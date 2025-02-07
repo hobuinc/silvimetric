@@ -108,6 +108,10 @@ def resolution() -> Generator[int, None, None]:
     yield 30
 
 @pytest.fixture(scope='session')
+def alignment() -> Generator[int, None, None]:
+    yield 'pixel_is_cell'
+
+@pytest.fixture(scope='session')
 def test_point_count() -> Generator[int, None, None]:
     yield 90000
 
