@@ -42,7 +42,7 @@ class Test_Shatter(object):
                     assert bool(np.all( a[xi, yi]['Z'][0] == ((maxy/storage.config.resolution) - (yi + 1)) ))
 
     def test_command_point(self, shatter_config, storage: Storage, maxy):
-        shatter_config.alignment = 'pixelispoint'
+        storage.config.alignment = 'pixelispoint'
         shatter(shatter_config)
         with storage.open('r') as a:
             assert a[:,:]['Z'].shape[0] == 121
