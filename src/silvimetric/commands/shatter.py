@@ -66,7 +66,8 @@ def run_graph(data_in, metrics):
     """
     graph = Graph(metrics)
 
-    return graph.run(data_in)
+    a = graph.run(data_in)
+    return a
 
 def agg_list(data_in):
     """
@@ -111,14 +112,23 @@ def write(data_in, storage, timestamp):
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
     xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
-    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
+    metr_dict = {f'{m.entry_name(a.name)}': m.dtype for a in storage.config.attrs for m in storage.config.metrics if a in m.attributes or not m.attributes}
     dtype_dict = attr_dict | xy_dict | metr_dict
 
-    varlen_types = {a.dtype for a in storage.config.attrs}
+    # varlen_types = {a.dtype for a in storage.config.attrs}
 
-    tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=True,
-        dataframe=data_in, mode='append', timestamp=timestamp,
-        column_types=dtype_dict, varlen_types=varlen_types)
+    start_x = int(data_in.X.min().item())
+    start_y = int(data_in.Y.min().item())
+    end_x = int(data_in.X.max().item()) + 1
+    end_y = int(data_in.Y.max().item()) + 1
+
+    with storage.open(mode='w', timestamp=timestamp) as A:
+        b = data_in.astype(dtype_dict).to_dict('list')
+
+        # doing a hack to fix TileDB's weird array usage.
+        for a in attr_dict:
+            b[a] = np.array([*b[a], None], 'O')[:-1]
+        A[start_x:end_x,start_y:end_y] = b
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
