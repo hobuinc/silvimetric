@@ -130,7 +130,16 @@ class Data:
                         self.bounds.maxx + res,
                         self.bounds.maxy + res
                     )
-                    stage._options['bounds'] = str(collar)
+                    bb = json.dumps({
+                        "minx": collar.minx, 
+                        "miny": collar.miny, 
+                        "maxx": collar.maxx, 
+                        "maxy": collar.maxy,
+                        "crs": self.storageconfig.crs.to_wkt()
+                    }, 
+                    sort_keys = False)
+
+                    # stage._options['bounds'] = str(collar)
                     # stage._options['bounds'] = str(self.bounds)
 
             # We strip off any writers from the pipeline that were
