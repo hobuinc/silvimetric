@@ -24,8 +24,8 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
         return f'AttributeDtype[{self.subtype}]'
 
     # TestDtypeTests
-    # def __hash__(self) -> int:
-    #     return hash(str(self))
+    def __hash__(self) -> int:
+        return hash(str(self))
 
 
     @property
@@ -74,22 +74,6 @@ class AttributeArray(pd.api.extensions.ExtensionArray):
     @property
     def dtype(self):
         return self._dtype
-
-    # work around imhomogenous results by forcing object type
-    def to_numpy(
-        self,
-        dtype: npt.DTypeLike | None = None,
-        copy: bool = False,
-        na_value: object = lib.no_default,
-    ) -> np.ndarray:
-
-        result = np.array(self._data, dtype='O')
-        if copy or na_value is not lib.no_default:
-            result = result.copy()
-        if na_value is not lib.no_default:
-            result[self.isna()] = na_value
-        return result
-
 
     def copy(self):
         return type(self)(self._data, self._dtype)

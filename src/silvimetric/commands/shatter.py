@@ -111,11 +111,13 @@ def write(data_in, storage, timestamp):
     data_in = data_in.rename(columns={'xi':'X','yi':'Y'})
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
-    xy_dict = { 'X': data_in.X.dtype, 'Y': data_in.Y.dtype }
+    local_attr_dict = {f'{a.name}': 'O' for a in storage.config.attrs}
+    xy_dict = { 'X': np.int32, 'Y': np.int32 }
     metr_dict = {f'{m.entry_name(a.name)}': m.dtype for a in storage.config.attrs for m in storage.config.metrics if a in m.attributes or not m.attributes}
     dtype_dict = attr_dict | xy_dict | metr_dict
+    local_dtypes = local_attr_dict | xy_dict | metr_dict
 
-    # varlen_types = {a.dtype for a in storage.config.attrs}
+    varlen_types = {a.dtype for a in storage.config.attrs}
 
     start_x = int(data_in.X.min().item())
     start_y = int(data_in.Y.min().item())
@@ -123,9 +125,13 @@ def write(data_in, storage, timestamp):
     end_y = int(data_in.Y.max().item()) + 1
 
     with storage.open(mode='w', timestamp=timestamp) as A:
-        b = data_in.astype(dtype_dict).to_dict('list')
+        b = data_in.astype(local_dtypes).to_dict('list')
 
-        # doing a hack to fix TileDB's weird array usage.
+        # tiledb.from_pandas(uri=storage.config.tdb_dir, sparse=False,
+        #     dataframe=b, mode='append', timestamp=timestamp,
+        #     column_types=dtype_dict, varlen_types=varlen_types, fit_to_df=True)
+        # doing a hack to fix TileDB's array usage.
+        # https://forum.tiledb.com/t/weird-behavior-with-variable-length-attributes/508
         for a in attr_dict:
             b[a] = np.array([*b[a], None], 'O')[:-1]
         A[start_x:end_x,start_y:end_y] = b
