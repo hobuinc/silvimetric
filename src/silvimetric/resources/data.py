@@ -71,16 +71,7 @@ class Data:
         reader = pdal.Reader(self.filename, tag='reader')
         reader._options['threads'] = self.reader_thread_count
         if self.bounds:
-            bb = json.dumps({
-                "minx": self.bounds.minx, 
-                "miny": self.bounds.miny, 
-                "maxx": self.bounds.maxx, 
-                "maxy": self.bounds.maxy,
-                "crs": self.storageconfig.crs.to_wkt()
-            }, 
-            sort_keys = False)
-            reader._options['bounds'] = bb
-            # reader._options['bounds'] = str(self.bounds)
+            reader._options['bounds'] = str(self.bounds)
 
 
         return reader.pipeline()
@@ -139,17 +130,7 @@ class Data:
                         self.bounds.maxx + res,
                         self.bounds.maxy + res
                     )
-                    bb = json.dumps({
-                        "minx": collar.minx, 
-                        "miny": collar.miny, 
-                        "maxx": collar.maxx, 
-                        "maxy": collar.maxy,
-                        "crs": self.storageconfig.crs.to_wkt()
-                    }, 
-                    sort_keys = False)
-                    stage._options['bounds'] = bb
-
-                    # stage._options['bounds'] = str(collar)
+                    stage._options['bounds'] = str(collar)
                     # stage._options['bounds'] = str(self.bounds)
 
             # We strip off any writers from the pipeline that were
@@ -244,16 +225,7 @@ class Data:
         # and this reflects point count of entire file
         reader = self.get_reader()
         if bounds:
-            bb = json.dumps({
-                "minx": bounds.minx, 
-                "miny": bounds.miny, 
-                "maxx": bounds.maxx, 
-                "maxy": bounds.maxy,
-                "crs": self.storageconfig.crs.to_wkt()
-            }, 
-            sort_keys = False)
-            reader._options['bounds'] = bb
-            # reader._options['bounds'] = str(bounds)
+            reader._options['bounds'] = str(bounds)
 
         pipeline = reader.pipeline()
         qi = pipeline.quickinfo[reader.type]
@@ -271,16 +243,7 @@ class Data:
 
         reader = copy.deepcopy(self.get_reader())
         if bounds:
-            bb = json.dumps({
-                "minx": bounds.minx, 
-                "miny": bounds.miny, 
-                "maxx": bounds.maxx, 
-                "maxy": bounds.maxy,
-                "crs": self.storageconfig.crs.to_wkt()
-            }, 
-            sort_keys = False)
-            reader._options['bounds'] = bb
-            # reader._options['bounds'] = str(bounds)
+            reader._options['bounds'] = str(bounds)
 
         pipeline = reader.pipeline()
         pipeline.execute()
