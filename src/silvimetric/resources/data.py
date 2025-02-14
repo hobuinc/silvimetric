@@ -82,9 +82,9 @@ class Data:
             reader._options['bounds'] = bb
             # reader._options['bounds'] = str(self.bounds)
         
-        file = open("reader1.json", "w")
-        file.write(reader.pipeline.pipeline)
-        file.close()
+        # file = open("reader1.json", "w")
+        # file.write(reader.pipeline.pipeline)
+        # file.close()
 
 
         return reader.pipeline()
