@@ -2,6 +2,7 @@ from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
 from math import ceil
+import pytest
 
 from silvimetric import grid_metrics, ExtractConfig, Extents, Log, extract, Storage
 

@@ -80,6 +80,6 @@ class Attribute():
     def __repr__(self) -> str:
         return json.dumps(self.to_json())
 
-# A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html
+# A list of pdal dimensions can be found here https://pdal.io/en/stable/dimensions.html
 Pdal_Attributes = { d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions }
 Attributes = Pdal_Attributes
