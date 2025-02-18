@@ -82,9 +82,9 @@ class Data:
             reader._options['bounds'] = bb
             # reader._options['bounds'] = str(self.bounds)
         
-        # file = open("reader1.json", "w")
-        # file.write(reader.pipeline.pipeline)
-        # file.close()
+        file = open("reader_make_pipeline.json", "w")
+        file.write(reader.pipeline().pipeline)
+        file.close()
 
 
         return reader.pipeline()
@@ -178,7 +178,7 @@ class Data:
         stages.append(assign_y)
         # stages.append(hag)
 
-        file = open("reader2.json", "w")
+        file = open("reader_get_pipeline.json", "w")
         file.write(pdal.Pipeline(stages).pipeline)
         file.close()
 
@@ -264,7 +264,7 @@ class Data:
             # reader._options['bounds'] = str(bounds)
 
         pipeline = reader.pipeline()
-        file = open("reader3.json", "w")
+        file = open("reader_estimate_count.json", "w")
         file.write(pipeline.pipeline)
         file.close()
         qi = pipeline.quickinfo[reader.type]
@@ -294,7 +294,7 @@ class Data:
             # reader._options['bounds'] = str(bounds)
 
         pipeline = reader.pipeline()
-        file = open("reader4.json", "w")
+        file = open("reader_count.json", "w")
         file.write(pipeline.pipeline)
         file.close()
         pipeline.execute()
