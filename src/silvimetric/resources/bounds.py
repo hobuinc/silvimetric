@@ -129,7 +129,7 @@ class Bounds(dict): #for JSON serializing
         return False
 
     def adjust_alignment(self, resolution, alignment):
-        if alignment.lower() == "pixelisarea":
+        if alignment.lower() in ["pixelisarea", "aligntocorner"]:
             xmindif = self.minx % resolution
             xmaxdif = self.maxx % resolution
             ymaxdif = self.maxy % resolution
@@ -143,7 +143,7 @@ class Bounds(dict): #for JSON serializing
                 self.miny = self.miny - ymindif
             if ymaxdif:
                 self.maxy = self.maxy + (resolution - ymaxdif)
-        elif alignment.lower() == "pixelispoint":
+        elif alignment.lower() in ["pixelispoint", "aligntocenter"]:
             xmindif = self.minx % resolution
             xmaxdif = self.maxx % resolution
             ymaxdif = self.maxy % resolution
