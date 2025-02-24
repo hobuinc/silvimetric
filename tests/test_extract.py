@@ -1,6 +1,8 @@
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
+from math import ceil
+import pytest
 
 from silvimetric import grid_metrics, ExtractConfig, Extents, Log, extract, Storage
 
@@ -37,7 +39,7 @@ def tif_test(extract_config):
         assert raster.RasterYSize == ysize
 
         r = raster.ReadAsArray()
-        assert all([ r[y,x] == ((root_maxy/resolution)-y-1)  for y in range(e.y1, e.y2) for x in range(e.x1, e.x2)])
+        assert all([ r[y,x] == (ceil(root_maxy/resolution)-y-1)  for y in range(e.y1, e.y2) for x in range(e.x1, e.x2)])
 
 class Test_Extract(object):
 
