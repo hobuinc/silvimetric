@@ -104,7 +104,7 @@ class StorageConfig(Config):
                     " projected coordinate system")
 
         self.metric_definitions = { m.name: str(m) for m in
-                self.metrics}
+                self.metrics }
 
     def __eq__(self, other):
 
@@ -209,7 +209,7 @@ class ShatterConfig(Config):
     """Config for Shatter process"""
     filename: str
     """Input filename referencing a PDAL pipeline or point cloud file."""
-    date: Union[datetime, Tuple[datetime, datetime]]
+    date: Union[datetime, Tuple[datetime, datetime]] = field(default=datetime.now())
     """A date or date range representing data collection times."""
     attrs: list[Attribute] = field(default_factory=list)
     """List of attributes to use in shatter. If this is not set it will be

@@ -73,13 +73,12 @@ def metric_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, bound
     p = os.path.abspath(path)
     log = Log('DEBUG')
 
-    def dummy_fn(df: pd.DataFrame) -> pd.DataFrame:
-        assert isinstance(df, pd.DataFrame)
-        ndf = df[df['NumberOfReturns'] >= 1]
-        assert isinstance(ndf, pd.DataFrame)
+    def dummy_fn(df: pd.DataFrame, *args) -> pd.DataFrame:
+        ndf = df[df['NumberOfReturns'] >= 10.0]
         return ndf
 
-    metrics[0].add_filter(dummy_fn, 'This is a function.')
+    #mean metric
+    metrics[0].add_filter(dummy_fn, 'dummyFilter')
     metrics[0].attributes=attrs
 
     """Make output"""

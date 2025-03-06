@@ -89,12 +89,6 @@ def m_profilearea(data, *args):
     else:
         return -9999.0
 
-# # TODO example for cover using all returns and a height threshold
-# # the threshold must be a parameter and not hardcoded
-# def m_cover(data):
-#     threshold = 2
-#     return (data > threshold).sum() / len(data)
-
 mode = Metric('mode', np.float32, m_mode)
 median = Metric('median', np.float32, m_median)
 # TODO better names?
@@ -125,4 +119,3 @@ statistics: dict[str, Metric] = dict(
     cumean=cumean,
     profilearea=profilearea,
 )
-# statistics['cover'] = Metric('cover', np.float32, m_cover)

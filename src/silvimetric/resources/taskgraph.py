@@ -1,17 +1,21 @@
 from .metric import Metric
+from .filter import Filter
 from functools import reduce
 
+NodeType =  Metric | Filter
+NodeTypeList = list[NodeType]
+
 class Graph():
-    def __init__(self, metrics: list[Metric] | Metric):
+    def __init__(self, tasks: NodeTypeList | NodeType):
         """
         Task graph for Metrics.
         """
 
         # TODO: add mutex to Graph so it can be run in parallel
-        if isinstance(metrics, Metric):
-            metrics = [metrics]
+        if isinstance(tasks, NodeType):
+            tasks = [tasks]
 
-        self.metrics = metrics
+        self.tasks = tasks
         self.nodes: dict[str, Node] = { }
         self.results = None
         self.initialized = False
@@ -20,7 +24,7 @@ class Graph():
         """
         Create task dependency list
         """
-        for m in self.metrics:
+        for m in self.tasks:
             self.nodes[m.name] = Node(m, self)
         node_vals = list(self.nodes.values())
         for n in node_vals:
@@ -35,17 +39,17 @@ class Graph():
         if not self.initialized:
             self.init()
 
-        m_names = [ m.name for m in self.metrics ]
-        res = [n.run(data_in) for k, n in self.nodes.items() if k in m_names]
+        t_names = [ t.name for t in self.tasks ]
+        res = [n.run(data_in) for k, n in self.nodes.items() if k in t_names]
 
         self.results = res[0].join(res[1:])
         return self.results
 
 
 class Node():
-    # TODO add mutex to Node so it can be run in parallel
-    def __init__(self, metric, graph):
-        self.metric = metric
+    # TODO add mutex to Node so it can be run in parallel?
+    def __init__(self, task: Filter | Metric, graph: Graph):
+        self.task = task
         self.graph = graph
         self.dependencies: set[Node] = ()
         self.results = None
@@ -59,8 +63,11 @@ class Node():
         they're presented in the set.
         """
         nodes = []
+        pre_runs = self.task.dependencies
+        if isinstance(self.task, Metric):
+            pre_runs = pre_runs + self.task.filters
 
-        for dep in self.metric.dependencies:
+        for dep in pre_runs:
             if dep.name in self.graph.nodes.keys():
                 nodes.append(self.graph.nodes[dep.name])
             else:
@@ -85,6 +92,7 @@ class Node():
         if self.results is not None:
             return self.results
 
-        args = list(node.run(data_in) for node in self.dependencies)
-        self.results = self.metric.do(data_in, *args)
+        deps = { node.task.name: node.run(data_in) for node in self.dependencies }
+
+        self.results = self.task.do(data_in, **deps)
         return self.results

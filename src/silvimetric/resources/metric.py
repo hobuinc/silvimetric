@@ -1,8 +1,7 @@
 import json
 import base64
 
-from typing_extensions import Self, Callable, Optional, Any, Union, List
-from uuid import uuid4
+from typing_extensions import Self, Callable, Any, Union, List
 from functools import reduce
 from threading import Lock
 
@@ -13,9 +12,9 @@ import pandas as pd
 
 from distributed import Future
 from .attribute import Attribute
+from .filter import Filter, FilterFn
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
-FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 mutex = Lock()
 
 class Metric():
@@ -26,20 +25,24 @@ class Metric():
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Self]=[], filters: List[FilterFn]=[],
+            dependencies: list[Self]=[], filters: List[Union[FilterFn, Filter]]=[],
             attributes: List[Attribute]=[]) -> None:
 
         #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
 
         self.name = name
-        """Metric name. eg. mean"""
+        """Metric name. Names should be unique across Metrics and Filters. eg. mean"""
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
         self.dependencies = dependencies
         """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
-        self.filters = filters
+        fn = [
+            f if isinstance(f, Filter) else Filter(method=f, name=f.__name__)
+            for f in filters
+        ]
+        self.filters = fn
         """List of user-defined filters to perform before performing method."""
         self.attributes = attributes
         """List of Attributes this Metric applies to. If empty it's used for all
@@ -67,7 +70,8 @@ class Metric():
             'dtype', self.dtype,
             'dependencies', frozenset(self.dependencies),
             'method', base64.b64encode(dill.dumps(self._method)).decode(),
-            'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
+            # 'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
+            'filters', frozenset(self.filters),
             'attrs', frozenset(self.attributes)))
 
     def schema(self, attr: Attribute) -> Any:
@@ -84,27 +88,29 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, locs, args):
+    def sanitize_and_run(self, d, locs, **kwargs):
         """Sanitize arguments, find the indices """
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
         # indices to their locations and then grab the correct index from args
 
         attr = d.name
-        attrs = [a.entry_name(attr) for a in self.dependencies]
+        metr_names = [a.entry_name(attr) for a in self.dependencies]
 
-        if isinstance(args, pd.DataFrame):
-            with mutex:
-                idx = locs.loc[d.index[0]]
-                xi = idx.xi
-                yi = idx.yi
-                pass_args = [args.at[(xi,yi), a] for a in attrs]
-        else:
-            pass_args = args
+        # if isinstance(args, pd.DataFrame):
+        with mutex:
+            idx = locs.loc[d.index[0]]
+            xi = idx.xi
+            yi = idx.yi
+            # pass_kwargs = {}
+            pass_kwargs = { { k, v.at[xi,yi] } for k,v in kwargs.items() }
+                # pass_args = [args.at[(xi,yi), a] for a in metr_names]
+        # else:
+        #     pass_args = args
 
-        return self._method(d, *pass_args)
+        return self._method(d, **pass_kwargs)
 
-    def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
+    def do(self, data: pd.DataFrame, **deps) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
         the same thing multiple times."""
 
@@ -123,24 +129,24 @@ class Metric():
             data = data[attrs]
 
         # run metric filters over the data first
-        data = self.run_filters(data)
+        # data = self.run_filters(data)
         idxer = data[idx]
         gb = data.groupby(idx)
 
-        # Arguments come in as separate dataframes returned from previous
-        # metrics deemed dependencies. If there are dependencies for this metric,
-        # we'll merge the outputs from those here so they're easier to work with.
-        def merge(left, right):
-            return left.merge(right, on=idx)
-        if len(args) > 1:
-            merged_args = reduce(merge, args)
-        elif len(args) == 1:
-            merged_args = args[0]
-        else:
-            merged_args = args
+        # # Arguments come in as separate dataframes returned from previous
+        # # metrics deemed dependencies. If there are dependencies for this metric,
+        # # we'll merge the outputs from those here so they're easier to work with.
+        # def merge(left, right):
+        #     return left.merge(right, on=idx)
+        # if len(args) > 1:
+        #     merged_args = reduce(merge, args)
+        # elif len(args) == 1:
+        #     merged_args = args[0]
+        # else:
+        #     merged_args = args
 
         # lambda method for use in dataframe aggregator
-        runner = lambda d: self.sanitize_and_run(d, idxer, merged_args)
+        runner = lambda d: self.sanitize_and_run(d, idxer, **deps)
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns
@@ -158,11 +164,14 @@ class Metric():
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
-    def add_filter(self, fn: FilterFn, desc: str):
+    def add_filter(self, fn: Filter | FilterFn, name: str=None):
         """
         Add filter method to list of filters to run before calling main method.
         """
-        self.filters.append(fn)
+        if isinstance(fn, Filter):
+            self.filters.append(fn)
+        else:
+            self.filters.append(Filter(fn, name))
 
     def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
         for f in self.filters:
@@ -185,7 +194,7 @@ class Metric():
         }
 
     @staticmethod
-    def from_dict(data: dict) -> "Metric":
+    def from_dict(data: dict) -> Self:
         name = data['name']
         dtype = np.dtype(data['dtype'])
         method = dill.loads(base64.b64decode(data['method'].encode()))

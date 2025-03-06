@@ -64,12 +64,11 @@ class TestMetrics():
 
         s = Storage.from_db(metric_shatter_config.tdb_dir)
         with s.open('r') as a:
-            q = a.query(coords=False, use_arrow=False).df
-
-            nor_mean = q[:]['m_NumberOfReturns_mean']
-            nor = q[:]['NumberOfReturns']
-            assert not nor_mean.isna().any()
-            assert nor.notna().any()
+            # q = a.query(coords=False, use_arrow=False).df
+            # nor_mean = q[:]['m_NumberOfReturns_mean']
+            # nor = q[:]['NumberOfReturns']
+            # assert not nor_mean.isna().any()
+            # assert nor.notna().any()
 
             assert a[:,:]['Z'].shape[0] == 100
             xdom = a.schema.domain.dim('X').domain[1]
@@ -77,17 +76,20 @@ class TestMetrics():
             assert xdom == 10
             assert ydom == 10
 
-            data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
+            data = a.query(attrs=['m_NumberOfReturns_mean', 'NumberOfReturns'], coords=True, use_arrow=False).df[:]
             data = data.set_index(['X','Y'])
 
             for xi in range(xdom):
                 for yi in range(ydom):
                     curr = data.loc[xi,yi]
-                    curr.size == 1
-                    curr.iloc[0].size == 900
-                    # this should have all indices from 0 to 9 filled.
-                    # if oob error, it's probably not this test's fault
-                    assert bool(np.all( curr.iloc[0] == ((maxy/resolution) - (yi + 1)) ))
+                    nor = curr.NumberOfReturns
+                    nor = nor[nor >= 10]
+                    nor_mean = curr.m_NumberOfReturns_mean
+                    if nor.size == 0:
+                        assert np.isnan(nor_mean)
+                    else:
+                        nor.size == 900
+                        assert nor_mean == (maxy/resolution) - (yi + 1)
 
     def test_custom(self, metric_data: pd.DataFrame, attrs: list[Attribute]) -> None:
         def m_over500(data):
