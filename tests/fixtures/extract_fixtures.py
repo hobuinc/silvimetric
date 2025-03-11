@@ -21,7 +21,7 @@ def extract_attrs(dims)->Generator[list[str], None, None]:
 
 @pytest.fixture(scope='function')
 def extract_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, bounds,
-        date, crs, resolution) -> Generator[pd.Series, None, None]:
+        date, crs, resolution, alignment) -> Generator[pd.Series, None, None]:
 
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
@@ -35,6 +35,7 @@ def extract_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, boun
                         resolution=resolution,
                         attrs=attrs,
                         metrics=metrics,
+                        alignment=alignment,
                         version=svversion)
 
     s = Storage.create(st_config)

@@ -39,7 +39,8 @@ def tif_test(extract_config):
         assert raster.RasterYSize == ysize
 
         r = raster.ReadAsArray()
-        assert all([ r[y,x] == ((root_maxy/resolution)-y-1)  for y in range(e.y1, e.y2) for x in range(e.x1, e.x2)])
+        # ceil accounts for differences between the area and point alignments
+        assert all([ r[y,x] == (ceil(root_maxy/resolution)-y-1)  for y in range(e.y1, e.y2) for x in range(e.x1, e.x2)])
 
 class Test_Extract(object):
 
