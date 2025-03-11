@@ -3,6 +3,7 @@ from scipy import stats
 from ..metric import Metric
 from .p_moments import mean
 from .percentiles import pct_base
+from operator import itemgetter
 
 import warnings
 # suppress warnings from dividing by 0, these are handled in the metric creation
@@ -18,35 +19,35 @@ def m_mode(data):
     v = u[i[0][0]]
     return v
 
-def m_median(data, *args):
+def m_median(data, **kwargs):
     return np.median(data)
 
-def m_min(data, *args):
+def m_min(data, **kwargs):
     return np.min(data)
 
-def m_max(data, *args):
+def m_max(data, **kwargs):
     return np.max(data)
 
-def m_stddev(data, *args):
+def m_stddev(data, **kwargs):
     return np.std(data)
 
-def m_cv(data, *args):
-    stddev, mean = args
+def m_cv(data, **kwargs):
+    stddev, mean = itemgetter('stddev', 'mean')(kwargs)
     if mean == 0:
         return np.nan
     return stddev / mean
 
 # TODO check performance of other methods
-def m_abovemean(data, *args):
-    mean = args[0]
+def m_abovemean(data, **kwargs):
+    mean = kwargs['mean']
     l = len(data)
     if l == 0:
         return np.nan
     return (data > mean).sum() / l
 
 # TODO check performance of other methods
-def m_abovemode(data, *args):
-    mode = args[0]
+def m_abovemode(data, **kwargs):
+    mode = kwargs['mode']
     l = len(data)
     if l == 0:
         return np.nan
@@ -55,8 +56,10 @@ def m_abovemode(data, *args):
 def m_iq(data):
     return stats.iqr(data)
 
-def m_crr(data, *args):
-    mean, minimum, maximum = args
+def m_crr(data, **kwargs):
+    mean = kwargs['mean']
+    minimum = kwargs['min']
+    maximum = kwargs['max']
     den = (maximum - minimum)
     if den == 0:
         return np.nan
@@ -68,9 +71,9 @@ def m_sqmean(data):
 def m_cumean(data):
     return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
 
-def m_profilearea(data, *args):
+def m_profilearea(data, **kwargs):
     # sanity check...must have valid heights/elevations
-    dmax, dmin , p = args
+    dmax, dmin , p = itemgetter('max', 'min', 'pct_base')(kwargs)
     if dmax <= 0:
         return -9999.0
 

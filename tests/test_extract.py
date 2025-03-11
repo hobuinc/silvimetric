@@ -7,7 +7,7 @@ from silvimetric import grid_metrics, ExtractConfig, Extents, Log, extract, Stor
 def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
     resolution = extract_config.resolution
-    filenames = [grid_metrics[m.name].entry_name(a.name)
+    filenames = [m.entry_name(a.name)
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
     storage = Storage.from_db(extract_config.tdb_dir)

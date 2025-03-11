@@ -46,8 +46,14 @@ class Filter():
     def __call__(self, data: pd.DataFrame) -> pd.DataFrame:
         return self.do(data)
 
-    def do(self, data: pd.DataFrame, *args):
-        return self._method(data, args)
+    def do(self, data: pd.DataFrame, **kwargs):
+        idx = ['xi','yi']
+        if any([i not in data.columns for i in idx]):
+            idx = ['X','Y']
+        res =  self._method(data, **kwargs)
+        return res
+
+        return self._method(data, **kwargs)
 
     def to_json(self) -> dict[str, any]:
         return {

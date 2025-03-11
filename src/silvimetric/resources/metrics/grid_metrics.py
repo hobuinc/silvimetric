@@ -3,6 +3,7 @@ import numpy as np
 
 from ..attribute import Attributes as A
 from ..metric import Metric
+from ..filter import Filter
 from .percentiles import percentiles
 from .l_moments import l_moments
 from .stats import statistics
@@ -65,7 +66,7 @@ def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
     grid_metrics = _get_grid_metrics(elev_key)
     for gm in grid_metrics.values():
         filter_val = min_ht if gm.name in exclude_list else ht_break
-        desc = ('Height break filter for cover FUSION Metrics.' if gm.name in
-                exclude_list else 'Min height filter for non-cover FUSION Metrics.')
-        gm.add_filter(make_elev_filter(filter_val, elev_key), desc)
+        method = make_elev_filter(filter_val, elev_key)
+        f = Filter(method, 'ht_filter')
+        gm.add_filter(f)
     return grid_metrics

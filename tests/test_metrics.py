@@ -53,16 +53,16 @@ class TestMetrics():
         #and median/stddev should not
         assert not any(x in b.dtypes for x in  ['m_Z_median', 'm_Z_stddev'])
 
-    def test_filter(self, metric_shatter_config, test_point_count, maxy,
+    def test_filter(self, filter_shatter_config, test_point_count, maxy,
             resolution):
 
-        m = metric_shatter_config.metrics[0]
+        m = filter_shatter_config.metrics[0]
         assert len(m.filters) == 1
 
-        pc = shatter(metric_shatter_config)
+        pc = shatter(filter_shatter_config)
         assert pc == test_point_count
 
-        s = Storage.from_db(metric_shatter_config.tdb_dir)
+        s = Storage.from_db(filter_shatter_config.tdb_dir)
         with s.open('r') as a:
             # q = a.query(coords=False, use_arrow=False).df
             # nor_mean = q[:]['m_NumberOfReturns_mean']

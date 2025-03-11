@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 
 from silvimetric import (Log, StorageConfig, ShatterConfig, Storage, Data,
-    Bounds, Metric)
+    Bounds, Metric, Filter)
 from silvimetric.resources.metrics.stats import sm_max, sm_min
 from silvimetric.resources.metrics.p_moments import mean
 from silvimetric import __version__ as svversion
@@ -66,20 +66,33 @@ def metric_dag_results() -> Generator[pd.DataFrame, None, None]:
     yield df
 
 @pytest.fixture(scope='function')
-def metric_shatter_config(tmp_path_factory, copc_filepath, attrs, metrics, bounds,
+def filter_shatter_config(tmp_path_factory, copc_filepath, attrs, bounds,
         date, crs, resolution) -> Generator[pd.Series, None, None]:
 
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
     log = Log('DEBUG')
 
-    def dummy_fn(df: pd.DataFrame, *args) -> pd.DataFrame:
+    def dummy_fn(df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         ndf = df[df['NumberOfReturns'] >= 10.0]
         return ndf
 
+    def m_mean(df, **kwargs):
+        col_name = df.name
+        filtered = kwargs['dummyFilter'][col_name]
+        return np.mean(filtered)
+
+    def m_median(df, **kwargs):
+        col_name = df.name
+        filtered = kwargs['dummyFilter'][col_name]
+        return np.median(filtered)
+
     #mean metric
-    metrics[0].add_filter(dummy_fn, 'dummyFilter')
-    metrics[0].attributes=attrs
+    f = Filter(dummy_fn, 'dummyFilter')
+    metrics = [
+        Metric('mean', np.float32, m_mean, filters=[f]),
+        Metric('median', np.float32, m_median, filters=[f]),
+    ]
 
     """Make output"""
     st_config=StorageConfig(tdb_dir=p,
@@ -116,11 +129,13 @@ def depless_crr():
 
 @pytest.fixture
 def dep_crr():
-    def m_crr_2(data, *args):
-        m, mi, ma = args
-        den = (ma- mi)
+    def m_crr_2(data, **kwargs):
+        mean = kwargs['mean']
+        minimum = kwargs['min']
+        maximum = kwargs['max']
+        den = (maximum - minimum)
         if den == 0:
             return np.nan
-        return (m - mi) / den
+        return (mean - minimum) / den
 
     return Metric('deps_crr', np.float32, m_crr_2, [mean, sm_min, sm_max])

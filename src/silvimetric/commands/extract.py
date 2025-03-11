@@ -9,11 +9,13 @@ import numpy as np
 import pandas as pd
 
 
-from .. import Storage, Extents, ExtractConfig
+from .. import Storage, Extents, ExtractConfig, Graph
+from .shatter import run_graph
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
-    np.dtype(np.int8).str: gdal.GDT_Int16,
+    np.dtype(np.uint8).str: gdal.GDT_Byte,
+    np.dtype(np.int8).str: gdal.GDT_Int8,
     np.dtype(np.uint16).str: gdal.GDT_UInt16,
     np.dtype(np.int16).str: gdal.GDT_Int16,
     np.dtype(np.uint32).str: gdal.GDT_UInt32,
@@ -24,7 +26,7 @@ np_to_gdal_types = {
     np.dtype(np.float64).str: gdal.GDT_Float64
 }
 
-def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
+def write_tif(xsize: int, ysize: int, data:np.ndarray, nan_val: float|int, name: str,
         config: ExtractConfig) -> None:
     """
     Write out a raster with GDAL
@@ -47,11 +49,11 @@ def write_tif(xsize: int, ysize: int, data:np.ndarray, name: str,
 
     driver = gdal.GetDriverByName("GTiff")
     gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]
-    tif = driver.Create(str(path), int(xsize), int(ysize), 1, gdal_type)
+    tif = driver.Create(str(path), int(xsize), int(ysize), 1, gdal_type, )
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
     tif.GetRasterBand(1).WriteArray(data)
-    tif.GetRasterBand(1).SetNoDataValue(np.nan)
+    tif.GetRasterBand(1).SetNoDataValue(nan_val)
     tif.FlushCache()
     tif = None
 
@@ -64,21 +66,19 @@ def get_metrics(data_in: pd.DataFrame, storage: Storage) -> Union[None, pd.DataF
     :return: Combined dict of attribute and newly derived metric data.
     """
 
-    #TODO should just use the metric calculation methods from shatter
     if data_in is None:
         return None
 
     def expl(x):
         return x.explode()
 
+    # rerun metrics
     attrs = [a.name for a in storage.config.attrs if a.name not in ['X','Y']]
+    exploded = data_in.apply(expl)[attrs].reset_index()
+    metric_data = run_graph(exploded, storage.config.metrics)
 
-    # set index so we can apply to the whole dataset without needing to skip X and Y
-    # then reset in the index because that's what metric.do expects
-    exploded = data_in.set_index(['X','Y']).apply(expl)[attrs].reset_index()
-    metric_data = dask.persist(*[ m.do(exploded) for m in storage.config.metrics ])
-
-    data_out = data_in.set_index(['X','Y']).join([m for m in metric_data])
+    #combine
+    data_out = data_in.join(metric_data)
     return data_out
 
 def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray) -> pd.DataFrame:
@@ -135,7 +135,7 @@ def handle_overlaps(config: ExtractConfig, storage: Storage, indices: np.ndarray
         clean_data = data.loc[data.index[~data.index.duplicated(False)]]
 
         storage.config.log.warning('Overlapping data detected. Rerunning metrics over these cells...')
-        new_metrics = get_metrics(redo_data.reset_index(), storage)
+        new_metrics = get_metrics(redo_data, storage)
     return pd.concat([clean_data, new_metrics]).reset_index()
 
 def extract(config: ExtractConfig) -> None:
@@ -164,9 +164,17 @@ def extract(config: ExtractConfig) -> None:
     config.log.info(f"Writing rasters to {config.out_dir}")
     for ma in ma_list:
         # TODO should output in sections so we don't run into memory problems
-        m_data = np.full(shape=(ysize,xsize), fill_value=np.nan, dtype=final[ma].dtype)
+        dtype = final[ma].dtype
+        if dtype.kind in ['u','i']:
+            nan_val = np.iinfo(dtype).max
+        elif dtype.kind == 'f':
+            nan_val = np.nan
+        else:
+            raise ValueError('Invalid Raster data type {dtype}.')
+
+        m_data = np.full(shape=(ysize,xsize), fill_value=nan_val, dtype=dtype)
         a = final[['X','Y',ma]].to_numpy()
         for x,y,md in a[:]:
             m_data[int(y)][int(x)] = md
 
-        write_tif(xsize, ysize, m_data, ma, config)
+        write_tif(xsize, ysize, m_data, nan_val, ma, config)

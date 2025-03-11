@@ -5,25 +5,25 @@ import warnings
 from ..metric import Metric
 
 
-def m_moments(data, *args):
-    mean = args[0]
+def m_moments(data, **kwargs):
+    mean = kwargs['mean']
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning)
         m = moment(data, center=mean, order=[2,3,4], nan_policy='propagate').tolist()
 
     return m
 
-def m_mean(data, *args):
+def m_mean(data, **kwargs):
     return np.mean(data)
 
-def m_variance(data, *args):
-    return args[0][0]
+def m_variance(data, **kwargs):
+    return kwargs['moment_base'][0]
 
-def m_skewness(data, *args):
-    return args[0][1]
+def m_skewness(data, **kwargs):
+    return kwargs['moment_base'][1]
 
-def m_kurtosis(data, *args):
-    return args[0][2]
+def m_kurtosis(data, **kwargs):
+    return kwargs['moment_base'][2]
 
 mean = Metric(name='mean', dtype=np.float32, method=m_mean)
 moment_base = Metric(name='moment_base', dtype=object, method=m_moments, dependencies=[mean])

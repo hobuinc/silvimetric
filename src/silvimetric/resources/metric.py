@@ -28,8 +28,6 @@ class Metric():
             dependencies: list[Self]=[], filters: List[Union[FilterFn, Filter]]=[],
             attributes: List[Attribute]=[]) -> None:
 
-        #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
-
         self.name = name
         """Metric name. Names should be unique across Metrics and Filters. eg. mean"""
         self.dtype = np.dtype(dtype).str
@@ -70,7 +68,6 @@ class Metric():
             'dtype', self.dtype,
             'dependencies', frozenset(self.dependencies),
             'method', base64.b64encode(dill.dumps(self._method)).decode(),
-            # 'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
             'filters', frozenset(self.filters),
             'attrs', frozenset(self.attributes)))
 
@@ -88,25 +85,21 @@ class Metric():
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, locs, **kwargs):
-        """Sanitize arguments, find the indices """
-        # Args are the return values of previous DataFrame aggregations.
-        # In order to access the correct location, we need a map of groupby
-        # indices to their locations and then grab the correct index from args
-
-        attr = d.name
-        metr_names = [a.entry_name(attr) for a in self.dependencies]
-
-        # if isinstance(args, pd.DataFrame):
-        with mutex:
-            idx = locs.loc[d.index[0]]
-            xi = idx.xi
-            yi = idx.yi
-            # pass_kwargs = {}
-            pass_kwargs = { { k, v.at[xi,yi] } for k,v in kwargs.items() }
-                # pass_args = [args.at[(xi,yi), a] for a in metr_names]
-        # else:
-        #     pass_args = args
+    def sanitize_and_run(self, d, **kwargs):
+        """
+        Sanitize kwargs. Results from Filters can be DataFrames, while
+        values from Metrics will be an pandas aggregate. DataFrames are pared
+        down to the index intersection with the incoming data and other
+        values will be passed as they are.
+        """
+        pass_kwargs = {}
+        if kwargs.items():
+            with mutex:
+                for k,v in kwargs.items():
+                    if isinstance(v, pd.DataFrame):
+                        pass_kwargs[k] = v.loc[v.index.intersection(d.index)]
+                    else:
+                        pass_kwargs[k] = v
 
         return self._method(d, **pass_kwargs)
 
@@ -129,24 +122,10 @@ class Metric():
             data = data[attrs]
 
         # run metric filters over the data first
-        # data = self.run_filters(data)
         idxer = data[idx]
         gb = data.groupby(idx)
 
-        # # Arguments come in as separate dataframes returned from previous
-        # # metrics deemed dependencies. If there are dependencies for this metric,
-        # # we'll merge the outputs from those here so they're easier to work with.
-        # def merge(left, right):
-        #     return left.merge(right, on=idx)
-        # if len(args) > 1:
-        #     merged_args = reduce(merge, args)
-        # elif len(args) == 1:
-        #     merged_args = args[0]
-        # else:
-        #     merged_args = args
-
-        # lambda method for use in dataframe aggregator
-        runner = lambda d: self.sanitize_and_run(d, idxer, **deps)
+        runner = lambda d: self.sanitize_and_run(d, **deps)
 
         # create map of current column name to tuple of new column name and metric method
         cols = data.columns

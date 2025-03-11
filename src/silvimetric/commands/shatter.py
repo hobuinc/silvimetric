@@ -195,7 +195,6 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         for batch in as_completed(pc_futures, with_results=True).batches():
             for future, pack in batch:
                 if isinstance(pack, CancelledError):
-                    print('asdfasdf')
                     continue
                 for pc in pack:
                     config.point_count = config.point_count + pc

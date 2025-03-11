@@ -40,7 +40,9 @@ class Graph():
             self.init()
 
         t_names = [ t.name for t in self.tasks ]
-        res = [n.run(data_in) for k, n in self.nodes.items() if k in t_names]
+        for k, n in self.nodes.items():
+            n.run(data_in)
+        res = [n.results for k, n in self.nodes.items() if k in t_names]
 
         self.results = res[0].join(res[1:])
         return self.results
@@ -54,6 +56,9 @@ class Node():
         self.dependencies: set[Node] = ()
         self.results = None
         self.initialized = False
+
+    def __repr__(self):
+        return f'NodeTask_{str(self.task)}'
 
     def init(self):
         """
@@ -81,6 +86,16 @@ class Node():
 
         return self
 
+    def _value(self):
+        if isinstance(self.task, Filter):
+            return self.results
+        else:
+            vals = self.results.values
+            if vals.size == 1:
+                return vals.item()
+            else:
+                return vals
+
     def run(self, data_in):
         """
         Iterate dependency Nodes and run them. If this Node has already been run
@@ -90,9 +105,9 @@ class Node():
             self.init()
 
         if self.results is not None:
-            return self.results
+            return self._value()
 
         deps = { node.task.name: node.run(data_in) for node in self.dependencies }
 
         self.results = self.task.do(data_in, **deps)
-        return self.results
+        return self._value()

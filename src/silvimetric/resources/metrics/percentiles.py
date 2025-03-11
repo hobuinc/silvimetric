@@ -5,56 +5,73 @@ from ..metric import Metric
 def percentile_base(data: pd.DataFrame):
     return np.percentile(data, range(100)).tolist()
 
-def m_p01(data: pd.DataFrame, *args):
-    return args[0][1]
+def m_p01(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[1]
 
-def m_p05(data: pd.DataFrame, *args):
-    return args[0][5]
+def m_p05(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[5]
 
-def m_p10(data: pd.DataFrame, *args):
-    return args[0][10]
+def m_p10(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[10]
 
-def m_p20(data: pd.DataFrame, *args):
-    return args[0][20]
+def m_p20(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[20]
 
-def m_p25(data: pd.DataFrame, *args):
-    return args[0][25]
+def m_p25(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[25]
 
-def m_p30(data: pd.DataFrame, *args):
-    return args[0][30]
+def m_p30(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[30]
 
-def m_p40(data: pd.DataFrame, *args):
-    return args[0][40]
+def m_p40(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[40]
 
-def m_p50(data: pd.DataFrame, *args):
-    return args[0][50]
+def m_p50(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[50]
 
-def m_p60(data: pd.DataFrame, *args):
-    return args[0][60]
+def m_p60(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[60]
 
-def m_p70(data: pd.DataFrame, *args):
-    return args[0][70]
+def m_p70(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[70]
 
-def m_p75(data: pd.DataFrame, *args):
-    return args[0][75]
+def m_p75(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[75]
 
-def m_p80(data: pd.DataFrame, *args):
-    return args[0][80]
+def m_p80(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[80]
 
-def m_p90(data: pd.DataFrame, *args):
-    return args[0][90]
+def m_p90(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[90]
 
-def m_p95(data: pd.DataFrame, *args):
-    return args[0][95]
+def m_p95(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[95]
 
-def m_p99(data: pd.DataFrame, *args):
-    return args[0][99]
+def m_p99(data: pd.DataFrame, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[99]
 
-def m_90m10(data, *args):
-    return args[0][90] - args[0][10]
+def m_90m10(data, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[90] - pct_base[10]
 
-def m_95m05(data, *args):
-    return args[0][95] - args[0][5]
+def m_95m05(data, **kwargs):
+    pct_base = kwargs['pct_base']
+    return pct_base[95] - pct_base[5]
 
 pct_base = Metric('pct_base', object, percentile_base)
 

@@ -72,8 +72,8 @@ class StorageConfig(Config):
         for a in [ 'Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity' ]])
     """List of :class:`silvimetric.resources.attribute.Attribute` attributes that
     represent point data, defaults to Z, NumberOfReturns, ReturnNumber, Intensity"""
-    metrics: list[Metric] = field(default_factory=lambda: [ grid_metrics[m]
-                                  for m in grid_metrics.keys() ])
+    metrics: list[Metric] = field(default_factory=lambda: [
+        v for v in grid_metrics.get_grid_metrics().values() ])
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics that
     represent derived data, defaults to values in grid_metrics object"""
     version: str = __version__

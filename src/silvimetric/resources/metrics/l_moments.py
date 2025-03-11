@@ -26,35 +26,39 @@ def lmom4(data):
             return [data.mean(), np.nan, np.nan, np.nan]
 
 # L1 is same as mean...computed using np.mean in L-moment base for speed
-def m_l1(data, *args):
-    return args[0][0]
+def m_l1(data, **kwargs):
+    lmombase = kwargs['lmombase']
+    return lmombase[0]
 
-def m_l2(data, *args):
-    return args[0][1]
+def m_l2(data, **kwargs):
+    lmombase = kwargs['lmombase']
+    return lmombase[1]
 
-def m_l3(data, *args):
-    return args[0][2]
+def m_l3(data, **kwargs):
+    lmombase = kwargs['lmombase']
+    return lmombase[2]
 
-def m_l4(data, *args):
-    return args[0][3]
+def m_l4(data, **kwargs):
+    lmombase = kwargs['lmombase']
+    return lmombase[3]
 
-def m_lcv(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+def m_lcv(data, **kwargs):
+    l: tuple[float, float, float, float] = kwargs['lmombase']
 
     try:
         return l[1] / l[0]
     except ZeroDivisionError as e:
         return np.nan
 
-def m_lskewness(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+def m_lskewness(data, **kwargs):
+    l: tuple[float, float, float, float] = kwargs['lmombase']
     try:
         return l[2] / l[1]
     except ZeroDivisionError as e:
         return np.nan
 
-def m_lkurtosis(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+def m_lkurtosis(data, **kwargs):
+    l: tuple[float, float, float, float] = kwargs['lmombase']
     try:
         return l[3] / l[1]
     except ZeroDivisionError as e:
@@ -88,7 +92,7 @@ l_moments: dict[str, Metric] = {
 # added b3 and l4 from:
 #   Vogel, R. M. and Fennessey, N. M.: L moment diagrams should replace product moment diagrams,
 #   Water Resour. Res., 29, 1745–1752, https://doi.org/10.1029/93WR00341, 1993.
-# def lmom4_og(data, *args):
+# def lmom4_og(data, **kwargs):
 #     # lmom4 returns the first four L-moments of data
 #     # data is the 1-d array
 #     # n is the total number of points in data, j is the j_th point

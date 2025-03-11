@@ -6,6 +6,7 @@ from .resources.storage import Storage
 from .resources.metric import Metric
 from .resources.metrics import grid_metrics, l_moments, percentiles, statistics, all_metrics
 from .resources.metrics import product_moments
+from .resources.filter import Filter
 from .resources.taskgraph import Graph
 from .resources.log import Log
 from .resources.data import Data
