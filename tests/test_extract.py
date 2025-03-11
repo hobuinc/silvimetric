@@ -1,6 +1,8 @@
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
+from math import ceil
+import pytest
 
 from silvimetric import grid_metrics, ExtractConfig, Extents, Log, extract, Storage
 
@@ -11,7 +13,7 @@ def tif_test(extract_config):
                     for m in extract_config.metrics
                     for a in extract_config.attrs]
     storage = Storage.from_db(extract_config.tdb_dir)
-    e = Extents(extract_config.bounds, extract_config.resolution, storage.config.root)
+    e = Extents(extract_config.bounds, extract_config.resolution, storage.config.alignment, storage.config.root)
     root_maxy = storage.config.root.maxy
 
     for f in filenames:
