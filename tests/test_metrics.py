@@ -65,11 +65,6 @@ class TestMetrics():
 
         s = Storage.from_db(filter_shatter_config.tdb_dir)
         with s.open('r') as a:
-            # q = a.query(coords=False, use_arrow=False).df
-            # nor_mean = q[:]['m_NumberOfReturns_mean']
-            # nor = q[:]['NumberOfReturns']
-            # assert not nor_mean.isna().any()
-            # assert nor.notna().any()
             xysize = 10 if alignment == 'pixelisarea' else 11
             maxy = s.config.root.maxy
 
