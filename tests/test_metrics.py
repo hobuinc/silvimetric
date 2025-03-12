@@ -94,7 +94,7 @@ class TestMetrics():
                         nor.size == 900
                         assert nor_mean == ceil(maxy/resolution) - (yi + 1)
 
-    def test_custom(self, metric_data: pd.DataFrame, attrs: list[Attribute]) -> None:
+    def test_custom(self, metric_data: pd.DataFrame, attrs: list[Attribute], alignment) -> None:
         def m_over500(data):
             return data[data >= 500].count()
         z_att = attrs[0]
@@ -103,8 +103,10 @@ class TestMetrics():
 
         b = Graph(m_cust).init().run(metric_data)
 
+        num_gt500 = 3 if alignment == 'pixelisarea' else 2
+
         assert b.m_Z_over500.any()
-        assert b.m_Z_over500.values[0] == 3
+        assert b.m_Z_over500.values[0] == num_gt500
 
     def test_dependency_passing(self, dep_crr, depless_crr, metric_data):
         nd1 = Graph(depless_crr).init().run(metric_data)

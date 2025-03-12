@@ -15,7 +15,7 @@ from silvimetric.resources.metrics.p_moments import mean
 from silvimetric import __version__ as svversion
 
 @pytest.fixture(scope='function')
-def autzen_storage(tmp_path_factory: pytest.TempPathFactory) -> Generator[StorageConfig, None, None]:
+def autzen_storage(tmp_path_factory: pytest.TempPathFactory, alignment) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp("test_tdb")
     p = os.path.abspath(path)
 
@@ -31,7 +31,7 @@ PROJECTION[\"Lambert_Conformal_Conic_2SP\"],PARAMETER[\"latitude_of_origin\",
 AUTHORITY[\"EPSG\",\"9002\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],
 AUTHORITY[\"EPSG\",\"2992\"]]"""
     b = Bounds(635579.2,848884.83,639003.73,853536.21)
-    sc = StorageConfig(b, srs, 10, tdb_dir=p)
+    sc = StorageConfig(b, srs, 10, tdb_dir=p, alignment=alignment)
     Storage.create(sc)
     yield sc
 
