@@ -158,7 +158,7 @@ class Metric():
 
     #TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
-    def add_filter(self, fn: FilterFn, desc: str):
+    def add_filter(self, fn: FilterFn):
         """
         Add filter method to list of filters to run before calling main method.
         """
