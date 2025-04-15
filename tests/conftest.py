@@ -18,7 +18,8 @@ pytest_plugins=[
     'fixtures.command_fixtures', 'fixtures.chunk_fixtures',
     'fixtures.western_fixtures', 'fixtures.data_fixtures',
     'fixtures.cli_fixtures', 'fixtures.fusion_fixtures',
-    'fixtures.metric_fixtures', 'fixtures.dask_fixtures'
+    'fixtures.metric_fixtures', 'fixtures.dask_fixtures',
+    'fixtures.fusion_fixtures'
 ]
 
 @pytest.fixture(scope='function')
@@ -52,7 +53,7 @@ def storage_config(tmp_path_factory, bounds, resolution, crs, attrs, metrics, al
 
 @pytest.fixture(scope='function')
 def storage(storage_config):
-    yield Storage.from_db(storage_config.tdb_dir)
+    yield Storage(storage_config)
 
 @pytest.fixture(scope='function')
 def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[ShatterConfig, None, None]:
@@ -61,7 +62,6 @@ def shatter_config(copc_filepath, storage_config, bounds, date) -> Generator[Sha
                       log = log,
                       filename = copc_filepath,
                       attrs = storage_config.attrs,
-                      metrics = storage_config.metrics,
                       bounds = bounds,
                       date = date, tile_size=10)
 

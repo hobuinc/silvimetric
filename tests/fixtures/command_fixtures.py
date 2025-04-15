@@ -21,7 +21,6 @@ def config_split(shatter_config: ShatterConfig) -> Generator[List[ShatterConfig]
             filename=sc.filename,
             date=date,
             attrs=sc.attrs,
-            metrics=sc.metrics,
             bounds=b,
             name=uuid.uuid4(),
             tile_size=4,

@@ -5,7 +5,7 @@ from typing_extensions import Generator, List
 
 from silvimetric import Extents, Data
 
-@pytest.fixture(scope='function', autouse=True)
+@pytest.fixture(scope='function')
 def filtered(copc_data, extents: Extents) -> Generator[List[Extents], None, None]:
     yield list(extents.chunk(copc_data, 1))
 

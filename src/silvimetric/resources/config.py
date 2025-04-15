@@ -67,7 +67,8 @@ class StorageConfig(Config):
     resolution: float = 30.0
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
     alignment: str = 'AlignToCenter'
-    """Alignment of pixels in database, same for all data in a project, options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
+    """Alignment of pixels in database, same for all data in a project,
+    options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
 
     attrs: list[Attribute] = field(default_factory=lambda: [
         Attribute(a, Attributes[a].dtype)
@@ -214,12 +215,6 @@ class ShatterConfig(Config):
     """Input filename referencing a PDAL pipeline or point cloud file."""
     date: Union[datetime, Tuple[datetime, datetime]]
     """A date or date range representing data collection times."""
-    attrs: list[Attribute] = field(default_factory=list)
-    """List of attributes to use in shatter. If this is not set it will be
-    filled by the attributes in the database instance."""
-    metrics: list[Metric] = field(default_factory=list)
-    """A list of metrics to use in shatter. If this is not set it will be filled
-    by the metrics in the database instance."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
@@ -252,10 +247,6 @@ class ShatterConfig(Config):
             self.tile_size = int(self.tile_size)
             self.log.warning(f'Truncating tile size to integer({self.tile_size})')
             pass
-        if not self.attrs:
-            self.attrs = s.getAttributes()
-        if not self.metrics:
-            self.metrics = s.getMetrics()
 
         del s
 
@@ -278,8 +269,6 @@ class ShatterConfig(Config):
         d['name'] = str(self.name)
         d['time_slot'] = self.time_slot
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
-        d['attrs'] = [a.to_json() for a in self.attrs]
-        d['metrics'] = [m.to_json() for m in self.metrics]
         d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
@@ -297,8 +286,6 @@ class ShatterConfig(Config):
     def from_dict(cls, data: dict):
         x = data
 
-        ms = list([ Metric.from_dict(m) for m in x['metrics']])
-        attrs = list([ Attribute.from_dict(a) for a in x['attrs']])
         if isinstance(x['date'], list):
             date = tuple(( datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date']))
         else:
@@ -309,8 +296,6 @@ class ShatterConfig(Config):
 
         n = cls(tdb_dir=x['tdb_dir'],
                 filename=x['filename'],
-                attrs=attrs,
-                metrics=ms,
                 debug=x['debug'],
                 name=uuid.UUID(x['name']),
                 bounds=Bounds(*x['bounds']),

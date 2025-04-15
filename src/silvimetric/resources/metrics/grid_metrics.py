@@ -15,10 +15,13 @@ def make_elev_filter(val,elev_key) :
 
 # TODO example for cover using all returns and a height threshold
 # the threshold must be a parameter and not hardcoded
-def make_cover_metric(threshold):
-    def m_cover(data):
-        return (data > threshold).sum() / len(data)
-    return Metric('cover', np.float32, m_cover, dependencies=[])
+def allcover(data, *args):
+    count = args[0]
+    return data.count() / count * 100
+deps = []
+count_metric = Metric('count', np.float32, lambda x: x.count())
+allcover_metric =  Metric('allcover', np.float32, allcover, dependencies=[count_metric])
+
 
 gr_perc = copy.deepcopy(percentiles)
 gr_l_moments = copy.deepcopy(l_moments)
@@ -53,8 +56,10 @@ def _get_grid_metrics(elev_key='Z'):
     gr_stats['stddev'].attributes = [A[elev_key], A['Intensity']]
     gr_stats['cv'].attributes = [A[elev_key], A['Intensity']]
 
+    allcover_metric.attributes = [A[elev_key]]
+
     grid_metrics: dict[str, Metric] = dict(gr_perc | gr_l_moments | gr_stats |
-            gr_p_moments)
+            gr_p_moments | { allcover_metric.name: allcover_metric})
     return grid_metrics
 
 def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
@@ -62,13 +67,11 @@ def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
     Get GridMetric Metrics with filters applied.
     """
     # cover metrics use the ht_break, all others use min_ht
-    gr_cover = make_cover_metric(ht_break)
-    exclude_list = [gr_cover.name]
-    grid_metrics = _get_grid_metrics(elev_key, ht_break)
-    grid_metrics[gr_cover.name] = gr_cover
-
+    exclude_list = [allcover_metric.name]
+    grid_metrics = _get_grid_metrics(elev_key)
+    grid_metrics['p01'].dependencies[0].add_filter(make_elev_filter(min_ht, elev_key))
     for gm in grid_metrics.values():
-        filter_val = min_ht if gm.name in exclude_list else ht_break
+        filter_val = ht_break if gm.name in exclude_list else min_ht
         method = make_elev_filter(filter_val, elev_key)
         gm.add_filter(method)
     return grid_metrics

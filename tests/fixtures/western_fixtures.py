@@ -56,8 +56,6 @@ def western_shatter_config(western_pipeline, western_storage, bounds, date) -> G
     s = ShatterConfig(tdb_dir = st.tdb_dir,
         log = log,
         filename = western_pipeline,
-        attrs = st.attrs,
-        metrics = st.metrics,
         bounds=bounds,
         debug = True,
         date=date)

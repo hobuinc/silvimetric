@@ -131,7 +131,7 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
     """ Create dask bags and the order of operations.  """
 
     ## Handle dask bag transitions through work states
-    attrs = [a.name for a in config.attrs]
+    attrs = [a.name for a in storage.config.attrs]
     timestamp = (config.time_slot, config.time_slot)
 
     # remove any extents that have already been done, only skip if full overlap
@@ -145,8 +145,6 @@ def get_processes(leaves: Leaves, config: ShatterConfig, storage: Storage) -> db
         if d is None:
             return False
         return not d.empty
-
-    graph = Graph(storage.config.metrics).init()
 
     points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)

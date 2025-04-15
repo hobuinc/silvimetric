@@ -26,8 +26,8 @@ class Metric():
     data as well as its insertion into the database.
     """
     def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Self]=[], filters: List[FilterFn]=[],
-            attributes: List[Attribute]=[]) -> None:
+            dependencies: list[Self]=None, filters: List[FilterFn]=None,
+            attributes: List[Attribute]=None) -> None:
 
         #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
 
@@ -35,15 +35,25 @@ class Metric():
         """Metric name. eg. mean"""
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
-        self.dependencies = dependencies
+        if dependencies is not None:
+            self.dependencies = dependencies
+        else:
+            self.dependencies = []
         """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
-        self.filters = filters
+        if filters is not None:
+            self.filters = filters
+        else:
+            self.filters = []
         """List of user-defined filters to perform before performing method."""
-        self.attributes = attributes
+        if attributes is not None:
+            self.attributes = attributes
+        else:
+            self.attributes = []
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
+
 
     def __eq__(self, other):
         if self.name != other.name:
@@ -98,7 +108,10 @@ class Metric():
                 idx = locs.loc[d.index[0]]
                 xi = idx.xi
                 yi = idx.yi
-                pass_args = [args.at[(xi,yi), a] for a in attrs]
+                try:
+                    pass_args = [args.at[(xi,yi), a] if any(args[a]) else args[a] for a in attrs]
+                except:
+                    print(d)
         else:
             pass_args = args
 
@@ -218,13 +231,6 @@ class Metric():
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def __eq__(self, other) -> tuple:
-        return (self.name == other.name and
-                self.dtype == other.dtype and
-                self.dependencies == other.dependencies and
-                self._method == other._method,
-                self.attributes == other.attributes,
-                self.filters == other.filters)
 
     def __call__(self, data: pd.DataFrame) -> pd.DataFrame:
         return self.do(data)

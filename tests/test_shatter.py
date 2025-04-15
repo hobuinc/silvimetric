@@ -107,8 +107,6 @@ class Test_Shatter(object):
                                log = log,
                                filename = s.filename,
                                tile_size = s.tile_size,
-                               attrs = s.attrs,
-                               metrics = s.metrics,
                                debug = s.debug,
                                bounds = b.bounds,
                                date=s.date,

@@ -29,8 +29,7 @@ def s3_storage(s3_storage_config) -> Generator[Storage, None, None]:
 @pytest.fixture(scope="function")
 def s3_shatter_config(s3_storage, copc_filepath, attrs, metrics, date) -> Generator[ShatterConfig, None, None]:
     config = s3_storage.config
-    yield ShatterConfig(filename=copc_filepath, attrs=attrs, metrics=metrics,
-                        tdb_dir=config.tdb_dir, date=date)
+    yield ShatterConfig(filename=copc_filepath, tdb_dir=config.tdb_dir, date=date)
 
 @pytest.fixture(scope='function')
 def uneven_storage_config(tmp_path_factory, bounds, crs, attrs, metrics) -> Generator[StorageConfig, None, None]:
@@ -57,8 +56,6 @@ def uneven_shatter_config(copc_filepath, uneven_storage_config, date) -> Generat
     s = ShatterConfig(tdb_dir = tdb_dir,
                       log = log,
                       filename = copc_filepath,
-                      attrs = uneven_storage_config.attrs,
-                      metrics = uneven_storage_config.metrics,
                       debug = True,
                       date=date)
     yield s
@@ -89,7 +86,5 @@ def partial_shatter_config(copc_filepath, date, partial_storage_config) -> Gener
     log = Log('INFO') # INFO
     yield ShatterConfig(tdb_dir=tdb_dir,
                       log=log,
-                      attrs=psc.attrs,
-                      metrics=psc.metrics,
                       filename=copc_filepath,
                       date=date)
