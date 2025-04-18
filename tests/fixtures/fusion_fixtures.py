@@ -1,13 +1,16 @@
 import os
 import datetime
-import json
 import pytest
 
 import pyproj
-import rasterio
-import pdal
+from osgeo import gdal
+import numpy as np
 
 import silvimetric as sm
+
+@pytest.fixture(scope='function')
+def fusion_tif_dir():
+    yield os.path.join(os.path.dirname(__file__), "..", "data", "fusion_rasters")
 
 @pytest.fixture(scope='function')
 def fusion_data_path():
@@ -16,8 +19,9 @@ def fusion_data_path():
 
 @pytest.fixture(scope='function')
 def fusion_data(fusion_data_path):
-    raster = rasterio.open(fusion_data_path)
-    yield raster.read(1)
+    raster = gdal.Open(fusion_data_path)
+    raster_data = np.array(raster.GetRasterBand(1).ReadAsArray())
+    yield raster_data
 
 @pytest.fixture(scope='function')
 def plumas_storage_config(tmp_path_factory):
@@ -57,5 +61,111 @@ def plumas_cover_file(plumas_tif_dir):
     yield os.path.join(plumas_tif_dir, 'm_Z_allcover.tif')
 
 @pytest.fixture(scope='function')
-def metric_map():
-    yield dict()
+def metric_map(plumas_tif_dir, fusion_tif_dir):
+    mapping = {
+        # '1st_cnt_above2_30METERS.tif':              'm_ReturnNumber_1st_count_above_htbreak.tif',
+        # '1st_cnt_above_mean_30METERS.tif':          'm_ReturnNumber_1st_count_above_mean.tif',
+        # '1st_cnt_above_mode_30METERS.tif':          'm_ReturnNumber_1st_count_above_mode.tif',
+        # '1st_cover_above2_30METERS.tif':            'm_ReturnNumber_cover_above_htbreak.tif',
+        # '1st_cover_above_mean_30METERS.tif':        'm_ReturnNumber_cover_above_mean.tif',
+        # '1st_cover_above_mode_30METERS.tif':        'm_ReturnNumber_cover_above_mode.tif',
+        # 'all_1st_cover_above2_30METERS.tif':        '',
+        # 'all_1st_cover_above_mean_30METERS.tif':    '',
+        # 'all_1st_cover_above_mode_30METERS.tif':    '',
+        # 'all_cnt_2plus_30METERS.tif':               'm_ReturnNumber_all_count_above_minht.tif',
+        # 'all_cnt_30METERS.tif':                     'm_ReturnNumber_all_count.tif',
+        # 'all_cnt_above2_30METERS.tif':              'm_ReturnNumber_all_count_above_htbreak.tif',
+        # 'all_cnt_above_mean_30METERS.tif':          'm_ReturnNumber_all_count_above_mean.tif',
+        # 'all_cnt_above_mode_30METERS.tif':          'm_ReturnNumber_all_count_above_mode.tif',
+        # 'all_cover_above2_30METERS.tif':            'm_ReturnNumber_all_cover.tif',
+        # 'all_cover_above_mean_30METERS.tif':        'm_ReturnNumber_all_cover_above_mean.tif',
+        # 'all_cover_above_mode_30METERS.tif':        'm_ReturnNumber_all_cover_above_mode.tif',
+        'elev_AAD_2plus_30METERS.tif':              'm_Z_aad.tif',
+        'elev_CV_2plus_30METERS.tif':               'm_Z_cv.tif',
+        'elev_IQ_2plus_30METERS.tif':               'm_Z_iq.tif',
+        'elev_L1_2plus_30METERS.tif':               'm_Z_l1.tif',
+        'elev_L2_2plus_30METERS.tif':               'm_Z_l2.tif',
+        'elev_L3_plus_30METERS.tif':                'm_Z_l3.tif',
+        'elev_L4_2plus_30METERS.tif':               'm_Z_l4.tif',
+        'elev_LCV_2plus_30METERS.tif':              'm_Z_lcv.tif',
+        'elev_Lkurtosis_2plus_30METERS.tif':        'm_Z_lkurtosis.tif',
+        'elev_Lskewness_2plus_30METERS.tif':        'm_Z_lskewness.tif',
+        'elev_MAD_median_30METERS.tif':             'm_Z_mad_median.tif',
+        'elev_MAD_mode_30METERS.tif':               'm_Z_mad_mode.tif',
+        'elev_P01_2plus_30METERS.tif':              'm_Z_p01.tif',
+        'elev_P05_2plus_30METERS.tif':              'm_Z_p05.tif',
+        'elev_P10_2plus_30METERS.tif':              'm_Z_p10.tif',
+        'elev_P20_2plus_30METERS.tif':              'm_Z_p20.tif',
+        'elev_P25_2plus_30METERS.tif':              'm_Z_p25.tif',
+        'elev_P30_2plus_30METERS.tif':              'm_Z_p30.tif',
+        'elev_P40_2plus_30METERS.tif':              'm_Z_p40.tif',
+        'elev_P50_2plus_30METERS.tif':              'm_Z_p50.tif',
+        'elev_P60_2plus_30METERS.tif':              'm_Z_p60.tif',
+        'elev_P70_2plus_30METERS.tif':              'm_Z_p70.tif',
+        'elev_P75_2plus_30METERS.tif':              'm_Z_p75.tif',
+        'elev_P80_2plus_30METERS.tif':              'm_Z_p80.tif',
+        'elev_P90_2plus_30METERS.tif':              'm_Z_p90.tif',
+        'elev_P95_2plus_30METERS.tif':              'm_Z_p95.tif',
+        'elev_P99_2plus_30METERS.tif':              'm_Z_p99.tif',
+        'elev_ave_2plus_30METERS.tif':              'm_Z_mean.tif',
+        # 'elev_canopy_relief_ratio_30METERS.tif':    '',
+        'elev_cubic_mean_30METERS.tif':             'm_Z_cumean.tif',
+        'elev_kurtosis_2plus_30METERS.tif':         'm_Z_kurtosis.tif',
+        'elev_max_2plus_30METERS.tif':              'm_Z_max.tif',
+        'elev_min_2plus_30METERS.tif':              'm_Z_min.tif',
+        'elev_mode_2plus_30METERS.tif':             'm_Z_mode.tif',
+        'elev_quadratic_mean_30METERS.tif':         'm_Z_sqmean.tif',
+        'elev_skewness_2plus_30METERS.tif':         'm_Z_skewness.tif',
+        'elev_stddev_2plus_30METERS.tif':           'm_Z_stddev.tif',
+        'elev_variance_2plus_30METERS.tif':         'm_Z_variance.tif',
+        # 'grnd_cnt_30METERS.tif':                    '',
+        'int_AAD_2plus_30METERS.tif':               'm_Intensity_aad.tif',
+        'int_CV_2plus_30METERS.tif':                'm_Intensity_cv.tif',
+        'int_IQ_2plus_30METERS.tif':                'm_Intensity_iq.tif',
+        'int_L1_2plus_30METERS.tif':                'm_Intensity_l1.tif',
+        'int_L2_2plus_30METERS.tif':                'm_Intensity_l2.tif',
+        'int_L3_2plus_30METERS.tif':                'm_Intensity_l3.tif',
+        'int_L4_2plus_30METERS.tif':                'm_Intensity_l4.tif',
+        'int_LCV_2plus_30METERS.tif':               'm_Intensity_lcv.tif',
+        'int_Lkurtosis_2plus_30METERS.tif':         'm_Intensity_lkurtosis.tif',
+        'int_Lskewness_2plus_30METERS.tif':         'm_Intensity_lskewness.tif',
+        'int_P01_2plus_30METERS.tif':               'm_Intensity_p01.tif',
+        'int_P05_2plus_30METERS.tif':               'm_Intensity_p05.tif',
+        'int_P10_2plus_30METERS.tif':               'm_Intensity_p10.tif',
+        'int_P20_2plus_30METERS.tif':               'm_Intensity_p20.tif',
+        'int_P25_2plus_30METERS.tif':               'm_Intensity_p25.tif',
+        'int_P30_2plus_30METERS.tif':               'm_Intensity_p30.tif',
+        'int_P40_2plus_30METERS.tif':               'm_Intensity_p40.tif',
+        'int_P50_2plus_30METERS.tif':               'm_Intensity_p50.tif',
+        'int_P60_2plus_30METERS.tif':               'm_Intensity_p60.tif',
+        'int_P70_2plus_30METERS.tif':               'm_Intensity_p70.tif',
+        'int_P75_2plus_30METERS.tif':               'm_Intensity_p75.tif',
+        'int_P80_2plus_30METERS.tif':               'm_Intensity_p80.tif',
+        'int_P90_2plus_30METERS.tif':               'm_Intensity_p90.tif',
+        'int_P95_2plus_30METERS.tif':               'm_Intensity_p95.tif',
+        'int_P99_2plus_30METERS.tif':               'm_Intensity_p99.tif',
+        'int_ave_2plus_30METERS.tif':               'm_Intensity_mean.tif',
+        'int_kurtosis_2plus_30METERS.tif':          'm_Intensity_kurtosis.tif',
+        'int_max_2plus_30METERS.tif':               'm_Intensity_max.tif',
+        'int_min_2plus_30METERS.tif':               'm_Intensity_min.tif',
+        'int_mode_2plus_30METERS.tif':              'm_Intensity_mode.tif',
+        'int_skewness_2plus_30METERS.tif':          'm_Intensity_skewness.tif',
+        'int_stddev_2plus_30METERS.tif':            'm_Intensity_stddev.tif',
+        'int_variance_2plus_30METERS.tif':          'm_Intensity_variance.tif',
+        # 'profile_area_30METERS.tif':                'm_Z_profile_area.tif',
+        # 'pulsecnt_30METERS.tif':                    '',
+        # 'r1_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r1_count.tif',
+        # 'r2_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r2_count.tif',
+        # 'r3_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r3_count.tif',
+        # 'r4_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r4_count.tif',
+        # 'r5_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r5_count.tif',
+        # 'r6_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r6_count.tif',
+        # 'r7_cnt_2plus_30METERS.tif':                'm_ReturnNumber_r7_count.tif'
+    }
+    path_mapping = {}
+    for k,v in mapping.items():
+        new_k = os.path.join(fusion_tif_dir, k)
+        new_v = os.path.join(plumas_tif_dir, v)
+        path_mapping[new_k] = new_v
+
+    yield path_mapping

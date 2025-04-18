@@ -68,7 +68,7 @@ def m_sqmean(data):
 def m_cumean(data):
     return np.cbrt(np.mean(np.power(np.absolute(data), 3)))
 
-def m_profilearea(data, *args):
+def m_profile_area(data, *args):
     # sanity check...must have valid heights/elevations
     dmax, dmin , p = args
     if dmax <= 0:
@@ -89,32 +89,33 @@ def m_profilearea(data, *args):
     else:
         return -9999.0
 
-# # TODO example for cover using all returns and a height threshold
-# # the threshold must be a parameter and not hardcoded
-# def m_cover(data):
-#     threshold = 2
-#     return (data > threshold).sum() / len(data)
+def m_mad_median(data, *args):
+    return stats.median_abs_deviation(data, nan_policy='propagate')
+
+# TODO what to do if mode has 2 values?
+def m_mad_mode(data, *args):
+    return stats.median_abs_deviation(data, center=stats.mode, nan_policy='propagate')
+
 
 mode = Metric('mode', np.float32, m_mode)
 median = Metric('median', np.float32, m_median)
-# TODO better names?
-sm_min = Metric('min', np.float32, m_min)
-sm_max = Metric('max', np.float32, m_max)
+minimum = Metric('min', np.float32, m_min)
+maximum = Metric('max', np.float32, m_max)
 stddev = Metric('stddev', np.float32, m_stddev)
 cv = Metric('cv', np.float32, m_cv, [ mean, stddev ])
 abovemean = Metric('abovemean', np.float32, m_abovemean, [ mean ])
 abovemode = Metric('abovemode', np.float32, m_abovemode, [ mode ])
 iq = Metric('iq', np.float32, m_iq)
-crr = Metric('crr', np.float32, m_crr, [ mean, sm_min, sm_max ])
+crr = Metric('crr', np.float32, m_crr, [ mean, minimum, maximum ])
 sqmean = Metric('sqmean', np.float32, m_sqmean)
 cumean = Metric('cumean', np.float32, m_cumean)
-profilearea = Metric('profilearea', np.float32, m_profilearea, [ sm_max, sm_min, pct_base ])
+profile_area = Metric('profile_area', np.float32, m_profile_area, [ maximum, minimum, pct_base ])
 
 statistics: dict[str, Metric] = dict(
     mode=mode,
     median=median,
-    min=sm_min,
-    max=sm_max,
+    min=minimum,
+    max=maximum,
     stddev=stddev,
     cv=cv,
     abovemean=abovemean,
@@ -123,6 +124,6 @@ statistics: dict[str, Metric] = dict(
     crr=crr,
     sqmean=sqmean,
     cumean=cumean,
-    profilearea=profilearea,
+    profile_area=profile_area,
 )
 # statistics['cover'] = Metric('cover', np.float32, m_cover)

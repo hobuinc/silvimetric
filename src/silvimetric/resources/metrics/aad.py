@@ -19,6 +19,6 @@ def m_madmode(data):
     return stats.median_abs_deviation(data, center=mode_center)
 
 aad: dict[str, Metric] = {}
-aad['aad'] = Metric('aad', np.float32, m_aad, product_moments['mean'])
-aad['madmedian'] = Metric('madmedian', np.float32, m_madmedian)
-aad['madmode'] = Metric('madmode', np.float32, m_madmode)
+aad['aad'] = Metric('aad', np.float32, m_aad, dependencies=[product_moments['mean']])
+aad['mad_median'] = Metric('mad_median', np.float32, m_madmedian)
+aad['mad_mode'] = Metric('mad_mode', np.float32, m_madmode)

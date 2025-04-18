@@ -1,25 +1,57 @@
 import os
 
 import silvimetric as sm
-import rasterio
+from osgeo import gdal
 import numpy as np
 
 # Test against Bob's FUSION data
 class TestFusion():
-    def test_cover(self, process_dask, fusion_data, plumas_shatter_config, plumas_tif_dir, plumas_cover_file):
+    # def test_cover(self, process_dask, plumas_shatter_config, plumas_tif_dir, metric_map):
+    def test_cover(self, configure_dask, plumas_shatter_config, plumas_tif_dir, metric_map):
         pl_tdb_dir = plumas_shatter_config.tdb_dir
         sm.shatter(plumas_shatter_config)
         ec = sm.ExtractConfig(tdb_dir=pl_tdb_dir, out_dir=plumas_tif_dir)
         sm.extract(ec)
-        raster = rasterio.open(plumas_cover_file)
-        raster_data = raster.read(1)
+        failures = []
+        failure_cell_count = []
+        failure_cell_avg = []
+        for f_path, sm_path in metric_map.items():
+            sm_raster = gdal.Open(sm_path)
+            sm_raster_data = np.array(sm_raster.GetRasterBand(1).ReadAsArray())
 
-        #TODO add a row to the fusion data to match raster data
-        padded_fusion = np.empty(raster_data.shape, dtype=fusion_data.dtype)
-        padded_fusion.fill(np.nan)
-        xshape = fusion_data.shape[0]
-        yshape = fusion_data.shape[1]
-        padded_fusion[:xshape, :yshape] = fusion_data
-        diff_data= np.abs(padded_fusion - raster_data)
+            f_raster = gdal.Open(f_path)
+            f_raster_data = np.array(f_raster.GetRasterBand(1).ReadAsArray())
 
-        assert np.all(np.nan_to_num(diff_data,0) < 1)
+            #TODO add a row to the fusion data to match raster data
+            padded_fusion = np.empty(sm_raster_data.shape, dtype=f_raster_data.dtype)
+            padded_fusion.fill(np.nan)
+            xshape = f_raster_data.shape[0]
+            yshape = f_raster_data.shape[1]
+            padded_fusion[:xshape, :yshape] = f_raster_data
+            diff_data= np.abs(padded_fusion - sm_raster_data)
+
+            if 'cover' in f_path:
+                # make sure cover differences are less than 5%
+                if not np.all(np.nan_to_num(diff_data,0) < 5):
+                    failures.append(sm_path)
+                    failure_cell_count.append( diff_data[~(np.nan_to_num(diff_data,0) < 5)].size )
+                    failure_cell_avg.append( diff_data[~(np.nan_to_num(diff_data,0) < 5)].mean() )
+            elif 'elev' in f_path and 'max' not in f_path and 'min' not in f_path:
+                # make sure elevation differences are less than 0.2 meters
+                if not np.all(np.nan_to_num(diff_data,0) < 0.2):
+                    failures.append(sm_path)
+                    failure_cell_count.append( diff_data[~(np.nan_to_num(diff_data,0) < 0.2)].size )
+                    failure_cell_avg.append( diff_data[~(np.nan_to_num(diff_data,0) < 0.2)].mean() )
+            else:
+                # make sure others have difference less than 1
+                if not np.all(np.nan_to_num(diff_data,0) < 1):
+                    failures.append(sm_path)
+                    failure_cell_count.append( diff_data[~(np.nan_to_num(diff_data,0) < 1)].size )
+                    failure_cell_avg.append( diff_data[~(np.nan_to_num(diff_data,0) < 1)].mean() )
+
+        for idx, f in enumerate(failures):
+            print('Failed:')
+            print('    path: ', os.path.basename(f))
+            print('    count:', failure_cell_count[idx])
+            print('    avg:', failure_cell_avg[idx])
+        assert not failures

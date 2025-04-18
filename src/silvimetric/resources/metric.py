@@ -108,10 +108,12 @@ class Metric():
                 idx = locs.loc[d.index[0]]
                 xi = idx.xi
                 yi = idx.yi
-                try:
-                    pass_args = [args.at[(xi,yi), a] if any(args[a]) else args[a] for a in attrs]
-                except:
-                    print(d)
+                pass_args = []
+                for a in attrs:
+                    try:
+                        pass_args.append(args.at[(xi,yi), a])
+                    except:
+                        pass_args.append(args[a])
         else:
             pass_args = args
 
@@ -131,12 +133,13 @@ class Metric():
         if any([i not in data.columns for i in idx]):
             idx = ['X','Y']
 
+        # run metric filters over the data first
+        data = self.run_filters(data)
+
         if self.attributes:
             attrs = [*[a.name for a in self.attributes],*idx]
             data = data[attrs]
 
-        # run metric filters over the data first
-        data = self.run_filters(data)
         idxer = data[idx]
         gb = data.groupby(idx)
 

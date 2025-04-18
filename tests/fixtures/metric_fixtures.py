@@ -10,7 +10,7 @@ import numpy as np
 
 from silvimetric import (Log, StorageConfig, ShatterConfig, Storage, Data,
     Bounds, Metric)
-from silvimetric.resources.metrics.stats import sm_max, sm_min
+from silvimetric.resources.metrics.stats import maximum, minimum
 from silvimetric.resources.metrics.p_moments import mean
 from silvimetric import __version__ as svversion
 
@@ -126,4 +126,4 @@ def dep_crr():
             return np.nan
         return (m - mi) / den
 
-    return Metric('deps_crr', np.float32, m_crr_2, [mean, sm_min, sm_max])
+    return Metric('deps_crr', np.float32, m_crr_2, [mean, minimum, maximum])

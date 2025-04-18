@@ -1,6 +1,6 @@
 from ..metric import Metric
 import numpy as np
-from lmoments3 import distr
+from scipy.stats import lmoment
 
 import warnings
 
@@ -10,22 +10,8 @@ def lmom4(data):
     # suppress warnings from dividing by 0, these are handled in the metric creation
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning)
-        n = data.count()
-        try:
-            paras = distr.gam.lmom_fit(data)
-            if n < 1:
-                return [np.nan, np.nan, np.nan, np.nan]
-            elif n < 2:
-                return [data.mean, np.nan, np.nan, np.nan]
-            elif n < 3:
-                return [*distr.gam.lmom(nmom=2, **paras), np.nan, np.nan, np.nan]
-            elif n < 4:
-                return [*distr.gam.lmom(nmom=3, **paras), np.nan, np.nan, np.nan]
-            return [*distr.gam.lmom(nmom=4, **paras)]
-        except:
-            return [data.mean(), np.nan, np.nan, np.nan]
+        return lmoment(data, order=[1,2,3,4], nan_policy='omit').tolist()
 
-# L1 is same as mean...computed using np.mean in L-moment base for speed
 def m_l1(data, *args):
     return args[0][0]
 
