@@ -8,14 +8,14 @@ import pdal
 import pathlib
 import json
 
+
 class Data:
     """Represents a point cloud or PDAL pipeline, and performs essential operations
     necessary to understand and execute a Shatter process."""
 
-    def __init__(self,
-                 filename: str,
-                 storageconfig: StorageConfig,
-                 bounds: Bounds = None):
+    def __init__(
+        self, filename: str, storageconfig: StorageConfig, bounds: Bounds = None
+    ):
         self.filename = filename
         """Path to either PDAL pipeline or point cloud file"""
 
@@ -43,8 +43,12 @@ class Data:
         self.log = storageconfig.log
 
     def to_json(self):
-        j = dict(filename=self.filename, bounds=self.bounds.get(),
-                pipeline=json.loads(self.pipeline.pipeline), is_pipeline=self.is_pipeline())
+        j = dict(
+            filename=self.filename,
+            bounds=self.bounds.get(),
+            pipeline=json.loads(self.pipeline.pipeline),
+            is_pipeline=self.is_pipeline(),
+        )
         return j
 
     def __repr__(self):
@@ -61,7 +65,6 @@ class Data:
             return True
         return False
 
-
     def make_pipeline(self) -> pdal.Pipeline:
         """Take a COPC or EPT endpoint and generate a PDAL pipeline for it
 
@@ -72,7 +75,6 @@ class Data:
         reader._options['threads'] = self.reader_thread_count
         if self.bounds:
             reader._options['bounds'] = str(self.bounds)
-
 
         return reader.pipeline()
         ## TODO
@@ -117,7 +119,9 @@ class Data:
             stage_type, stage_kind = stage.type.split('.')
             if stage_type == 'readers':
                 if not stage_kind in allowed_readers:
-                    raise Exception(f"Readers for SilviMetric must be of type 'copc' or 'ept', not '{stage_kind}'")
+                    raise Exception(
+                        f"Readers for SilviMetric must be of type 'copc' or 'ept', not '{stage_kind}'"
+                    )
                 readers.append(stage)
 
             # we only answer to copc or ept readers
@@ -128,7 +132,7 @@ class Data:
                         self.bounds.minx - res,
                         self.bounds.miny - res,
                         self.bounds.maxx + res,
-                        self.bounds.maxy + res
+                        self.bounds.maxy + res,
                     )
                     stage._options['bounds'] = str(collar)
                     # stage._options['bounds'] = str(self.bounds)
@@ -141,13 +145,19 @@ class Data:
         # we don't support weird pipelines of shapes
         # that aren't simply a line.
         if len(readers) != 1:
-            raise Exception(f"Pipelines can only have one reader of type {allowed_readers}")
+            raise Exception(
+                f'Pipelines can only have one reader of type {allowed_readers}'
+            )
 
         resolution = self.storageconfig.resolution
         # Add xi and yi – only need this for PDAL < 2.6
-        ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-        assign_x = pdal.Filter.assign(value=f"xi = (X - {self.storageconfig.root.minx}) / {resolution}")
-        assign_y = pdal.Filter.assign(value=f"yi = (({self.storageconfig.root.maxy} - Y) / {resolution}) - 1")
+        ferry = pdal.Filter.ferry(dimensions='X=>xi, Y=>yi')
+        assign_x = pdal.Filter.assign(
+            value=f'xi = (X - {self.storageconfig.root.minx}) / {resolution}'
+        )
+        assign_y = pdal.Filter.assign(
+            value=f'yi = (({self.storageconfig.root.maxy} - Y) / {resolution}) - 1'
+        )
         # hag = pdal.Filter.hag_nn()
 
         stages.append(ferry)
@@ -166,10 +176,10 @@ class Data:
         try:
             self.pipeline.execute()
             if self.pipeline.log and self.pipeline.log is not None:
-                self.log.debug(f"PDAL log: {self.pipeline.log}")
+                self.log.debug(f'PDAL log: {self.pipeline.log}')
         except Exception as e:
             if self.pipeline.log and self.pipeline.log is not None:
-                self.log.debug(f"PDAL log: {self.pipeline.log}")
+                self.log.debug(f'PDAL log: {self.pipeline.log}')
             print(self.pipeline.pipeline, e)
             raise e
 
@@ -179,6 +189,7 @@ class Data:
         :return: get data as a numpy ndarray
         """
         return self.pipeline.arrays[0]
+
     array = property(get_array)
 
     def get_reader(self) -> pdal.Reader:

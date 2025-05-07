@@ -4,8 +4,13 @@ from typing_extensions import Union
 
 from .. import Storage, Bounds
 
-def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
-        name: Union[UUID, str]):
+
+def check_values(
+    start_time: datetime,
+    end_time: datetime,
+    bounds: Bounds,
+    name: Union[UUID, str],
+):
     """
     Validate arguments for info command.
 
@@ -37,8 +42,15 @@ def check_values(start_time: datetime, end_time: datetime, bounds: Bounds,
         else:
             raise TypeError(f'Incorrect type of "name" argument.')
 
-def info(tdb_dir:str, start_time:datetime=None, end_time:datetime=None,
-          bounds:Bounds=None, name:Union[str, UUID]=None, concise:bool=False) -> dict:
+
+def info(
+    tdb_dir: str,
+    start_time: datetime = None,
+    end_time: datetime = None,
+    bounds: Bounds = None,
+    name: Union[str, UUID] = None,
+    concise: bool = False,
+) -> dict:
     """
     Collect information about database in current state
 
@@ -68,18 +80,20 @@ def info(tdb_dir:str, start_time:datetime=None, end_time:datetime=None,
 
         info = {
             'attributes': [a.to_json() for a in atts],
-            'metadata': meta.to_json()
+            'metadata': meta.to_json(),
         }
 
         try:
-            history = tdb.get_history(start_time, end_time, bounds, name, concise)
+            history = tdb.get_history(
+                start_time, end_time, bounds, name, concise
+            )
 
             if bool(history) and isinstance(history, list):
-                history = [ h for h in history ]
+                history = [h for h in history]
             elif bool(history):
-                history = [ history ]
+                history = [history]
             else:
-                history = [ ]
+                history = []
 
             info['history'] = history
         except KeyError:

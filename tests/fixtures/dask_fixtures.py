@@ -1,5 +1,4 @@
 import pytest
-import os
 from typing_extensions import Generator
 import dask
 

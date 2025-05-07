@@ -24,8 +24,7 @@ left = [
     'trimming',
     'brimming',
     'bushing',
-    'lopping'
-
+    'lopping',
 ]
 
 # some from https://en.wikipedia.org/wiki/Category:Forestry_researchers
@@ -50,8 +49,7 @@ right = [
     'Lowman',
     'Lugo',
     'McArdle',
-    'McGuire'
-    'McGaughey',
+    'McGuireMcGaughey',
     'Mendelsohn',
     'Moser',
     'Munger',
@@ -66,8 +64,7 @@ right = [
     'Waugh',
     'Winslow',
     'Woolsey',
-    'Zon'
-  
+    'Zon',
 ]
 
 
@@ -78,6 +75,7 @@ def get_random_name(sep='_'):
         r = rng.choice(right).lower()
         name = f'{l}-{r}'
         return name
+
 
 if __name__ == '__main__':
     print(get_random_name())

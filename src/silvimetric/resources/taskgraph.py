@@ -1,7 +1,7 @@
 from .metric import Metric
-from functools import reduce
 
-class Graph():
+
+class Graph:
     def __init__(self, metrics: list[Metric] | Metric):
         """
         Task graph for Metrics.
@@ -12,7 +12,7 @@ class Graph():
             metrics = [metrics]
 
         self.metrics = metrics
-        self.nodes: dict[str, Node] = { }
+        self.nodes: dict[str, Node] = {}
         self.results = None
         self.initialized = False
 
@@ -35,14 +35,14 @@ class Graph():
         if not self.initialized:
             self.init()
 
-        m_names = [ m.name for m in self.metrics ]
+        m_names = [m.name for m in self.metrics]
         res = [n.run(data_in) for k, n in self.nodes.items() if k in m_names]
 
         self.results = res[0].join(res[1:])
         return self.results
 
 
-class Node():
+class Node:
     # TODO add mutex to Node so it can be run in parallel
     def __init__(self, metric, graph):
         self.metric = metric
