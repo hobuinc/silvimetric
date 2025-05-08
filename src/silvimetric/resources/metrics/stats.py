@@ -12,26 +12,26 @@ warnings.filterwarnings(
 )
 
 
-def m_mode(data):
+def m_mode(data, *args):
     u, c = np.unique(data, return_counts=True)
     i = np.where(c == c.max())
     v = u[i[0][0]]
     return v
 
 
-def m_median(data):
+def m_median(data, *args):
     return np.median(data)
 
 
-def m_min(data):
+def m_min(data, *args):
     return np.min(data)
 
 
-def m_max(data):
+def m_max(data, *args):
     return np.max(data)
 
 
-def m_stddev(data):
+def m_stddev(data, *args):
     return np.std(data)
 
 
@@ -92,7 +92,8 @@ def m_profilearea(data, *args):
     # second sanity check...99th percentile must be > 0
     p99 = p[99]
     if p99 > 0.0:
-        # compute area under normalized percentile height curve using composite trapeziod rule
+        # compute area under normalized percentile height curve using composite
+        # trapeziod rule
         pcts = np.array(p[:98])
         areas = pcts * 2 / p99
         pa = p0 / p99 + areas.sum() + 1

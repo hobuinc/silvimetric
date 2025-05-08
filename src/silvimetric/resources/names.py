@@ -71,7 +71,7 @@ right = [
 def get_random_name(sep='_'):
     rng = random.SystemRandom()
     while 1:
-        l = rng.choice(left).lower()
+        l = rng.choice(left).lower()  # noqa: E741
         r = rng.choice(right).lower()
         name = f'{l}-{r}'
         return name

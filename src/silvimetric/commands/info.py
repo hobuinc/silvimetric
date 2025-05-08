@@ -3,6 +3,7 @@ from uuid import UUID
 from typing_extensions import Union
 
 from .. import Storage, Bounds
+from typing import Optional
 
 
 def check_values(
@@ -26,30 +27,30 @@ def check_values(
     :meta public:
     """
     if start_time is not None and not isinstance(start_time, datetime):
-        raise TypeError(f'Incorrect type of "start_time" argument.')
+        raise TypeError('Incorrect type of "start_time" argument.')
     if end_time is not None and not isinstance(end_time, datetime):
-        raise TypeError(f'Incorrect type of "end_time" argument.')
+        raise TypeError('Incorrect type of "end_time" argument.')
     if bounds is not None and not isinstance(bounds, Bounds):
-        raise TypeError(f'Incorrect type of "bounds" argument.')
+        raise TypeError('Incorrect type of "bounds" argument.')
     if name is not None:
         if isinstance(name, UUID):
             pass
         elif isinstance(name, str):
             try:
                 UUID(name)
-            except:
-                raise TypeError(f'Incorrect type of "name" argument.')
+            except Exception as e:
+                raise TypeError('Incorrect type of "name" argument.') from e
         else:
-            raise TypeError(f'Incorrect type of "name" argument.')
+            raise TypeError('Incorrect type of "name" argument.')
 
 
 def info(
     tdb_dir: str,
-    start_time: datetime = None,
-    end_time: datetime = None,
-    bounds: Bounds = None,
-    name: Union[str, UUID] = None,
-    concise: bool = False,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+    bounds: Optional[Bounds] = None,
+    name: Optional[Union[str, UUID]] = None,
+    concise: Optional[bool] = False,
 ) -> dict:
     """
     Collect information about database in current state

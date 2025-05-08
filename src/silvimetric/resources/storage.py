@@ -6,7 +6,7 @@ import pathlib
 import contextlib
 import json
 import urllib
-from typing_extensions import Generator
+from typing_extensions import Generator, Optional
 
 from math import floor
 
@@ -63,7 +63,6 @@ class Storage:
         # adjust cell bounds if necessary
         config.root.adjust_to_cell_lines(config.resolution)
 
-        # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
         xi = floor(
             (config.root.maxx - config.root.minx) / float(config.resolution)
         )
@@ -212,7 +211,7 @@ class Storage:
         :param mode: Mode to open TileDB stream in. Valid options are
             'w', 'r', 'm', 'd'., defaults to 'r'.
         :param timestamp: Timestamp to open database at., defaults to None.
-        :raises Exception: Incorrect Mode was given, only valid modes are 'w' and 'r'.
+        :raises Exception: Incorrect Mode, only valid modes are 'w' and 'r'.
         :raises Exception: Path exists and is not a TileDB array.
         :raises Exception: Path does not exist.
         :yield: TileDB array context manager.
@@ -231,7 +230,7 @@ class Storage:
         elif pathlib.Path(self.config.tdb_dir).exists():
             raise Exception(
                 f'Path {self.config.tdb_dir} already exists and is not'
-                + ' initialized for TileDB access.'
+                ' initialized for TileDB access.'
             )
         else:
             raise Exception(f'Path {self.config.tdb_dir} does not exist')
@@ -267,7 +266,7 @@ class Storage:
         start_time: datetime,
         end_time: datetime,
         bounds: Bounds,
-        name: str = None,
+        name: Optional[str] = None,
         concise: bool = False,
     ):
         """
@@ -325,10 +324,10 @@ class Storage:
 
     def mbrs(self, proc_num: int):
         """
-        Get minimum bounding rectangle of a given shatter process. If this process
-        has been finished and consolidated the mbr will be much less granulated
-        than if the fragments are still intact. Mbrs are represented as tuples
-        in the form of ((minx, maxx), (miny, maxy))
+        Get minimum bounding rectangle of a given shatter process. If this
+        process has been finished and consolidated the mbr will be much less
+        granulated than if the fragments are still intact. Mbrs are represented
+        as tuples in the form of ((minx, maxx), (miny, maxy))
 
         :param proc_num: Process number or time slot of the shatter process.
         :return: Returns mbrs that match the given process number.

@@ -21,9 +21,9 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     """
     Execute pipeline and retrieve point cloud data for this extent
 
-    :param extents: :class:`silvimetric.resources.extents.Extents` being operated on.
+    :param extents: :class:`silvimetric.resources.extents.Extents` being used.
     :param filename: Path to either PDAL pipeline or point cloud.
-    :param storage: :class:`silvimetric.resources.storage.Storage` database object.
+    :param storage: :class:`silvimetric.resources.storage.Storage` database.
     :return: Point data array from PDAL.
     """
     data = Data(filename, storage.config, bounds=extents.bounds)
@@ -37,7 +37,7 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     Arrange data to fit key-value TileDB input format.
 
     :param data: Tuple of indices and point data array (xis, yis, data).
-    :param leaf: :class:`silvimetric.resources.extents.Extent` being operated on.
+    :param leaf: :class:`silvimetric.resources.extents.Extent` being used.
     :param attrs: List of attribute names.
     :raises Exception: Missing attribute error.
     :return: None if no work is done, or a tuple of indices and rearranged data.
@@ -117,7 +117,11 @@ def write(data_in, storage, timestamp):
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
     xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
-    metr_dict = {f'{m.name}': m.dtype for m in storage.config.metrics}
+    metr_dict = {
+        f'{m.entry_name(a.name)}': m.dtype
+        for m in storage.config.metrics
+        for a in storage.config.attrs
+    }
     dtype_dict = attr_dict | xy_dict | metr_dict
 
     varlen_types = {a.dtype for a in storage.config.attrs}
@@ -211,7 +215,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
-            for future, pack in batch:
+            for _, pack in batch:
                 if isinstance(pack, CancelledError):
                     print('asdfasdf')
                     continue
@@ -256,8 +260,8 @@ def shatter(config: ShatterConfig) -> int:
 
     config.log.info('Beginning shatter process...')
     config.log.debug(f'Shatter Config: {config}')
-    config.log.debug(f'Data: {str(data)}')
-    config.log.debug(f'Extents: {str(extents)}')
+    config.log.debug(f'Data: {data}')
+    config.log.debug(f'Extents: {extents}')
 
     if not config.time_slot:  # defaults to 0, which is reserved for storage cfg
         config.time_slot = storage.reserve_time_slot()

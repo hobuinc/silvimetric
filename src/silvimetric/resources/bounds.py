@@ -58,7 +58,7 @@ class Bounds(dict):  # for JSON serializing
             if bbox_str[0] != '(':
                 raise Exception(
                     f'Unable to load Bounds via json or PDAL bounds type {e}'
-                )
+                ) from e
             t = ast.literal_eval(bbox_str)
             minx = t[0][0]
             maxx = t[0][1]
@@ -125,7 +125,7 @@ class Bounds(dict):  # for JSON serializing
         """Determine if two bounds are disjointed
 
         :param other: Bounds this object is being compared to
-        :return: True if this box shares no point with the other box, otherwise False
+        :return: True if this box shares no point with the other
         """
         if other.minx > self.maxx or other.maxx < self.minx:
             return True

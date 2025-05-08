@@ -20,10 +20,10 @@ mutex = Lock()
 
 class Metric:
     """
-    A Metric is a TileDB entry representing derived cell data. There is a base set of
-    metrics available through Silvimetric, or you can create your own. A Metric
-    object has all the information necessary to facilitate the derivation of
-    data as well as its insertion into the database.
+    A Metric is a TileDB entry representing derived cell data. There is a base
+    set of metrics available through Silvimetric, or you can create your own. A
+    Metric object has all the information necessary to facilitate the derivation
+    of data as well as its insertion into the database.
     """
 
     def __init__(
@@ -31,23 +31,24 @@ class Metric:
         name: str,
         dtype: np.dtype,
         method: MetricFn,
-        dependencies: list[Self] = [],
-        filters: List[FilterFn] = [],
-        attributes: List[Attribute] = [],
+        dependencies: Optional[List[Self]] = None,
+        filters: Optional[List[FilterFn]] = None,
+        attributes: Optional[List[Attribute]] = None,
     ) -> None:
-        # TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
+        # TODO make deps, filters, attrs into tuples or sets, not lists so
+        # they're hashable
 
         self.name = name
         """Metric name. eg. mean"""
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
-        self.dependencies = dependencies
+        self.dependencies = dependencies if dependencies is not None else []
         """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
-        self.filters = filters
+        self.filters = filters if filters is not None else []
         """List of user-defined filters to perform before performing method."""
-        self.attributes = attributes
+        self.attributes = attributes if attributes is not None else []
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
 
@@ -146,8 +147,9 @@ class Metric:
         gb = data.groupby(idx)
 
         # Arguments come in as separate dataframes returned from previous
-        # metrics deemed dependencies. If there are dependencies for this metric,
-        # we'll merge the outputs from those here so they're easier to work with.
+        # metrics deemed dependencies. If there are dependencies for this
+        # metric, we'll merge the outputs from those here so they're easier
+        # to work with.
         def merge(left, right):
             return left.merge(right, on=idx)
 
@@ -160,9 +162,10 @@ class Metric:
 
         # lambda method for use in dataframe aggregator
         def runner(d):
-            self.sanitize_and_run(d, idxer, merged_args)
+            return self.sanitize_and_run(d, idxer, merged_args)
 
-        # create map of current column name to tuple of new column name and metric method
+        # create map of current column name to tuple of new column name and
+        # metric method
         cols = data.columns
         prev_cols = [col for col in cols if col not in idx]
         new_cols = {c: [(self.entry_name(c), runner)] for c in prev_cols}

@@ -48,8 +48,8 @@ from .common import dask_handle, close_dask
     '--dasktype',
     default='processes',
     type=click.Choice(['threads', 'processes']),
-    help='What Dask uses for parallelization. For more'
-    'information see here https://docs.dask.org/en/stable/scheduling.html#local-threads',
+    help='What Dask uses for parallelization. For more information see here'
+    ' https://docs.dask.org/en/stable/scheduling.html#local-threads',
 )
 @click.option(
     '--scheduler',
@@ -186,7 +186,7 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
     '--resolution', type=float, default=100, help='Summary pixel resolution'
 )
 @click.option(
-    '--filter',
+    '--filter_empty',
     is_flag=True,
     type=bool,
     default=False,
@@ -200,7 +200,9 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
     '--bounds', type=BoundsParamType(), default=None, help='Bounds to scan.'
 )
 @click.pass_obj
-def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
+def scan_cmd(
+    app, resolution, point_count, pointcloud, bounds, depth, filter_empty
+):
     """Scan point cloud, output information on it, and determine the optimal
     tile size."""
     dask_handle(
@@ -218,7 +220,7 @@ def scan_cmd(app, resolution, point_count, pointcloud, bounds, depth, filter):
         point_count,
         resolution,
         depth,
-        filter,
+        filter_empty,
         log=app.log,
     )
 
@@ -295,7 +297,7 @@ def initialize_cmd(
     is_flag=True,
     default=False,
     type=bool,
-    help='Whether or not to write a report of the process, useful for debugging',
+    help='Whether or not to write a report of the process for debugging',
 )
 @click.option(
     '--date',
@@ -345,8 +347,6 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 
     if report:
         if app.scheduler != 'distributed':
-            from dask.diagnostics import ProgressBar
-
             app.log.warning(
                 'Report option is incompatible with scheduler'
                 '{scheduler}, skipping.'
@@ -354,7 +354,7 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
             shatter.shatter(config)
         else:
             report_path = f'reports/{config.name}.html'
-            with performance_report(report_path) as pr:
+            with performance_report(report_path):
                 shatter.shatter(config)
             print(f'Writing report to {report_path}.')
     else:
@@ -417,24 +417,42 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 
 
 @cli.command('delete')
-@click.option('--id', type=click.UUID, required=True, help='Shatter Task UUID.')
+@click.option(
+    '--task_id',
+    '--id',
+    type=click.UUID,
+    required=True,
+    help='Shatter Task UUID.',
+)
 @click.pass_obj
-def delete_cmd(app, id):
-    manage.delete(tdb_dir=app.tdb_dir, name=id, log=app.log)
+def delete_cmd(app, task_id):
+    manage.delete(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('restart')
-@click.option('--id', type=click.UUID, required=True, help='Shatter Task UUID.')
+@click.option(
+    '--task_id',
+    '--id',
+    type=click.UUID,
+    required=True,
+    help='Shatter Task UUID.',
+)
 @click.pass_obj
-def restart_cmd(app, id):
-    manage.restart(tdb_dir=app.tdb_dir, name=id, log=app.log)
+def restart_cmd(app, task_id):
+    manage.restart(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('resume')
-@click.option('--id', type=click.UUID, required=True, help='Shatter Task UUID.')
+@click.option(
+    '--task_id',
+    '--id',
+    type=click.UUID,
+    required=True,
+    help='Shatter Task UUID.',
+)
 @click.pass_obj
-def resume_cmd(app, id):
-    manage.resume(tdb_dir=app.tdb_dir, name=id, log=app.log)
+def resume_cmd(app, task_id):
+    manage.resume(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
 
 
 if __name__ == '__main__':

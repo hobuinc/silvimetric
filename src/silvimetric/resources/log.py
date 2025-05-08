@@ -10,7 +10,7 @@ import logging
 import pathlib
 import sys
 
-from typing_extensions import Any, Dict
+from typing_extensions import Any, Dict, Optional
 
 try:
     import websocket
@@ -59,7 +59,7 @@ class Log:
     def __init__(
         self,
         log_level: int,
-        logdir: str = None,
+        logdir: Optional[str] = None,
         logtype: str = 'stream',
         logfilename: str = 'silvimetric-log.txt',
     ):
@@ -88,7 +88,8 @@ class Log:
 
         # File Handler for Logging
         log_format = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
+            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d'
+            ' - %(message)s'
         )
 
         # We only use a file handler if user specified a logdir
@@ -106,31 +107,10 @@ class Log:
             file_handler.setLevel(self.log_level)
             file_handler.setFormatter(log_format)
             self.logger.addHandler(file_handler)
-
-        if WebSocketHandler:
-            self.relay = None
-
-        # Supplemental Handler
-        if self.logtype == 'rich':
-            from rich.logging import RichHandler
-
-            log_handler = RichHandler()
-        elif self.logtype == 'websocket' and WebSocketHandler:
-            formatter = CustomJsonFormatter()
-            self.relay = websocket.WebSocket()
-            url = f'ws://{config["WEBSOCKET_URL"]}/websocket'
-            try:
-                self.relay.connect(url)
-            except ConnectionRefusedError as err:
-                raise ConnectionRefusedError(f'Connection Refused to {url}')
-            log_handler = WebSocketHandler('DEBUG', websocket=self.relay)
-            log_handler.setFormatter(formatter)
         else:
-            # if the user didn't specify a log dir, we just do the StreamHandler
-            if not self.logdir:
-                log_handler = logging.StreamHandler(stream=sys.stdout)
-                log_handler.setFormatter(log_format)
-                self.logger.addHandler(log_handler)
+            log_handler = logging.StreamHandler(stream=sys.stdout)
+            log_handler.setFormatter(log_format)
+            self.logger.addHandler(log_handler)
 
     def to_json(self):
         return {

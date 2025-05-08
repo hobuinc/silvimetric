@@ -69,7 +69,7 @@ class Attribute:
         Create Attribute from string or dict version of it.
 
         :param data: Stringified or json object of attribute
-        :raises TypeError: Incorrect type of incoming data, must be string or dict
+        :raises TypeError: Incorrect type of data, must be string or dict
         :return: Return derived Attribute
         """
         j = json.loads(data)

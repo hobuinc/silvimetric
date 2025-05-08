@@ -53,8 +53,8 @@ class Node:
 
     def init(self):
         """
-        Iterate through dependencies. If node is already in graph, reference that.
-        If not, create an entry in the graph and then reference it. Nodes
+        Iterate through dependencies. If node is already in graph, reference
+        that. If not, create an entry in the graph and then reference it. Nodes
         represent arguments to pass to the Metric method, in the order that
         they're presented in the set.
         """

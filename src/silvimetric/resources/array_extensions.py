@@ -51,7 +51,8 @@ class AttributeArray(pd.api.extensions.ExtensionArray):
     def __init__(self, arrays, dtype):
         assert isinstance(dtype, AttributeDtype)
         self._dtype = dtype
-        # self._data = np.array([np.array(array, dtype=dtype.subtype) for array in arrays], dtype=dtype.subtype)
+        # self._data = np.array([np.array(array, dtype=dtype.subtype) for array
+        # in arrays], dtype=dtype.subtype)
         self._data = [
             np.asarray(array, dtype=dtype.subtype) for array in arrays
         ]

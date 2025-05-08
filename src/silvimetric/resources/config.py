@@ -2,7 +2,6 @@ import pyproj
 
 import json
 import uuid
-import numpy as np
 
 from pathlib import Path
 from abc import ABC, abstractmethod
@@ -74,13 +73,14 @@ class StorageConfig(Config):
             for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
         ]
     )
-    """List of :class:`silvimetric.resources.attribute.Attribute` attributes that
-    represent point data, defaults to Z, NumberOfReturns, ReturnNumber, Intensity"""
+    """List of :class:`silvimetric.resources.attribute.Attribute` attributes
+    that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
+    Intensity"""
     metrics: list[Metric] = field(
         default_factory=lambda: [grid_metrics[m] for m in grid_metrics.keys()]
     )
-    """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics that
-    represent derived data, defaults to values in grid_metrics object"""
+    """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
+    that represent derived data, defaults to values in grid_metrics object"""
     version: str = __version__
     """Silvimetric version"""
     capacity: int = 1000000
@@ -115,7 +115,6 @@ class StorageConfig(Config):
 
     def __eq__(self, other):
         # We don't compare logs
-        eq = True
         for k in other.__dict__.keys():
             if k != 'log':
                 if self.__dict__[k] != other.__dict__[k]:
@@ -404,7 +403,7 @@ class ExtractConfig(Config):
         if 'bounds' in x:
             bounds = Bounds(*x['bounds'])
         if 'log' in x:
-            l = x['log']
+            l = x['log']  # noqa: E741
             log = Log(
                 l['log_level'], l['logdir'], l['logtype'], l['logfilename']
             )

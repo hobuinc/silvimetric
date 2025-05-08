@@ -198,8 +198,8 @@ class Extents(object):
     ):
         """
         Creates quad tree of chunks for this bounds, runs pdal quickinfo over
-        this to determine if there are any points available. Uses a bottom resolution
-        of 1km.
+        this to determine if there are any points available. Uses a bottom
+        resolution of 1km.
 
         :param data: Data object containing point cloud details.
         :param res_threshold: Resolution threshold., defaults to 100
