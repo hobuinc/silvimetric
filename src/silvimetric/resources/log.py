@@ -5,11 +5,12 @@ Date: February 2021
 
 A module for setting up logging.
 """
+
 import logging
 import pathlib
 import sys
 
-from typing_extensions import Any, Dict
+from typing_extensions import Any, Dict, Optional
 
 try:
     import websocket
@@ -27,17 +28,19 @@ else:
             message_dict: Dict[str, Any],
         ) -> None:
             super().add_fields(log_record, record, message_dict)
-            if log_record.get("level"):
-                log_record["level"] = log_record["level"].upper()
+            if log_record.get('level'):
+                log_record['level'] = log_record['level'].upper()
             else:
-                log_record["level"] = record.levelname
+                log_record['level'] = record.levelname
 
-            if log_record.get("type") is None:
-                log_record["type"] = "log_message"
+            if log_record.get('type') is None:
+                log_record['type'] = 'log_message'
             return None
 
     class WebSocketHandler(logging.Handler):
-        def __init__(self, level: str, websocket: "websocket.WebSocket") -> None:
+        def __init__(
+            self, level: str, websocket: 'websocket.WebSocket'
+        ) -> None:
             super().__init__(level)
             self.ws = websocket
             # TODO: check if websocket is already connected?
@@ -53,11 +56,13 @@ else:
 
 
 class Log:
-    def __init__(self,
-                 log_level: int,
-                 logdir: str = None,
-                 logtype: str = "stream",
-                 logfilename: str = "silvimetric-log.txt"):
+    def __init__(
+        self,
+        log_level: int,
+        logdir: Optional[str] = None,
+        logtype: str = 'stream',
+        logfilename: str = 'silvimetric-log.txt',
+    ):
         """
         Creates logging formatting and structure
 
@@ -65,7 +70,7 @@ class Log:
         """
 
         # need to be careful not to pull logging from previous runs
-        self.logger = logging.getLogger("silvimetric")
+        self.logger = logging.getLogger('silvimetric')
         self.logdir = logdir
         if logdir:
             self.logtype = 'file'
@@ -83,7 +88,8 @@ class Log:
 
         # File Handler for Logging
         log_format = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d'
+            ' - %(message)s'
         )
 
         # We only use a file handler if user specified a logdir
@@ -95,43 +101,24 @@ class Log:
             if not logpath.exists():
                 logpath.mkdir()
 
-            logfilename = str(logpath / self.logfilename )
-            file_handler = logging.FileHandler( logfilename )
+            logfilename = str(logpath / self.logfilename)
+            file_handler = logging.FileHandler(logfilename)
 
             file_handler.setLevel(self.log_level)
             file_handler.setFormatter(log_format)
             self.logger.addHandler(file_handler)
-
-        if WebSocketHandler:
-            self.relay = None
-
-        # Supplemental Handler
-        if self.logtype == "rich":
-            from rich.logging import RichHandler
-
-            log_handler = RichHandler()
-        elif self.logtype == "websocket" and WebSocketHandler:
-            formatter = CustomJsonFormatter()
-            self.relay = websocket.WebSocket()
-            url = f'ws://{config["WEBSOCKET_URL"]}/websocket'
-            try:
-                self.relay.connect(url)
-            except ConnectionRefusedError as err:
-                raise ConnectionRefusedError(f"Connection Refused to {url}")
-            log_handler = WebSocketHandler("DEBUG", websocket=self.relay)
-            log_handler.setFormatter(formatter)
         else:
-            # if the user didn't specify a log dir, we just do the StreamHandler
-            if not self.logdir:
-                log_handler = logging.StreamHandler(stream=sys.stdout)
-                log_handler.setFormatter(log_format)
-                self.logger.addHandler(log_handler)
+            log_handler = logging.StreamHandler(stream=sys.stdout)
+            log_handler.setFormatter(log_format)
+            self.logger.addHandler(log_handler)
 
     def to_json(self):
-        return {'logdir': self.logdir,
-                'log_level': self.log_level,
-                'logtype': self.logtype ,
-                'logfilename': self.logfilename}
+        return {
+            'logdir': self.logdir,
+            'log_level': self.log_level,
+            'logtype': self.logtype,
+            'logfilename': self.logfilename,
+        }
 
     def __del__(self) -> None:
         """Any special cleanups?"""
@@ -158,9 +145,8 @@ class Log:
         """Print out where our logs are going"""
 
         if self.logdir:
-            logstring = f"{self.logfilename}"
+            logstring = f'{self.logfilename}'
         else:
-            logstring = "stdout"
+            logstring = 'stdout'
 
         return f"SilviMetric logging {id(self)} @ '{logstring}'"
-

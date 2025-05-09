@@ -4,7 +4,8 @@ import pdal
 from tiledb import Attr
 from .array_extensions import AttributeArray, AttributeDtype
 
-class Attribute():
+
+class Attribute:
     """Represents point data from a PDAL execution that has been binned, and
     provides the information necessary to transfer that data to the database."""
 
@@ -20,7 +21,9 @@ class Attribute():
             try:
                 self.dtype = AttributeDtype(subtype=dtype)
             except Exception as e:
-                raise AttributeError(f"Invalid dtype passed to Attribute: {dtype}") from e
+                raise AttributeError(
+                    f'Invalid dtype passed to Attribute: {dtype}'
+                ) from e
 
     def make_array(self, data, copy=False):
         """Create Pandas Extension array for TileDB compatibility."""
@@ -41,7 +44,6 @@ class Attribute():
     def __hash__(self):
         return hash(('name', self.name, 'dtype', self.dtype))
 
-
     def schema(self) -> Attr:
         """
         Create the tiledb schema for this attribute.
@@ -50,13 +52,10 @@ class Attribute():
         return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
 
     def to_json(self) -> object:
-        return {
-            'name': self.name,
-            'dtype': np.dtype(self.dtype.subtype).str
-        }
+        return {'name': self.name, 'dtype': np.dtype(self.dtype.subtype).str}
 
     @staticmethod
-    def from_dict(data: dict) -> "Attribute":
+    def from_dict(data: dict) -> 'Attribute':
         """
         Make an Attribute from a JSON like object
         """
@@ -65,21 +64,23 @@ class Attribute():
         return Attribute(name, dtype)
 
     @staticmethod
-    def from_string(data: str) -> "Attribute":
+    def from_string(data: str) -> 'Attribute':
         """
         Create Attribute from string or dict version of it.
 
         :param data: Stringified or json object of attribute
-        :raises TypeError: Incorrect type of incoming data, must be string or dict
+        :raises TypeError: Incorrect type of data, must be string or dict
         :return: Return derived Attribute
         """
         j = json.loads(data)
         return Attribute.from_dict(j)
 
-
     def __repr__(self) -> str:
         return json.dumps(self.to_json())
 
-# A list of pdal dimensions can be found here https://pdal.io/en/stable/dimensions.html
-Pdal_Attributes = { d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions }
+
+# A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html
+Pdal_Attributes = {
+    d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions
+}
 Attributes = Pdal_Attributes

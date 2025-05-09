@@ -6,7 +6,7 @@ import pathlib
 import contextlib
 import json
 import urllib
-from typing_extensions import Generator
+from typing_extensions import Generator, Optional
 
 from math import floor
 
@@ -14,13 +14,15 @@ from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
 from .bounds import Bounds
 
+
 class Storage:
-    """ Handles storage of shattered data in a TileDB Database. """
+    """Handles storage of shattered data in a TileDB Database."""
 
-    def __init__(self, config: StorageConfig, ctx:tiledb.Ctx=None):
-
-        if not tiledb.object_type(config.tdb_dir) == "array":
-            raise Exception(f"Given database directory '{config.tdb_dir}' does not exist")
+    def __init__(self, config: StorageConfig, ctx: tiledb.Ctx = None):
+        if not tiledb.object_type(config.tdb_dir) == 'array':
+            raise Exception(
+                f"Given database directory '{config.tdb_dir}' does not exist"
+            )
 
         self.config = config
 
@@ -30,9 +32,8 @@ class Storage:
     def __exit__(self, exc_type, exc_value, exc_tb):
         return
 
-
     @staticmethod
-    def create( config:StorageConfig, ctx:tiledb.Ctx=None):
+    def create(config: StorageConfig, ctx: tiledb.Ctx = None):
         """
         Creates TileDB storage.
 
@@ -62,23 +63,35 @@ class Storage:
         # adjust cell bounds if necessary
         config.root.adjust_alignment(config.resolution, config.alignment)
 
-        # dims = { d['name']: d['dtype'] for d in pdal.dimensions if d['name'] in config.attrs }
-        xi = floor((config.root.maxx - config.root.minx) / float(config.resolution))
-        yi = floor((config.root.maxy - config.root.miny) / float(config.resolution))
+        xi = floor(
+            (config.root.maxx - config.root.minx) / float(config.resolution)
+        )
+        yi = floor(
+            (config.root.maxy - config.root.miny) / float(config.resolution)
+        )
 
-        dim_row = tiledb.Dim(name="X", domain=(0,xi), dtype=np.int32)
-        dim_col = tiledb.Dim(name="Y", domain=(0,yi), dtype=np.int32)
+        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.int32)
+        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.int32)
         domain = tiledb.Domain(dim_row, dim_col)
 
-        count_att = tiledb.Attr(name="count", dtype=np.int32)
+        count_att = tiledb.Attr(name='count', dtype=np.int32)
         dim_atts = [attr.schema() for attr in config.attrs]
 
-        metric_atts = [m.schema(a) for m in config.metrics for a in config.attrs if a in m.attributes or not m.attributes]
+        metric_atts = [
+            m.schema(a)
+            for m in config.metrics
+            for a in config.attrs
+            if a in m.attributes or not m.attributes
+        ]
 
         # Check that all attributes required for metric usage are available
         att_list = [a.name for a in config.attrs]
-        required_atts = [d.name for m in config.metrics for d in m.dependencies
-                if isinstance(d, Attribute)]
+        required_atts = [
+            d.name
+            for m in config.metrics
+            for d in m.dependencies
+            if isinstance(d, Attribute)
+        ]
         for ra in required_atts:
             if ra not in att_list:
                 raise ValueError(f'Missing required dependency, {ra}.')
@@ -86,13 +99,17 @@ class Storage:
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
-        schema = tiledb.ArraySchema(domain=domain, sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts], allows_duplicates=True,
-            capacity=1000)
+        schema = tiledb.ArraySchema(
+            domain=domain,
+            sparse=True,
+            attrs=[count_att, *dim_atts, *metric_atts],
+            allows_duplicates=True,
+            capacity=1000,
+        )
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
-        with tiledb.SparseArray(config.tdb_dir, "w") as a:
+        with tiledb.SparseArray(config.tdb_dir, 'w') as a:
             meta = str(config)
             a.meta['config'] = meta
 
@@ -148,7 +165,6 @@ class Storage:
 
         return val
 
-
     def saveMetadata(self, key: str, data: str, timestamp: int) -> None:
         """
         Save metadata to storage.
@@ -178,19 +194,24 @@ class Storage:
 
     def getDerivedNames(self) -> list[str]:
         # if no attributes are set in the metric, use all
-        return [m.entry_name(a.name) for m in self.config.metrics
-                for a in self.config.attrs if not m.attributes
-                or a.name in [ma.name for ma in m.attributes]]
+        return [
+            m.entry_name(a.name)
+            for m in self.config.metrics
+            for a in self.config.attrs
+            if not m.attributes or a.name in [ma.name for ma in m.attributes]
+        ]
 
     @contextlib.contextmanager
-    def open(self, mode:str='r', timestamp=None) -> Generator[tiledb.SparseArray, None, None]:
+    def open(
+        self, mode: str = 'r', timestamp=None
+    ) -> Generator[tiledb.SparseArray, None, None]:
         """
         Open stream for TileDB database in given mode and at given timestamp.
 
         :param mode: Mode to open TileDB stream in. Valid options are
             'w', 'r', 'm', 'd'., defaults to 'r'.
         :param timestamp: Timestamp to open database at., defaults to None.
-        :raises Exception: Incorrect Mode was given, only valid modes are 'w' and 'r'.
+        :raises Exception: Incorrect Mode, only valid modes are 'w' and 'r'.
         :raises Exception: Path exists and is not a TileDB array.
         :raises Exception: Path does not exist.
         :yield: TileDB array context manager.
@@ -199,16 +220,20 @@ class Storage:
         # tiledb and dask have bad interaction with opening an array if
         # other threads present
 
-        if tiledb.object_type(self.config.tdb_dir) == "array":
+        if tiledb.object_type(self.config.tdb_dir) == 'array':
             if mode in ['w', 'r', 'd', 'm']:
-                tdb = tiledb.open(self.config.tdb_dir, mode, timestamp=timestamp)
+                tdb = tiledb.open(
+                    self.config.tdb_dir, mode, timestamp=timestamp
+                )
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
         elif pathlib.Path(self.config.tdb_dir).exists():
-            raise Exception(f"Path {self.config.tdb_dir} already exists and is not" +
-                    " initialized for TileDB access.")
+            raise Exception(
+                f'Path {self.config.tdb_dir} already exists and is not'
+                ' initialized for TileDB access.'
+            )
         else:
-            raise Exception(f"Path {self.config.tdb_dir} does not exist")
+            raise Exception(f'Path {self.config.tdb_dir} does not exist')
 
         try:
             yield tdb
@@ -236,8 +261,14 @@ class Storage:
 
         return time
 
-    def get_history(self, start_time: datetime, end_time: datetime,
-                    bounds: Bounds, name:str=None, concise:bool=False):
+    def get_history(
+        self,
+        start_time: datetime,
+        end_time: datetime,
+        bounds: Bounds,
+        name: Optional[str] = None,
+        concise: bool = False,
+    ):
         """
         Retrieve history of the database at current point in time.
 
@@ -253,10 +284,9 @@ class Storage:
         # In future may want to collect all configs regardless, since they're
         # still being stored there.
         af = tiledb.array_fragments(self.config.tdb_dir, True)
-        m = [ ]
+        m = []
         for idx in range(len(af)):
-
-            time_range =  af[idx].timestamp_range
+            time_range = af[idx].timestamp_range
             # all shatter processes should be input as a point in time, eg (1,1)
             if isinstance(time_range, tuple):
                 time_range = time_range[0]
@@ -294,17 +324,19 @@ class Storage:
 
     def mbrs(self, proc_num: int):
         """
-        Get minimum bounding rectangle of a given shatter process. If this process
-        has been finished and consolidated the mbr will be much less granulated
-        than if the fragments are still intact. Mbrs are represented as tuples
-        in the form of ((minx, maxx), (miny, maxy))
+        Get minimum bounding rectangle of a given shatter process. If this
+        process has been finished and consolidated the mbr will be much less
+        granulated than if the fragments are still intact. Mbrs are represented
+        as tuples in the form of ((minx, maxx), (miny, maxy))
 
         :param proc_num: Process number or time slot of the shatter process.
         :return: Returns mbrs that match the given process number.
         """
         af_all = self.get_fragments_by_time(proc_num)
         mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
-        mbrs = tuple(tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list)
+        mbrs = tuple(
+            tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list
+        )
         return mbrs
 
     def get_fragments_by_time(self, proc_num: int) -> list[tiledb.FragmentInfo]:
@@ -332,8 +364,11 @@ class Storage:
             sh_cfg.finished = False
 
         self.config.log.debug('Deleting fragments...')
-        tiledb.Array.delete_fragments(self.config.tdb_dir,
-            timestamp_start=proc_num, timestamp_end=proc_num)
+        tiledb.Array.delete_fragments(
+            self.config.tdb_dir,
+            timestamp_start=proc_num,
+            timestamp_end=proc_num,
+        )
         self.config.log.debug('Rewriting config.')
         with self.open('w', (proc_num, proc_num)) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
@@ -349,17 +384,23 @@ class Storage:
         """
         try:
             afs = self.get_fragments_by_time(proc_num)
-            uris = [ os.path.split(urllib.parse.urlparse(f.uri).path)[-1] for f in afs ]
+            uris = [
+                os.path.split(urllib.parse.urlparse(f.uri).path)[-1]
+                for f in afs
+            ]
             tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
-            c = tiledb.Config({"sm.vacuum.mode": "fragments"})
+            c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
             tiledb.vacuum(self.config.tdb_dir, c)
-            self.config.log.info(f"Consolidated time slot {proc_num}.")
+            self.config.log.info(f'Consolidated time slot {proc_num}.')
         except Exception as e:
             if retries >= 3:
-                self.config.log.warning("Failed to consolidate time slot "
-                        f"{proc_num} {retries} time(s). Stopping.")
+                self.config.log.warning(
+                    'Failed to consolidate time slot '
+                    f'{proc_num} {retries} time(s). Stopping.'
+                )
                 raise e
-            self.config.log.warning("Failed to consolidate time slot "
-                    f"{proc_num} {retries+1} time. Retrying...")
-            self.consolidate_shatter(proc_num, retries+1)
-
+            self.config.log.warning(
+                'Failed to consolidate time slot '
+                f'{proc_num} {retries + 1} time. Retrying...'
+            )
+            self.consolidate_shatter(proc_num, retries + 1)

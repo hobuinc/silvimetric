@@ -1,16 +1,21 @@
 from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 
-class Test_Configuration(object):
 
-    def test_serialization(self, storage_config, shatter_config, extract_config):
+class Test_Configuration(object):
+    def test_serialization(
+        self,
+        storage_config: StorageConfig,
+        shatter_config: ShatterConfig,
+        extract_config: ExtractConfig,
+    ):
         # storage
         j = str(storage_config)
         c = StorageConfig.from_string(j)
 
-        mean = [ m for m in c.metrics if m.name == 'mean']
+        mean = [m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1
 
-        assert int(mean[0]._method([2,2,2,2])) == 2
+        assert int(mean[0]._method([2, 2, 2, 2])) == 2
         cd = c.to_json()
         scd = storage_config.to_json()
         cd.pop('log')

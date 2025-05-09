@@ -31,23 +31,31 @@ x_pos = np.arange(minx, maxx, interval, dtype=np.float32)
 y_pos = np.arange(miny, maxy, interval, dtype=np.float32)
 # positions = pos[np.where(pos % cell_size != 0)]
 
-alg = lambda y: floor(y/cell_size) + diff_maker
+def alg(y):
+    return floor(y / cell_size) + diff_maker
 
-data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
-                  for x in x_pos for y in y_pos],
+data = np.array(
+    [(x, y, alg(y), alg(y), alg(y), alg(y)) for x in x_pos for y in y_pos],
     dtype=[
         ('X', np.float32),
         ('Y', np.float32),
         ('Z', np.float32),
         ('Intensity', np.uint16),
         ('NumberOfReturns', np.uint8),
-        ('ReturnNumber', np.uint8)
-    ]
+        ('ReturnNumber', np.uint8),
+    ],
 )
 
 print(f'writing out to {filename}')
 
-p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(filename, a_srs='EPSG:5070', scale_x=0.01, scale_y=0.01, scale_z=0.01, forward='all')
+p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(
+    filename,
+    a_srs='EPSG:5070',
+    scale_x=0.01,
+    scale_y=0.01,
+    scale_z=0.01,
+    forward='all',
+)
 p.execute()
 
 # perform the same function, but adjust to a buffered size of +0.5*resolution
@@ -63,7 +71,7 @@ miny -= cell_size / 2
 maxy += cell_size / 2
 
 # has a nice square root of 300
-num_points = (maxx - minx) ** 2 # 108900.0
+num_points = (maxx - minx) ** 2  # 108900.0
 split = maxx - minx
 
 interval = (maxx - minx) / split
@@ -75,21 +83,29 @@ x_pos = np.arange(minx, maxx, interval, dtype=np.float32)
 y_pos = np.arange(miny, maxy, interval, dtype=np.float32)
 # positions = pos[np.where(pos % cell_size != 0)]
 
-alg = lambda y: floor((y+15)/cell_size) + diff_maker
+def alg2(y):
+    return floor((y + 15) / cell_size) + diff_maker
 
-data = np.array([(x, y, alg(y), alg(y), alg(y), alg(y))
-                  for x in x_pos for y in y_pos],
+data = np.array(
+    [(x, y, alg2(y), alg2(y), alg2(y), alg2(y)) for x in x_pos for y in y_pos],
     dtype=[
         ('X', np.float32),
         ('Y', np.float32),
         ('Z', np.float32),
         ('Intensity', np.uint16),
         ('NumberOfReturns', np.uint8),
-        ('ReturnNumber', np.uint8)
-    ]
+        ('ReturnNumber', np.uint8),
+    ],
 )
 
 print(f'writing out to {filename}')
 
-p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(filename, a_srs='EPSG:5070', scale_x=0.01, scale_y=0.01, scale_z=0.01, forward='all')
+p: pdal.Pipeline = pdal.Pipeline(arrays=[data]) | pdal.Writer(
+    filename,
+    a_srs='EPSG:5070',
+    scale_x=0.01,
+    scale_y=0.01,
+    scale_z=0.01,
+    forward='all',
+)
 p.execute()
