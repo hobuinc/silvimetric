@@ -80,7 +80,9 @@ class StorageConfig(Config):
     that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
     Intensity"""
     metrics: list[Metric] = field(
-        default_factory=lambda: [grid_metrics[m] for m in grid_metrics.keys()]
+        default_factory=lambda: [
+            grid_metrics.default[m] for m in grid_metrics.default.keys()
+        ]
     )
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
     that represent derived data, defaults to values in grid_metrics object"""
@@ -152,17 +154,19 @@ class StorageConfig(Config):
         else:
             crs = None
 
-        n = cls(tdb_dir = x['tdb_dir'],
-                root = root,
-                log = Log(**x['log']),
-                resolution = x['resolution'],
-                alignment = x['alignment'],
-                attrs = attrs,
-                crs = crs,
-                metrics = ms,
-                capacity = x['capacity'],
-                version = x['version'],
-                next_time_slot=x['next_time_slot'])
+        n = cls(
+            tdb_dir=x['tdb_dir'],
+            root=root,
+            log=Log(**x['log']),
+            resolution=x['resolution'],
+            alignment=x['alignment'],
+            attrs=attrs,
+            crs=crs,
+            metrics=ms,
+            capacity=x['capacity'],
+            version=x['version'],
+            next_time_slot=x['next_time_slot'],
+        )
 
         return n
 
@@ -316,19 +320,21 @@ class ShatterConfig(Config):
         # TODO key error if these aren't there. If we're calling from_string
         # then these keys need to exist.
 
-        n = cls(tdb_dir=x['tdb_dir'],
-                filename=x['filename'],
-                debug=x['debug'],
-                name=uuid.UUID(x['name']),
-                bounds=Bounds(*x['bounds']),
-                tile_size=x['tile_size'],
-                start_time=x['start_time'],
-                end_time=x['end_time'],
-                point_count=x['point_count'],
-                mbr=mbr,
-                date=date,
-                time_slot=x['time_slot'],
-                finished=x['finished'])
+        n = cls(
+            tdb_dir=x['tdb_dir'],
+            filename=x['filename'],
+            debug=x['debug'],
+            name=uuid.UUID(x['name']),
+            bounds=Bounds(*x['bounds']),
+            tile_size=x['tile_size'],
+            start_time=x['start_time'],
+            end_time=x['end_time'],
+            point_count=x['point_count'],
+            mbr=mbr,
+            date=date,
+            time_slot=x['time_slot'],
+            finished=x['finished'],
+        )
 
         return n
 

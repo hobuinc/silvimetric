@@ -32,7 +32,9 @@ class Data:
             self.bounds = Data.get_bounds(self.reader)
 
         # adjust bounds if necessary
-        self.bounds.adjust_alignment(storageconfig.resolution, storageconfig.alignment)
+        self.bounds.adjust_alignment(
+            storageconfig.resolution, storageconfig.alignment
+        )
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
 
         self.storageconfig = storageconfig
@@ -122,8 +124,8 @@ class Data:
             if stage_type == 'readers':
                 if stage_kind not in allowed_readers:
                     raise Exception(
-                        'Readers for SilviMetric must be of type \'copc\' or'
-                            f'\'ept\', not \'{stage_kind}\''
+                        "Readers for SilviMetric must be of type 'copc' or"
+                        f"'ept', not '{stage_kind}'"
                     )
                 readers.append(stage)
 
@@ -160,7 +162,7 @@ class Data:
         )
         assign_y = pdal.Filter.assign(
             value=f'yi = (({self.storageconfig.root.maxy} - Y) / '
-                f'{resolution}) - 1'
+            f'{resolution}) - 1'
         )
         # hag = pdal.Filter.hag_nn()
 

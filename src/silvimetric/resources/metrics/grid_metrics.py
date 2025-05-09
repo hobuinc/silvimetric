@@ -9,27 +9,33 @@ from .stats import statistics
 from .p_moments import product_moments
 from .aad import aad
 
-def make_elev_filter(val,elev_key) :
+
+def make_elev_filter(val, elev_key):
     def f_z_gt_val(data):
         return data[data[elev_key] > val]
+
     return f_z_gt_val
+
 
 # TODO example for cover using all returns and a height threshold
 # the threshold must be a parameter and not hardcoded
 def all_cover(data, *args):
     count = args[0]
     return data.count() / count * 100
+
+
 deps = []
-count_metric = Metric('count', np.float32, lambda x: x.count(), attributes=[A['ReturnNumber']])
-allcover_metric =  Metric('all_cover', np.float32, all_cover,
-    dependencies=[count_metric], attributes=[A['ReturnNumber']])
+count_metric = Metric(
+    'count', np.float32, lambda x: x.count(), attributes=[A['ReturnNumber']]
+)
+allcover_metric = Metric(
+    'all_cover',
+    np.float32,
+    all_cover,
+    dependencies=[count_metric],
+    attributes=[A['ReturnNumber']],
+)
 
-
-gr_perc = copy.deepcopy(percentiles)
-gr_l_moments = copy.deepcopy(l_moments)
-gr_stats = copy.deepcopy(statistics)
-gr_p_moments = copy.deepcopy(product_moments)
-gr_aad = copy.deepcopy(aad)
 
 def _get_grid_metrics(elev_key='Z'):
     """
@@ -38,10 +44,16 @@ def _get_grid_metrics(elev_key='Z'):
     For PDAL in SilviMetric, elevation will be Z or HeightAboveGround.
     https://pdal.io/en/latest/dimensions.html#dimensions
     """
+    gr_perc = copy.deepcopy(percentiles)
+    gr_l_moments = copy.deepcopy(l_moments)
+    gr_stats = copy.deepcopy(statistics)
+    gr_p_moments = copy.deepcopy(product_moments)
+    gr_aad = copy.deepcopy(aad)
+
     assert elev_key in ['Z', 'HeightAboveGround']
     for p in gr_perc.values():
         p.attributes = [A[elev_key], A['Intensity']]
-    for l in gr_l_moments.values():
+    for l in gr_l_moments.values():  # noqa: E741
         l.attributes = [A[elev_key], A['Intensity']]
 
     gr_stats['cumean'].attributes = [A[elev_key]]
@@ -63,9 +75,16 @@ def _get_grid_metrics(elev_key='Z'):
     gr_aad['mad_median'].attributes = [A[elev_key]]
     gr_aad['mad_mode'].attributes = [A[elev_key]]
 
-    grid_metrics: dict[str, Metric] = dict(gr_perc | gr_l_moments | gr_stats |
-            gr_p_moments | gr_aad | { allcover_metric.name: allcover_metric})
+    grid_metrics: dict[str, Metric] = dict(
+        gr_perc
+        | gr_l_moments
+        | gr_stats
+        | gr_p_moments
+        | gr_aad
+        | {allcover_metric.name: allcover_metric}
+    )
     return grid_metrics
+
 
 def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
     """
@@ -83,3 +102,6 @@ def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
         gm.add_filter(method)
 
     return grid_metrics
+
+
+default = get_grid_metrics()

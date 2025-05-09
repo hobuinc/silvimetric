@@ -68,7 +68,7 @@ class Test_Autzen(object):
     ):
         """Check open Autzen"""
         data = Data(autzen_filepath, storage_config)
-        assert data.is_pipeline()
+        assert not data.is_pipeline()
         data.execute()
         assert len(data.array) == 577637
         assert data.estimate_count(data.bounds) == 577637

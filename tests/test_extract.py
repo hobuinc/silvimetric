@@ -4,7 +4,7 @@ from pyproj import CRS
 from math import ceil
 
 from silvimetric import (
-    grid_metrics,
+    all_metrics,
     ExtractConfig,
     Extents,
     Log,
@@ -17,7 +17,7 @@ def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
     resolution = extract_config.resolution
     filenames = [
-        grid_metrics[m.name].entry_name(a.name)
+        all_metrics[m.name].entry_name(a.name)
         for m in extract_config.metrics
         for a in extract_config.attrs
     ]

@@ -24,7 +24,6 @@ def config_split(
             ShatterConfig(
                 filename=sc.filename,
                 date=date,
-                attrs=sc.attrs,
                 bounds=b,
                 name=uuid.uuid4(),
                 tile_size=4,
