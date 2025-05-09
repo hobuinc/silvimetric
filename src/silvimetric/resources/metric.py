@@ -2,7 +2,6 @@ import json
 import base64
 
 from typing_extensions import Self, Callable, Optional, Any, Union, List
-from uuid import uuid4
 from functools import reduce
 from threading import Lock
 
@@ -18,30 +17,38 @@ MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 mutex = Lock()
 
-class Metric():
-    """
-    A Metric is a TileDB entry representing derived cell data. There is a base set of
-    metrics available through Silvimetric, or you can create your own. A Metric
-    object has all the information necessary to facilitate the derivation of
-    data as well as its insertion into the database.
-    """
-    def __init__(self, name: str, dtype: np.dtype, method: MetricFn,
-            dependencies: list[Self]=[], filters: List[FilterFn]=[],
-            attributes: List[Attribute]=[]) -> None:
 
-        #TODO make deps, filters, attrs into tuples or sets, not lists so they're hashable
+class Metric:
+    """
+    A Metric is a TileDB entry representing derived cell data. There is a base
+    set of metrics available through Silvimetric, or you can create your own. A
+    Metric object has all the information necessary to facilitate the derivation
+    of data as well as its insertion into the database.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        dtype: np.dtype,
+        method: MetricFn,
+        dependencies: Optional[List[Self]] = None,
+        filters: Optional[List[FilterFn]] = None,
+        attributes: Optional[List[Attribute]] = None,
+    ) -> None:
+        # TODO make deps, filters, attrs into tuples or sets, not lists so
+        # they're hashable
 
         self.name = name
         """Metric name. eg. mean"""
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
-        self.dependencies = dependencies
+        self.dependencies = dependencies if dependencies is not None else []
         """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
-        self.filters = filters
+        self.filters = filters if filters is not None else []
         """List of user-defined filters to perform before performing method."""
-        self.attributes = attributes
+        self.attributes = attributes if attributes is not None else []
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
 
@@ -62,13 +69,25 @@ class Metric():
             return True
 
     def __hash__(self):
-        return hash((
-            'name', self.name,
-            'dtype', self.dtype,
-            'dependencies', frozenset(self.dependencies),
-            'method', base64.b64encode(dill.dumps(self._method)).decode(),
-            'filters', frozenset(base64.b64encode(dill.dumps(f)).decode() for f in self.filters),
-            'attrs', frozenset(self.attributes)))
+        return hash(
+            (
+                'name',
+                self.name,
+                'dtype',
+                self.dtype,
+                'dependencies',
+                frozenset(self.dependencies),
+                'method',
+                base64.b64encode(dill.dumps(self._method)).decode(),
+                'filters',
+                frozenset(
+                    base64.b64encode(dill.dumps(f)).decode()
+                    for f in self.filters
+                ),
+                'attrs',
+                frozenset(self.attributes),
+            )
+        )
 
     def schema(self, attr: Attribute) -> Any:
         """
@@ -85,7 +104,7 @@ class Metric():
         return f'm_{attr}_{self.name}'
 
     def sanitize_and_run(self, d, locs, args):
-        """Sanitize arguments, find the indices """
+        """Sanitize arguments, find the indices"""
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
         # indices to their locations and then grab the correct index from args
@@ -98,7 +117,7 @@ class Metric():
                 idx = locs.loc[d.index[0]]
                 xi = idx.xi
                 yi = idx.yi
-                pass_args = [args.at[(xi,yi), a] for a in attrs]
+                pass_args = [args.at[(xi, yi), a] for a in attrs]
         else:
             pass_args = args
 
@@ -114,12 +133,12 @@ class Metric():
         if isinstance(data, Future):
             data = data.result()
 
-        idx = ['xi','yi']
+        idx = ['xi', 'yi']
         if any([i not in data.columns for i in idx]):
-            idx = ['X','Y']
+            idx = ['X', 'Y']
 
         if self.attributes:
-            attrs = [*[a.name for a in self.attributes],*idx]
+            attrs = [*[a.name for a in self.attributes], *idx]
             data = data[attrs]
 
         # run metric filters over the data first
@@ -128,10 +147,12 @@ class Metric():
         gb = data.groupby(idx)
 
         # Arguments come in as separate dataframes returned from previous
-        # metrics deemed dependencies. If there are dependencies for this metric,
-        # we'll merge the outputs from those here so they're easier to work with.
+        # metrics deemed dependencies. If there are dependencies for this
+        # metric, we'll merge the outputs from those here so they're easier
+        # to work with.
         def merge(left, right):
             return left.merge(right, on=idx)
+
         if len(args) > 1:
             merged_args = reduce(merge, args)
         elif len(args) == 1:
@@ -140,15 +161,14 @@ class Metric():
             merged_args = args
 
         # lambda method for use in dataframe aggregator
-        runner = lambda d: self.sanitize_and_run(d, idxer, merged_args)
+        def runner(d):
+            return self.sanitize_and_run(d, idxer, merged_args)
 
-        # create map of current column name to tuple of new column name and metric method
+        # create map of current column name to tuple of new column name and
+        # metric method
         cols = data.columns
         prev_cols = [col for col in cols if col not in idx]
-        new_cols = {
-            c: [( self.entry_name(c), runner )]
-            for c in prev_cols
-        }
+        new_cols = {c: [(self.entry_name(c), runner)] for c in prev_cols}
 
         val = gb.aggregate(new_cols)
 
@@ -156,7 +176,7 @@ class Metric():
         val.columns = val.columns.droplevel(0)
         return val
 
-    #TODO make dict with key for each Attribute effected? {att: [fn]}
+    # TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
     def add_filter(self, fn: FilterFn, desc: str):
         """
@@ -167,10 +187,12 @@ class Metric():
     def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
         for f in self.filters:
             ndf = f(data)
-            #TODO should this check be here?
+            # TODO should this check be here?
             if not isinstance(ndf, pd.DataFrame):
-                raise TypeError('Filter outputs must be a DataFrame. '
-                        f'Type detected: {type(ndf)}')
+                raise TypeError(
+                    'Filter outputs must be a DataFrame. '
+                    f'Type detected: {type(ndf)}'
+                )
             data = ndf
         return data
 
@@ -180,36 +202,44 @@ class Metric():
             'dtype': np.dtype(self.dtype).str,
             'dependencies': [d.to_json() for d in self.dependencies],
             'method': base64.b64encode(dill.dumps(self._method)).decode(),
-            'filters': [base64.b64encode(dill.dumps(f)).decode() for f in self.filters],
-            'attributes': [a.to_json() for a in self.attributes]
+            'filters': [
+                base64.b64encode(dill.dumps(f)).decode() for f in self.filters
+            ],
+            'attributes': [a.to_json() for a in self.attributes],
         }
 
     @staticmethod
-    def from_dict(data: dict) -> "Metric":
+    def from_dict(data: dict) -> 'Metric':
         name = data['name']
         dtype = np.dtype(data['dtype'])
         method = dill.loads(base64.b64decode(data['method'].encode()))
 
-        if 'dependencies' in data.keys() and \
-                data['dependencies'] and \
-                data['dependencies'] is not None:
-            dependencies = [ Metric.from_dict(d) for d in data['dependencies'] ]
+        if (
+            'dependencies' in data.keys()
+            and data['dependencies']
+            and data['dependencies'] is not None
+        ):
+            dependencies = [Metric.from_dict(d) for d in data['dependencies']]
         else:
-            dependencies = [ ]
+            dependencies = []
 
-        if 'attributes' in data.keys() and \
-                data['attributes'] and \
-                data['attributes'] is not None:
-            attributes = [ Attribute.from_dict(a) for a in data['attributes']]
+        if (
+            'attributes' in data.keys()
+            and data['attributes']
+            and data['attributes'] is not None
+        ):
+            attributes = [Attribute.from_dict(a) for a in data['attributes']]
         else:
-            attributes = [ ]
+            attributes = []
 
-        if 'filters' in data.keys() and \
-                data['filters'] and \
-                data['filters'] is not None:
-            filters = [ dill.loads(base64.b64decode(f)) for f in data['filters'] ]
+        if (
+            'filters' in data.keys()
+            and data['filters']
+            and data['filters'] is not None
+        ):
+            filters = [dill.loads(base64.b64decode(f)) for f in data['filters']]
         else:
-            filters = [ ]
+            filters = []
 
         return Metric(name, dtype, method, dependencies, filters, attributes)
 
@@ -218,16 +248,8 @@ class Metric():
         j = json.loads(data)
         return Metric.from_dict(j)
 
-    def __eq__(self, other) -> tuple:
-        return (self.name == other.name and
-                self.dtype == other.dtype and
-                self.dependencies == other.dependencies and
-                self._method == other._method,
-                self.attributes == other.attributes,
-                self.filters == other.filters)
-
     def __call__(self, data: pd.DataFrame) -> pd.DataFrame:
         return self.do(data)
 
     def __repr__(self) -> str:
-        return f"Metric_{self.name}"
+        return f'Metric_{self.name}'

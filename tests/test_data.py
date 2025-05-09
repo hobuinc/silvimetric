@@ -1,8 +1,10 @@
 from silvimetric import Data, Storage, Bounds
 
-class Test_Data(object):
 
-    def test_filepath(self, no_cell_line_path, storage_config, no_cell_line_pc, bounds):
+class Test_Data(object):
+    def test_filepath(
+        self, no_cell_line_path, storage_config, no_cell_line_pc, bounds
+    ):
         """Check open a COPC file"""
         data = Data(no_cell_line_path, storage_config)
         assert data.is_pipeline() == False
@@ -10,7 +12,9 @@ class Test_Data(object):
         assert len(data.array) == no_cell_line_pc
         assert data.estimate_count(bounds) == no_cell_line_pc
 
-    def test_pipeline(self, no_cell_line_pipeline, bounds, storage_config, no_cell_line_pc):
+    def test_pipeline(
+        self, no_cell_line_pipeline, bounds, storage_config, no_cell_line_pc
+    ):
         """Check open a pipeline"""
         data = Data(no_cell_line_pipeline, storage_config)
         assert data.is_pipeline() == True
@@ -18,15 +22,17 @@ class Test_Data(object):
         assert len(data.array) == no_cell_line_pc
         assert data.estimate_count(bounds) == no_cell_line_pc
 
-    def test_pipeline_bounds(self, no_cell_line_pipeline, bounds, storage_config, no_cell_line_pc):
+    def test_pipeline_bounds(
+        self, no_cell_line_pipeline, bounds, storage_config, no_cell_line_pc
+    ):
         """Check open a pipeline with our own bounds"""
         ll = list(bounds.bisect())[0]
 
-        #data will be collared upon execution, extra data will be grabbed
+        # data will be collared upon execution, extra data will be grabbed
         minx, miny, maxx, maxy = ll.get()
         collared = Bounds(minx - 30, miny - 30, maxx + 30, maxy + 30)
 
-        data = Data(no_cell_line_pipeline, storage_config, bounds = ll)
+        data = Data(no_cell_line_pipeline, storage_config, bounds=ll)
         assert data.is_pipeline() == True
         data.execute()
 
@@ -36,10 +42,10 @@ class Test_Data(object):
         assert data.estimate_count(ll) == no_cell_line_pc
         assert data.count(ll) == no_cell_line_pc / 4
 
-class Test_Autzen(object):
 
+class Test_Autzen(object):
     def test_filepath(self, autzen_filepath, storage_config):
-        """Check open Autzen """
+        """Check open Autzen"""
         data = Data(autzen_filepath, storage_config)
         assert data.is_pipeline() == False
         data.execute()

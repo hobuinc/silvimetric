@@ -1,5 +1,3 @@
-
-
 # Test against Bob's FUSION data
-class TestFusion():
+class TestFusion:
     pass

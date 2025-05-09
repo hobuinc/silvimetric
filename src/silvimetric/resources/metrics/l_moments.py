@@ -6,6 +6,7 @@ import warnings
 
 # TODO: provide link to documentation on L-Moments
 
+
 def lmom4(data):
     # suppress warnings from dividing by 0, these are handled in the metric creation
     with warnings.catch_warnings():
@@ -18,47 +19,65 @@ def lmom4(data):
             elif n < 2:
                 return [data.mean, np.nan, np.nan, np.nan]
             elif n < 3:
-                return [*distr.gam.lmom(nmom=2, **paras), np.nan, np.nan, np.nan]
+                return [
+                    *distr.gam.lmom(nmom=2, **paras),
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                ]
             elif n < 4:
-                return [*distr.gam.lmom(nmom=3, **paras), np.nan, np.nan, np.nan]
+                return [
+                    *distr.gam.lmom(nmom=3, **paras),
+                    np.nan,
+                    np.nan,
+                    np.nan,
+                ]
             return [*distr.gam.lmom(nmom=4, **paras)]
-        except:
+        except Exception:
             return [data.mean(), np.nan, np.nan, np.nan]
+
 
 # L1 is same as mean...computed using np.mean in L-moment base for speed
 def m_l1(data, *args):
     return args[0][0]
 
+
 def m_l2(data, *args):
     return args[0][1]
+
 
 def m_l3(data, *args):
     return args[0][2]
 
+
 def m_l4(data, *args):
     return args[0][3]
 
+
 def m_lcv(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+    lmom: tuple[float, float, float, float] = args[0]
 
     try:
-        return l[1] / l[0]
-    except ZeroDivisionError as e:
+        return lmom[1] / lmom[0]
+    except ZeroDivisionError:
         return np.nan
+
 
 def m_lskewness(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+    lmom: tuple[float, float, float, float] = args[0]
     try:
-        return l[2] / l[1]
-    except ZeroDivisionError as e:
+        return lmom[2] / lmom[1]
+    except ZeroDivisionError:
         return np.nan
 
+
 def m_lkurtosis(data, *args):
-    l: tuple[float, float, float, float] = args[0]
+    lmom: tuple[float, float, float, float] = args[0]
     try:
-        return l[3] / l[1]
-    except ZeroDivisionError as e:
+        return lmom[3] / lmom[1]
+    except ZeroDivisionError:
         return np.nan
+
 
 # intermediate metric, not intended for insertion into db
 l_mom_base = Metric('lmombase', object, lmom4, [])
@@ -69,10 +88,8 @@ l2 = Metric('l2', np.float32, m_l2, [l_mom_base])
 l3 = Metric('l3', np.float32, m_l3, [l_mom_base])
 l4 = Metric('l4', np.float32, m_l4, [l_mom_base])
 lcv = Metric('lcv', np.float32, m_lcv, [l_mom_base])
-lskewness = Metric('lskewness', np.float32, m_lskewness,
-    [l_mom_base])
-lkurtosis = Metric('lkurtosis', np.float32, m_lkurtosis,
-    [l_mom_base])
+lskewness = Metric('lskewness', np.float32, m_lskewness, [l_mom_base])
+lkurtosis = Metric('lkurtosis', np.float32, m_lkurtosis, [l_mom_base])
 
 l_moments: dict[str, Metric] = {
     'l1': l1,

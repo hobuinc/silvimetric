@@ -4,8 +4,8 @@ import json
 from silvimetric.commands import scan, info, shatter, manage
 from silvimetric import ShatterConfig, Storage
 
-class TestCommands(object):
 
+class TestCommands(object):
     def test_scan(self, shatter_config):
         s = shatter_config
         res = scan.scan(s.tdb_dir, s.filename, s.bounds, 10, 10, 5)
@@ -40,16 +40,16 @@ class TestCommands(object):
     def test_delete(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]
 
-        for i in range(1,len(ids)+1):
+        for i in range(1, len(ids) + 1):
             h = info.info(tdb_dir=tdb_filepath)
 
             assert bool(h['history'])
-            assert len(h['history']) == 5-i
+            assert len(h['history']) == 5 - i
             idx = i - 1
             manage.delete(tdb_filepath, ids[idx])
 
         s = Storage.from_db(tdb_filepath)
-        assert s.config.next_time_slot==5
+        assert s.config.next_time_slot == 5
 
         h = info.info(tdb_dir=tdb_filepath)
         assert len(h['history']) == 0
@@ -70,12 +70,12 @@ class TestCommands(object):
     def test_restart(self, tdb_filepath, config_split):
         ids = [c.name for c in config_split]
 
-        for i in range(1,len(ids)+1):
+        for i in range(1, len(ids) + 1):
             h = info.info(tdb_dir=tdb_filepath)
 
             assert bool(h['history'])
             assert len(h['history']) == len(ids)
-            manage.restart(tdb_filepath, ids[i-1])
+            manage.restart(tdb_filepath, ids[i - 1])
 
         h = info.info(tdb_dir=tdb_filepath)
         assert bool(h['history'])
@@ -86,8 +86,8 @@ class TestCommands(object):
         storage = Storage.from_db(shatter_config.tdb_dir)
 
         # modify shatter config
-        shatter_config.tile_size=1
-        shatter_config.mbr = (((0,4), (0,4)),)
+        shatter_config.tile_size = 1
+        shatter_config.mbr = (((0, 4), (0, 4)),)
         # send to shatter
         pc = shatter.shatter(shatter_config)
         assert pc == test_point_count - (test_point_count / 4)
