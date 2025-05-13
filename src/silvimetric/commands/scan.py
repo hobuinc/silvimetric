@@ -53,7 +53,7 @@ def scan(
             logger.info('Gathering initial chunks...')
             count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
-            if filter:
+            if filter_empty:
                 chunks = extents.chunk(data, resolution, point_count, depth)
                 cell_counts = [ch.cell_count for ch in chunks]
 

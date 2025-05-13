@@ -86,7 +86,6 @@ def western_shatter_config(
         log=log,
         filename=western_pipeline,
         bounds=bounds,
-        debug=True,
         date=date,
     )
     yield s

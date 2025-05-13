@@ -101,7 +101,7 @@ def uneven_shatter_config(
     log = uneven_storage_config.log
 
     s = ShatterConfig(
-        tdb_dir=tdb_dir, log=log, filename=copc_filepath, debug=True, date=date
+        tdb_dir=tdb_dir, log=log, filename=copc_filepath, date=date
     )
     yield s
 

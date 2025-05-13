@@ -154,7 +154,6 @@ class Test_Shatter(object):
                 log=log,
                 filename=s.filename,
                 tile_size=s.tile_size,
-                debug=s.debug,
                 bounds=b.bounds,
                 date=s.date,
                 time_slot=time_slot,
