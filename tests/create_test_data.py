@@ -70,7 +70,7 @@ maxx += cell_size / 2
 miny -= cell_size / 2
 maxy += cell_size / 2
 
-# has a nice square root of 300
+# has a nice square root
 num_points = (maxx - minx) ** 2  # 108900.0
 split = maxx - minx
 

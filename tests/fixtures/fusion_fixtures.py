@@ -37,7 +37,7 @@ def fusion_data(fusion_data_path: str):
 @pytest.fixture(scope='function')
 def plumas_storage_config(tmp_path_factory: pytest.TempPathFactory):
     crs = pyproj.CRS.from_epsg(26910)
-    bounds = sm.Bounds(minx=635547, maxx=635847, miny=4402305, maxy=4402805)
+    bounds = sm.Bounds(minx=635547, maxx=635847, miny=4402347.17, maxy=4402805)
     gms = sm.grid_metrics.get_grid_metrics('Z', 2, 2).values()
     attr_names = ['Z', 'Intensity', 'NumberOfReturns', 'ReturnNumber']
     attrs = [a for k, a in sm.Attributes.items() if k in attr_names]

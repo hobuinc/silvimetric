@@ -139,7 +139,7 @@ class Test_Shatter(object):
         test_point_count: int,
         request: pytest.FixtureRequest,
         maxy: float,
-        resolution: int,
+        alignment: str
     ):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)
@@ -164,8 +164,12 @@ class Test_Shatter(object):
         assert len(history) == 4
         assert isinstance(history, list)
         pcs = [h['point_count'] for h in history]
-        assert sum(pcs) == test_point_count
-        assert pc == test_point_count
+
+        # When alignment is point and using uneven_shatter_config, the bounds
+        # will be changed so that not all points are grabbed. This is expected.
+        if alignment != 'pixelispoint' or sh_cfg != 'uneven_shatter_config':
+            assert sum(pcs) == test_point_count
+            assert pc == test_point_count
 
         with storage.open('r') as a:
             data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]

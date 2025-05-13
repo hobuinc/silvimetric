@@ -102,4 +102,4 @@ class Test_Storage(object):
                 def schema(att, met):
                     return all_metrics[met.name].schema(att)
 
-                assert all([e_name(a) == schema(a, m) for a in a_list])
+                assert all([e_name(a, m) == schema(a, m) for a in a_list])
