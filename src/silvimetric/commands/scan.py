@@ -17,7 +17,7 @@ def scan(
     point_count: int = 600000,
     resolution: float = 100,
     depth: int = 6,
-    filter: bool = False,
+    filter_empty: bool = False,
     log: Log = None,
 ):
     """
@@ -29,7 +29,8 @@ def scan(
     :param point_count: Point count threshold., defaults to 600000
     :param resolution: Resolution threshold., defaults to 100
     :param depth: Tree depth threshold., defaults to 6
-    :param filter: Remove empty Extents. This takes longer, but is more accurage., defaults to False
+    :param filter_empty: Remove empty Extents. This takes longer, but is more
+    accurate., defaults to False
     :return: Returns list of point counts.
     """
 
@@ -127,7 +128,9 @@ def extent_handle(
     miny = bmaxy - (extent.y2 * extent.resolution)
     maxy = bmaxy - (extent.y1 * extent.resolution)
 
-    chunk = Extents(Bounds(minx, miny, maxx, maxy), extent.resolution, extent.alignment, r)
+    chunk = Extents(
+        Bounds(minx, miny, maxx, maxy), extent.resolution, extent.alignment, r
+    )
 
     if extent.bounds == extent.root:
         extent.root = chunk.bounds

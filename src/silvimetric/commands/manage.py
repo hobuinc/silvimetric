@@ -28,15 +28,15 @@ def delete(tdb_dir: str, name: str, log: Log = None) -> ShatterConfig:
 
     try:
         config = ShatterConfig.from_dict(res['history'][0])
-    except LookupError:
-        raise KeyError(f'Shatter process with ID {name} does not exist')
+    except LookupError as e:
+        raise KeyError(f'Shatter process with ID {name} does not exist') from e
 
     try:
         time_slot = config.time_slot
-    except KeyError:
+    except KeyError as e:
         raise ValueError(
             f'Shatter process with ID {name} is missing a time reservation.'
-        )
+        ) from e
 
     storage = Storage.from_db(tdb_dir)
 
