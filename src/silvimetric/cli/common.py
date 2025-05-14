@@ -1,55 +1,65 @@
 import click
 import pyproj
 import webbrowser
-from contextlib import nullcontext
 
 import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
-from distributed.client import _get_global_client as get_client
 
-from ..resources.metrics import l_moments, percentiles, statistics, product_moments
+from ..resources.metrics import (
+    l_moments,
+    percentiles,
+    statistics,
+    product_moments,
+)
 from ..resources.metrics import aad, grid_metrics, all_metrics
 
 from .. import Bounds, Attribute, Metric, Attributes, Log
 
 
 class BoundsParamType(click.ParamType):
-    name = "Bounds"
+    name = 'Bounds'
 
     def convert(self, value, param, ctx):
         try:
             b = Bounds.from_string(value)
             return b
         except ValueError:
-            self.fail(f"{value!r} is not a bounds type", param, ctx)
+            self.fail(f'{value!r} is not a bounds type', param, ctx)
+
 
 class CRSParamType(click.ParamType):
-    name = "CRS"
+    name = 'CRS'
 
     def convert(self, value, param, ctx) -> pyproj.CRS:
         try:
             crs = pyproj.CRS.from_user_input(value)
             return crs
         except Exception as e:
-            self.fail(f"{value!r} is not a CRS type with error {e}", param, ctx)
+            self.fail(f'{value!r} is not a CRS type with error {e}', param, ctx)
+
 
 class AttrParamType(click.ParamType):
-    name="Attrs"
-    #TODO add import similar to metrics
+    name = 'Attrs'
+
+    # TODO add import similar to metrics
     def convert(self, value, param, ctx) -> list[Attribute]:
         if isinstance(value, list):
             try:
                 return [Attributes[a] for a in value]
             except Exception as e:
-                self.fail(f"{value!r} is not available in Attributes, {e}", param, ctx)
+                self.fail(
+                    f'{value!r} is not available in Attributes, {e}', param, ctx
+                )
         elif isinstance(value, str):
             return Attributes[value]
         else:
-            self.fail(f"{value!r} is of an invalid type, {e}", param, ctx)
+            self.fail(f'{value!r} is of an invalid type.', param, ctx)
+
 
 class MetricParamType(click.ParamType):
-    name="metrics"
+    name = 'metrics'
+
     def convert(self, value, param, ctx) -> list[Metric]:
         if value is None or not value:
             return list(all_metrics.values())
@@ -66,20 +76,29 @@ class MetricParamType(click.ParamType):
                     cwd = os.getcwd()
                     p = Path(cwd, val)
                     if not p.exists():
-                        self.fail("Failed to find import file for metrics at"
-                                f" {str(p)}", param, ctx)
+                        self.fail(
+                            'Failed to find import file for metrics at'
+                            f' {p}',
+                            param,
+                            ctx,
+                        )
 
-                    spec = importlib.util.spec_from_file_location('user_metrics', str(p))
+                    spec = importlib.util.spec_from_file_location(
+                        'user_metrics', str(p)
+                    )
                     user_metrics = importlib.util.module_from_spec(spec)
                     spec.loader.exec_module(user_metrics)
                     ms = user_metrics.metrics()
                 except Exception as e:
-                    self.fail(f"Failed to import metrics from {str(p)} with error {e}",
-                            param, ctx)
+                    self.fail(
+                        f'Failed to import metrics from {p} with error {e}',
+                        param,
+                        ctx,
+                    )
 
                 for m in ms:
                     if not isinstance(m, Metric):
-                        self.fail(f"Invalid Metric supplied: {m}")
+                        self.fail(f'Invalid Metric supplied: {m}')
 
                 metrics.update(list(user_metrics.metrics()))
             else:
@@ -105,13 +124,22 @@ class MetricParamType(click.ParamType):
                             metrics.add(m)
                         else:
                             metrics.udpate(list(m))
-                except Exception as e:
-                    self.fail(f"{val!r} is not available in Metrics", param, ctx)
+                except Exception:
+                    self.fail(
+                        f'{val!r} is not available in Metrics', param, ctx
+                    )
         return list(metrics)
 
-def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
-        watch: bool, log: Log) -> None:
-    dask_config = { }
+
+def dask_handle(
+    dasktype: str,
+    scheduler: str,
+    workers: int,
+    threads: int,
+    watch: bool,
+    log: Log,
+) -> None:
+    dask_config = {}
 
     if dasktype == 'threads':
         dask_config['n_workers'] = threads
@@ -136,9 +164,13 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
 
         dask_config['scheduler'] = scheduler
         if dasktype == 'processes':
-            cluster = LocalCluster(processes=True, n_workers=workers, threads_per_worker=threads)
+            cluster = LocalCluster(
+                processes=True, n_workers=workers, threads_per_worker=threads
+            )
         elif dasktype == 'threads':
-            cluster = LocalCluster(processes=False, n_workers=workers, threads_per_worker=threads)
+            cluster = LocalCluster(
+                processes=False, n_workers=workers, threads_per_worker=threads
+            )
         else:
             raise ValueError(f"Invalid value for 'dasktype', {dasktype}")
 
@@ -152,6 +184,7 @@ def dask_handle(dasktype: str, scheduler: str, workers: int, threads: int,
         dask_config['scheduler'] = scheduler
 
     dask.config.set(dask_config)
+
 
 def close_dask() -> None:
     client = dask.config.get('distributed.client')

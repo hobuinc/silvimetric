@@ -1,5 +1,6 @@
 from .. import Storage, StorageConfig
 
+
 def initialize(storage: StorageConfig):
     """
     Initialize a Silvimetric TileDB instance for a given StorageConfig instance.

@@ -4,14 +4,20 @@ import pytest
 import os
 import copy
 
-from silvimetric import Storage, all_metrics, Attribute, Attributes, StorageConfig, Log
+from silvimetric import (
+    Storage,
+    all_metrics,
+    Attribute,
+    Attributes,
+    StorageConfig,
+)
 from silvimetric import __version__ as svversion
 
-class Test_Storage(object):
 
+class Test_Storage(object):
     def test_schema(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
-            s:tiledb.ArraySchema = st.schema
+            s: tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
             assert s.attr('count').dtype == np.int32
 
@@ -45,16 +51,31 @@ class Test_Storage(object):
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
 
-    def test_metric_dependencies(self, tmp_path_factory, metrics, crs, resolution, alignment, attrs, bounds):
+    def test_metric_dependencies(
+        self,
+        tmp_path_factory,
+        metrics,
+        crs,
+        resolution,
+        alignment,
+        attrs,
+        bounds,
+    ):
         ms = copy.deepcopy(metrics)
 
-        path = tmp_path_factory.mktemp("test_tdb")
+        path = tmp_path_factory.mktemp('test_tdb')
         p = os.path.abspath(path)
-        log = Log('DEBUG')
 
         ms[0].dependencies = [Attributes['HeightAboveGround']]
-        sc = StorageConfig(tdb_dir=p, crs=crs, resolution=resolution,
-                alignment = alignment, attrs=attrs, metrics=ms, root=bounds)
+        sc = StorageConfig(
+            tdb_dir=p,
+            crs=crs,
+            resolution=resolution,
+            alignment=alignment,
+            attrs=attrs,
+            metrics=ms,
+            root=bounds,
+        )
 
         with pytest.raises(ValueError) as e:
             Storage.create(sc)
@@ -74,8 +95,11 @@ class Test_Storage(object):
             s: tiledb.ArraySchema = st.schema
             for m in m_list:
                 assert m.name in all_metrics.keys()
-                def e_name(att):
-                    return s.attr(m.entry_name(att.name))
-                def schema(att):
-                    return all_metrics[m.name].schema(att)
-                assert all([e_name(a) == schema(a) for a in a_list])
+
+                def e_name(att, met):
+                    return s.attr(met.entry_name(att.name))
+
+                def schema(att, met):
+                    return all_metrics[met.name].schema(att)
+
+                assert all([e_name(a, m) == schema(a, m) for a in a_list])

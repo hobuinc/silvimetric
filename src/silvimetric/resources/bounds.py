@@ -1,10 +1,12 @@
 import json
 import ast
 
-#TODO should these bounds have a buffer?
-class Bounds(dict): #for JSON serializing
+
+# TODO should these bounds have a buffer?
+class Bounds(dict):  # for JSON serializing
     """Simple class to represent a 2 or 3-dimensional bounding box that can be
     generated from both JSON or PDAL bounds form."""
+
     def __init__(self, minx: float, miny: float, maxx: float, maxy: float):
         self.minx = float(minx)
         """minimum X Plane"""
@@ -16,10 +18,13 @@ class Bounds(dict): #for JSON serializing
         """maximum Y plane"""
 
     def __eq__(self, other):
-        return  other.minx == self.minx and \
-                other.miny == self.miny and \
-                other.maxx == self.maxx and \
-                other.maxy == self.maxy
+        return (
+            other.minx == self.minx
+            and other.miny == self.miny
+            and other.maxx == self.maxx
+            and other.maxy == self.maxy
+        )
+
     def __ne__(self, other):
         return not other.__eq__(self)
 
@@ -51,14 +56,15 @@ class Bounds(dict): #for JSON serializing
             # ([1,101],[2,102],[3,103])
             bbox_str = bbox_str.strip()
             if bbox_str[0] != '(':
-                raise Exception(f"Unable to load Bounds via json or PDAL bounds type {e}")
+                raise Exception(
+                    f'Unable to load Bounds via json or PDAL bounds type {e}'
+                ) from e
             t = ast.literal_eval(bbox_str)
             minx = t[0][0]
             maxx = t[0][1]
             miny = t[1][0]
             maxy = t[1][1]
             return Bounds(minx, miny, maxx, maxy)
-
 
         # parse explicit style
         if 'minx' in bbox:
@@ -70,14 +76,15 @@ class Bounds(dict): #for JSON serializing
 
         # parse GeoJSON array style
         if len(bbox) == 4:
-            return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[2]),
-                            float(bbox[3]))
+            return Bounds(
+                float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+            )
         elif len(bbox) == 6:
-            return Bounds(float(bbox[0]), float(bbox[1]), float(bbox[3]),
-                            float(bbox[4]))
+            return Bounds(
+                float(bbox[0]), float(bbox[1]), float(bbox[3]), float(bbox[4])
+            )
         else:
-            raise Exception("Bounding boxes must have either 4 or 6 elements")
-
+            raise Exception('Bounding boxes must have either 4 or 6 elements')
 
     def get(self) -> list[float]:
         """Return Bounds as a list of floats
@@ -85,7 +92,6 @@ class Bounds(dict): #for JSON serializing
         :return: list of floats in form [minx, miny, maxx, maxy]
         """
         return [self.minx, self.miny, self.maxx, self.maxy]
-
 
     def to_string(self) -> str:
         """Return string representation of Bounds
@@ -101,26 +107,25 @@ class Bounds(dict): #for JSON serializing
         """
         return self.get()
 
-
     def bisect(self):
         """Bisects the current Bounds
 
         :yield: 4 child bounds
         """
-        centerx = self.minx + ((self.maxx - self.minx)/ 2)
-        centery = self.miny + ((self.maxy - self.miny)/ 2)
+        centerx = self.minx + ((self.maxx - self.minx) / 2)
+        centery = self.miny + ((self.maxy - self.miny) / 2)
         yield from [
-            Bounds(self.minx, self.miny, centerx, centery), # lower left
-            Bounds(centerx, self.miny, self.maxx, centery), # lower right
-            Bounds(self.minx, centery, centerx, self.maxy), # top left
-            Bounds(centerx, centery, self.maxx, self.maxy), # top right
+            Bounds(self.minx, self.miny, centerx, centery),  # lower left
+            Bounds(centerx, self.miny, self.maxx, centery),  # lower right
+            Bounds(self.minx, centery, centerx, self.maxy),  # top left
+            Bounds(centerx, centery, self.maxx, self.maxy),  # top right
         ]
 
     def disjoint(self, other):
         """Determine if two bounds are disjointed
 
         :param other: Bounds this object is being compared to
-        :return: True if this box shares no point with the other box, otherwise False
+        :return: True if this box shares no point with the other
         """
         if other.minx > self.maxx or other.maxx < self.minx:
             return True
