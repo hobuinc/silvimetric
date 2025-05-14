@@ -10,7 +10,7 @@ def m_moments(data, *args):
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', category=RuntimeWarning)
         m = moment(
-            data, center=mean, order=[2, 3, 4], nan_policy='propagate'
+            data, center=mean, order=[2, 3, 4], nan_policy='omit'
         ).tolist()
     # if any(mean):
     # else:
