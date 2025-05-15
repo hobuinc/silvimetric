@@ -152,7 +152,7 @@ def get_processes(
     """Create dask bags and the order of operations."""
 
     ## Handle dask bag transitions through work states
-    attrs = [a.name for a in config.attrs]
+    attrs = [a.name for a in storage.config.attrs]
     timestamp = (config.time_slot, config.time_slot)
 
     # remove any extents that have already been done, only skip if full overlap

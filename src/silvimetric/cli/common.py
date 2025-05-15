@@ -1,12 +1,10 @@
 import click
 import pyproj
 import webbrowser
-from contextlib import nullcontext
 
 import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
-from distributed.client import _get_global_client as get_client
 
 from ..resources.metrics import (
     l_moments,
@@ -56,7 +54,7 @@ class AttrParamType(click.ParamType):
         elif isinstance(value, str):
             return Attributes[value]
         else:
-            self.fail(f'{value!r} is of an invalid type, {e}', param, ctx)
+            self.fail(f'{value!r} is of an invalid type.', param, ctx)
 
 
 class MetricParamType(click.ParamType):
@@ -80,7 +78,7 @@ class MetricParamType(click.ParamType):
                     if not p.exists():
                         self.fail(
                             'Failed to find import file for metrics at'
-                            f' {str(p)}',
+                            f' {p}',
                             param,
                             ctx,
                         )
@@ -93,7 +91,7 @@ class MetricParamType(click.ParamType):
                     ms = user_metrics.metrics()
                 except Exception as e:
                     self.fail(
-                        f'Failed to import metrics from {str(p)} with error {e}',
+                        f'Failed to import metrics from {p} with error {e}',
                         param,
                         ctx,
                     )
@@ -126,7 +124,7 @@ class MetricParamType(click.ParamType):
                             metrics.add(m)
                         else:
                             metrics.udpate(list(m))
-                except Exception as e:
+                except Exception:
                     self.fail(
                         f'{val!r} is not available in Metrics', param, ctx
                     )

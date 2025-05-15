@@ -1,3 +1,4 @@
+from datetime import datetime
 import tempfile
 from typing_extensions import Generator
 
@@ -6,6 +7,9 @@ from silvimetric import __version__ as svversion
 import os
 import shutil
 import pytest
+
+from silvimetric.resources.attribute import Attribute
+from silvimetric.resources.metric import Metric
 
 
 @pytest.fixture(scope='class')
@@ -22,7 +26,9 @@ def WesternBounds() -> Generator[Bounds, None, None]:
 
 
 @pytest.fixture(scope='function')
-def western_filepath(tmp_path_factory) -> Generator[str, None, None]:
+def western_filepath(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Generator[str, None, None]:
     temp_name = next(tempfile._get_candidate_names())
     path = tmp_path_factory.mktemp(temp_name)
     yield os.path.abspath(path)
@@ -31,7 +37,12 @@ def western_filepath(tmp_path_factory) -> Generator[str, None, None]:
 
 @pytest.fixture(scope='function')
 def western_config(
-    western_filepath, WesternBounds, resolution, WebMercator, attrs, metrics
+    western_filepath: str,
+    WesternBounds: Bounds,
+    resolution: int,
+    WebMercator: str,
+    attrs: list[Attribute],
+    metrics: list[Metric],
 ) -> Generator[StorageConfig, None, None]:
     log = Log(20)
     yield StorageConfig(
@@ -47,7 +58,9 @@ def western_config(
 
 
 @pytest.fixture(scope='function')
-def western_storage(western_config) -> Generator[Storage, None, None]:
+def western_storage(
+    western_config: StorageConfig,
+) -> Generator[Storage, None, None]:
     yield Storage.create(western_config)
 
 
@@ -60,7 +73,10 @@ def western_pipeline() -> Generator[str, None, None]:
 
 @pytest.fixture(scope='function')
 def western_shatter_config(
-    western_pipeline, western_storage, bounds, date
+    western_pipeline: str,
+    western_storage: Storage,
+    bounds: Bounds,
+    date: datetime,
 ) -> Generator[ShatterConfig, None, None]:
     log = Log(20)  # INFO
     st = western_storage.config
@@ -69,10 +85,7 @@ def western_shatter_config(
         tdb_dir=st.tdb_dir,
         log=log,
         filename=western_pipeline,
-        attrs=st.attrs,
-        metrics=st.metrics,
         bounds=bounds,
-        debug=True,
         date=date,
     )
     yield s

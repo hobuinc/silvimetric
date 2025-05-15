@@ -17,40 +17,46 @@ MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
 mutex = Lock()
 
-
-class Metric:
+class Metric():
     """
     A Metric is a TileDB entry representing derived cell data. There is a base
-    set of metrics available through Silvimetric, or you can create your own. A
-    Metric object has all the information necessary to facilitate the derivation
-    of data as well as its insertion into the database.
+    set of metrics available through Silvimetric, or you can create your own.
+    A Metric object has all the information necessary to facilitate the
+    derivation of data as well as its insertion into the database.
     """
-
     def __init__(
         self,
         name: str,
         dtype: np.dtype,
         method: MetricFn,
-        dependencies: Optional[List[Self]] = None,
-        filters: Optional[List[FilterFn]] = None,
-        attributes: Optional[List[Attribute]] = None,
+        dependencies: Optional[list[Self]]=None,
+        filters: Optional[List[FilterFn]]=None,
+        attributes: Optional[List[Attribute]]=None
     ) -> None:
-        # TODO make deps, filters, attrs into tuples or sets, not lists so
-        # they're hashable
 
         self.name = name
         """Metric name. eg. mean"""
         self.dtype = np.dtype(dtype).str
         """Numpy data type."""
-        self.dependencies = dependencies if dependencies is not None else []
+        if dependencies is not None:
+            self.dependencies = dependencies
+        else:
+            self.dependencies = []
         """Metrics this is dependent on."""
         self._method = method
         """The method that processes this data."""
-        self.filters = filters if filters is not None else []
+        if filters is not None:
+            self.filters = filters
+        else:
+            self.filters = []
         """List of user-defined filters to perform before performing method."""
-        self.attributes = attributes if attributes is not None else []
+        if attributes is not None:
+            self.attributes = attributes
+        else:
+            self.attributes = []
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
+
 
     def __eq__(self, other):
         if self.name != other.name:
@@ -117,7 +123,12 @@ class Metric:
                 idx = locs.loc[d.index[0]]
                 xi = idx.xi
                 yi = idx.yi
-                pass_args = [args.at[(xi, yi), a] for a in attrs]
+                pass_args = []
+                for a in attrs:
+                    try:
+                        pass_args.append(args.at[(xi,yi), a])
+                    except Exception:
+                        pass_args.append(args[a])
         else:
             pass_args = args
 
@@ -137,12 +148,13 @@ class Metric:
         if any([i not in data.columns for i in idx]):
             idx = ['X', 'Y']
 
+        # run metric filters over the data first
+        data = self.run_filters(data)
+
         if self.attributes:
             attrs = [*[a.name for a in self.attributes], *idx]
             data = data[attrs]
 
-        # run metric filters over the data first
-        data = self.run_filters(data)
         idxer = data[idx]
         gb = data.groupby(idx)
 
@@ -178,7 +190,7 @@ class Metric:
 
     # TODO make dict with key for each Attribute effected? {att: [fn]}
     # for now these filters apply to all Attributes
-    def add_filter(self, fn: FilterFn, desc: str):
+    def add_filter(self, fn: FilterFn):
         """
         Add filter method to list of filters to run before calling main method.
         """

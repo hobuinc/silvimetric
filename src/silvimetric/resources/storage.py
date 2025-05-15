@@ -61,7 +61,7 @@ class Storage:
             ctx = tiledb.default_ctx()
 
         # adjust cell bounds if necessary
-        config.root.adjust_to_cell_lines(config.resolution)
+        config.root.adjust_alignment(config.resolution, config.alignment)
 
         xi = floor(
             (config.root.maxx - config.root.minx) / float(config.resolution)

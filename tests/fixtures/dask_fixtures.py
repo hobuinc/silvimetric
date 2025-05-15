@@ -25,7 +25,7 @@ def process_dask() -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope='function')
-def dask_proc_client(process_dask) -> Generator[None, None, None]:
+def dask_proc_client(process_dask: None) -> Generator[None, None, None]:
     client = dask.distributed.Client()
     dask.config.set({'distributed.client': client})
 
@@ -35,7 +35,7 @@ def dask_proc_client(process_dask) -> Generator[None, None, None]:
 
 
 @pytest.fixture(scope='function')
-def dask_thread_client(threaded_dask) -> Generator[None, None, None]:
+def dask_thread_client(threaded_dask: None) -> Generator[None, None, None]:
     client = dask.distributed.Client()
     dask.config.set({'distributed.client': client})
 
