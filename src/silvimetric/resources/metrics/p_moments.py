@@ -26,6 +26,7 @@ def m_mean(data, *args):
     return m
 
 
+
 def m_variance(data, *args):
     return args[0][0]
 

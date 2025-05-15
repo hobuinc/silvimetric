@@ -41,6 +41,7 @@ def copc_filepath(alignment: int) -> Generator[str, None, None]:
         yield os.path.abspath(path)
 
 
+
 @pytest.fixture(scope='function')
 def copc_data(
     copc_filepath: str, storage_config: StorageConfig

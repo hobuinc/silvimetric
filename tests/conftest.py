@@ -69,6 +69,7 @@ def storage_config(
     yield sc
 
 
+
 @pytest.fixture(scope='function')
 def storage(storage_config: StorageConfig):
     yield Storage(storage_config)
@@ -168,6 +169,7 @@ def test_point_count(alignment: int) -> Generator[int, None, None]:
         yield 90000
     else:  # pixelispoint
         yield 108900
+
 
 
 @pytest.fixture(scope='session')

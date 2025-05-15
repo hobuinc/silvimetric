@@ -22,6 +22,7 @@ def m_mode(data, *args):
     return mode[0].item()
 
 
+
 def m_median(data, *args):
     return np.median(data)
 

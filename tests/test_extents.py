@@ -8,6 +8,7 @@ from silvimetric.resources.config import ShatterConfig
 from silvimetric.resources.storage import Storage
 
 
+
 def check_for_overlap(leaves: list[Extents], chunk: Extents):
     idx = [i for l in leaves for i in l.get_indices()]  # noqa: E741
     u, c = np.unique(idx, return_counts=True)

@@ -6,6 +6,7 @@ from silvimetric.commands import shatter
 from silvimetric.resources.config import ShatterConfig
 
 
+
 @pytest.fixture(scope='session')
 def runner():
     return CliRunner()
