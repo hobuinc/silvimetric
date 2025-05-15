@@ -118,7 +118,7 @@ def write(data_in, storage, timestamp):
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
     xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
     metr_dict = {
-        f'{m.entry_name(a.name)}': m.dtype
+        f'{m.entry_name(a.name)}': np.dtype(m.dtype)
         for m in storage.config.metrics
         for a in storage.config.attrs
     }

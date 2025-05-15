@@ -161,13 +161,14 @@ def metric_map(plumas_tif_dir: str, fusion_tif_dir: str):
         'int_stddev_2plus_30METERS.tif': 'm_Intensity_stddev.tif',
         'int_variance_2plus_30METERS.tif': 'm_Intensity_variance.tif',
         # TODO: finish incorporating these from FUSION
-        # '1st_cnt_above2_30METERS.tif': 'm_ReturnNumber_1st_count_above_htbreak.tif',  # noqa: E501
-        # '1st_cnt_above_mean_30METERS.tif': 'm_ReturnNumber_1st_count_above_mean.tif', # noqa: E501
-        # '1st_cnt_above_mode_30METERS.tif': 'm_ReturnNumber_1st_count_above_mode.tif', # noqa: E501
-        # '1st_cover_above2_30METERS.tif': 'm_ReturnNumber_cover_above_htbreak.tif', # noqa: E501
-        # '1st_cover_above_mean_30METERS.tif': 'm_ReturnNumber_cover_above_mean.tif', # noqa: E501
-        # '1st_cover_above_mode_30METERS.tif': 'm_ReturnNumber_cover_above_mode.tif', # noqa: E501
-        # 'all_1st_cover_above2_30METERS.tif': '',
+        '1st_cnt_above2_30METERS.tif': 'm_ReturnNumber_1st_count_above_htbreak.tif',  # noqa: E501
+        '1st_cnt_above_mean_30METERS.tif': 'm_Z_1st_count_above_mean.tif', # noqa: E501
+        '1st_cnt_above_mode_30METERS.tif': 'm_Z_1st_count_above_mode.tif', # noqa: E501
+        '1st_cover_above2_30METERS.tif': 'm_ReturnNumber_1st_cover_above_htbreak.tif', # noqa: E501
+        'all_cover_above2_30METERS.tif': 'm_ReturnNumber_all_cover_above_htbreak.tif',
+        '1st_cover_above_mean_30METERS.tif': 'm_Z_1st_cover_above_mean.tif', # noqa: E501
+        '1st_cover_above_mode_30METERS.tif': 'm_Z_1st_cover_above_mode.tif', # noqa: E501
+        'all_1st_cover_above2_30METERS.tif': 'm_Z_all_1st_cover_above_htbreak.tif',
         # 'all_1st_cover_above_mean_30METERS.tif': '',
         # 'all_1st_cover_above_mode_30METERS.tif': '',
         # 'all_cnt_2plus_30METERS.tif': 'm_ReturnNumber_all_count_above_minht.tif', # noqa: E501
@@ -175,7 +176,6 @@ def metric_map(plumas_tif_dir: str, fusion_tif_dir: str):
         # 'all_cnt_above2_30METERS.tif': 'm_ReturnNumber_all_count_above_htbreak.tif', # noqa: E501
         # 'all_cnt_above_mean_30METERS.tif': 'm_ReturnNumber_all_count_above_mean.tif', # noqa: E501
         # 'all_cnt_above_mode_30METERS.tif': 'm_ReturnNumber_all_count_above_mode.tif', # noqa: E501
-        # 'all_cover_above2_30METERS.tif': 'm_ReturnNumber_all_cover.tif',
         # 'all_cover_above_mean_30METERS.tif': 'm_ReturnNumber_all_cover_above_mean.tif', # noqa: E501
         # 'all_cover_above_mode_30METERS.tif': 'm_ReturnNumber_all_cover_above_mode.tif', # noqa: E501
         # 'profile_area_30METERS.tif': 'm_Z_profile_area.tif',

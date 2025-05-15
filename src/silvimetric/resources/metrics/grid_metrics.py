@@ -19,22 +19,30 @@ def make_elev_filter(val, elev_key):
 
 # TODO example for cover using all returns and a height threshold
 # the threshold must be a parameter and not hardcoded
-def all_cover(data, *args):
+def cover_fn(data, *args):
     count = args[0]
     return data.count() / count * 100
 
+def cover_above_val(data, *args):
+    count = args[0]
+    return count / data.count() * 100
 
-deps = []
-count_metric = Metric(
-    'count', np.float32, lambda x: x.count(), attributes=[A['ReturnNumber']]
-)
-allcover_metric = Metric(
-    'all_cover',
-    np.float32,
-    all_cover,
-    dependencies=[count_metric],
-    attributes=[A['ReturnNumber']],
-)
+def count_fn(data, *args):
+    return data.count()
+
+
+def count_above_mean(data, *args):
+    mean = args[0]
+    return data[data > mean].count()
+
+
+def count_above_mode(data, *args):
+    mode = args[0]
+    return data[data > mode].count()
+
+
+def first_returns_filter(data):
+    return data[data.ReturnNumber == 1]
 
 
 def _get_grid_metrics(elev_key='Z'):
@@ -51,10 +59,10 @@ def _get_grid_metrics(elev_key='Z'):
     gr_aad = copy.deepcopy(aad)
 
     assert elev_key in ['Z', 'HeightAboveGround']
-    for p in gr_perc.values():
-        p.attributes = [A[elev_key], A['Intensity']]
-    for l in gr_l_moments.values():  # noqa: E741
-        l.attributes = [A[elev_key], A['Intensity']]
+    for m in (gr_perc | gr_l_moments | gr_p_moments).values():
+        m.attributes = [A[elev_key], A['Intensity']]
+        for d in m.dependencies:
+            d.attributes = [A[elev_key], A['Intensity']]
 
     gr_stats['cumean'].attributes = [A[elev_key]]
     gr_stats['sqmean'].attributes = [A[elev_key]]
@@ -75,13 +83,96 @@ def _get_grid_metrics(elev_key='Z'):
     gr_aad['mad_median'].attributes = [A[elev_key]]
     gr_aad['mad_mode'].attributes = [A[elev_key]]
 
+    count_metric = Metric(
+        'count',
+        np.int32,
+        count_fn,
+        attributes=[A['ReturnNumber']],
+    )
+    first_cnt_above_htbreak = Metric(
+        '1st_count_above_htbreak',
+        np.int32,
+        count_fn,
+        filters=[first_returns_filter],
+        attributes=[A['ReturnNumber']],
+    )
+    first_cnt_above_mean = Metric(
+        '1st_count_above_mean',
+        np.int32,
+        count_above_mean,
+        filters=[first_returns_filter],
+        attributes=[A['Z']],
+        dependencies=[gr_p_moments['mean']],
+    )
+    first_cnt_above_mode = Metric(
+        '1st_count_above_mode',
+        np.int32,
+        count_above_mean,
+        filters=[first_returns_filter],
+        attributes=[A['Z']],
+        dependencies=[gr_stats['mode']],
+    )
+    counts = {
+        '1st_count_above_htbreak': first_cnt_above_htbreak,
+        '1st_count_above_mean': first_cnt_above_mean,
+        '1st_count_above_mode': first_cnt_above_mode,
+    }
+
+
+    first_count_metric = Metric(
+        '1st_count',
+        np.int32,
+        count_fn,
+        filters = [first_returns_filter],
+        attributes=[A['ReturnNumber']],
+    )
+    all_cover_metric = Metric(
+        'all_cover_above_htbreak',
+        np.float32,
+        cover_fn,
+        dependencies=[count_metric],
+        attributes=[A['ReturnNumber']],
+    )
+    first_cover_metric = Metric(
+        '1st_cover_above_htbreak',
+        np.float32,
+        cover_fn,
+        dependencies=[first_count_metric],
+        filters=[first_returns_filter],
+        attributes=[A['ReturnNumber']],
+    )
+    first_cover_above_mean_metric = Metric(
+        '1st_cover_above_mean',
+        np.float32,
+        cover_above_val,
+        dependencies=[first_cnt_above_mean],
+        filters=[first_returns_filter],
+        attributes=[A['Z']],
+    )
+    first_cover_above_mode_metric = Metric(
+        '1st_cover_above_mode',
+        np.float32,
+        cover_above_val,
+        dependencies=[first_cnt_above_mode],
+        filters=[first_returns_filter],
+        attributes=[A['Z']],
+    )
+
+    covers = {
+        'all_cover': all_cover_metric,
+        '1st_cover': first_cover_metric,
+        '1st_cover_above_mean': first_cover_above_mean_metric,
+        '1st_cover_above_mode': first_cover_above_mode_metric
+    }
+
     grid_metrics: dict[str, Metric] = dict(
         gr_perc
         | gr_l_moments
         | gr_stats
         | gr_p_moments
         | gr_aad
-        | {allcover_metric.name: allcover_metric}
+        | counts
+        | covers
     )
     return grid_metrics
 
@@ -91,14 +182,34 @@ def get_grid_metrics(elev_key='Z', min_ht=2, ht_break=3):
     Get GridMetric Metrics with filters applied.
     """
     # cover metrics use the ht_break, all others use min_ht
-    cover_list = [allcover_metric.name]
     grid_metrics = _get_grid_metrics(elev_key)
+    no_dep_filter_list = [
+        'all_cover_above_htbreak',
+        '1st_cover_above_htbreak',
+    ]
+    ht_break_list = [
+        'all_cover_above_htbreak',
+        '1st_cover_above_htbreak',
+        '1st_count_above_htbreak',
+    ]
+    no_filter_list = [
+        '1st_count_above_mean',
+        '1st_count_above_mode',
+        '1st_cover_above_mean',
+        '1st_cover_above_mode',
+    ]
     for gm in grid_metrics.values():
-        filter_val = ht_break if gm.name in cover_list else min_ht
+        if gm.name in no_filter_list:
+            continue
+
+        filter_val = ht_break if gm.name in ht_break_list else min_ht
         method = make_elev_filter(filter_val, elev_key)
-        for d in gm.dependencies:
-            if not d.filters:
-                d.filters.append(method)
+
+        if gm.name not in no_dep_filter_list:
+            for d in gm.dependencies:
+                if not d.filters:
+                    d.filters.append(method)
+
         gm.add_filter(method)
 
     return grid_metrics

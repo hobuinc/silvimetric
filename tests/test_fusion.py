@@ -15,7 +15,7 @@ class TestFusion:
     # by quite a bit, and some of the elevation metrics are failing.
     # Elevation metrics messing up: CV, L3, L4, MAD_mode, kurtosis, mode,
     #   skewness, and variance.
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_cover(
         self,
         # configure_dask: None,
@@ -91,4 +91,4 @@ class TestFusion:
             print('    path: ', os.path.basename(f))
             print('    count:', failure_cell_count[idx])
             print('    avg:', failure_cell_avg[idx])
-        # assert not failures
+        assert not failures
