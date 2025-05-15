@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+
 from ..metric import Metric
 from .p_moments import mean
 from .percentiles import pct_base
@@ -13,10 +14,12 @@ warnings.filterwarnings(
 
 
 def m_mode(data, *args):
-    u, c = np.unique(data, return_counts=True)
-    i = np.where(c == c.max())
-    v = u[i[0][0]]
-    return v
+    # copy FUSION's process as closely as possible
+    # split into 64 bins, get the lowest value of highest bin count
+
+    counts, bins = np.histogram(data, 64, range=(data.min(), data.max()))
+    mode = bins[:-1][counts == counts.max()]
+    return mode[0].item()
 
 
 def m_median(data, *args):
