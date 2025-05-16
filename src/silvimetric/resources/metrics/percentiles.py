@@ -74,6 +74,31 @@ def m_90m10(data, *args):
 def m_95m05(data, *args):
     return args[0][95] - args[0][5]
 
+def m_profile_area(data, *args):
+    # sanity check...must have valid heights/elevations
+    p = args[0]
+    dmax = data.max()
+    dmin = data.min()
+    if dmax <= 0:
+        return -9999.0
+
+    p0 = max(dmin, 0.0)
+
+    # second sanity check...99th percentile must be > 0
+    p99 = p[99]
+    if p99 > 0.0:
+        # compute area under normalized percentile height curve using composite
+        # trapeziod rule
+        grid_pa = p0 / p99
+        pcts = np.array(p[1:98])
+        areas = pcts * 2 / p99
+        pa = grid_pa + areas.sum() + 1
+
+        return pa * 0.5
+    else:
+        return -9999.0
+
+
 
 pct_base = Metric('pct_base', object, percentile_base)
 
@@ -95,3 +120,6 @@ percentiles['p95'] = Metric('p95', np.float32, m_p95, [pct_base])
 percentiles['p99'] = Metric('p99', np.float32, m_p99, [pct_base])
 percentiles['90m10'] = Metric('90m10', np.float32, m_90m10, [pct_base])
 percentiles['95m05'] = Metric('95m05', np.float32, m_95m05, [pct_base])
+percentiles['profile_area'] = Metric(
+    'profile_area', np.float32, m_profile_area, [pct_base]
+)

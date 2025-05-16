@@ -160,35 +160,35 @@ def metric_map(plumas_tif_dir: str, fusion_tif_dir: str):
         'int_skewness_2plus_30METERS.tif': 'm_Intensity_skewness.tif',
         'int_stddev_2plus_30METERS.tif': 'm_Intensity_stddev.tif',
         'int_variance_2plus_30METERS.tif': 'm_Intensity_variance.tif',
-        # TODO: finish incorporating these from FUSION
         '1st_cnt_above2_30METERS.tif': 'm_ReturnNumber_1st_count_above_htbreak.tif',  # noqa: E501
-        '1st_cnt_above_mean_30METERS.tif': 'm_Z_1st_count_above_mean.tif', # noqa: E501
-        '1st_cnt_above_mode_30METERS.tif': 'm_Z_1st_count_above_mode.tif', # noqa: E501
+        '1st_cnt_above_mean_30METERS.tif': 'm_Z_1st_count_above_mean.tif',
+        '1st_cnt_above_mode_30METERS.tif': 'm_Z_1st_count_above_mode.tif',
         '1st_cover_above2_30METERS.tif': 'm_ReturnNumber_1st_cover_above_htbreak.tif', # noqa: E501
-        'all_cover_above2_30METERS.tif': 'm_ReturnNumber_all_cover_above_htbreak.tif',
-        '1st_cover_above_mean_30METERS.tif': 'm_Z_1st_cover_above_mean.tif', # noqa: E501
-        '1st_cover_above_mode_30METERS.tif': 'm_Z_1st_cover_above_mode.tif', # noqa: E501
-        'all_1st_cover_above2_30METERS.tif': 'm_Z_all_1st_cover_above_htbreak.tif',
-        # 'all_1st_cover_above_mean_30METERS.tif': '',
-        # 'all_1st_cover_above_mode_30METERS.tif': '',
-        # 'all_cnt_2plus_30METERS.tif': 'm_ReturnNumber_all_count_above_minht.tif', # noqa: E501
-        # 'all_cnt_30METERS.tif': 'm_ReturnNumber_all_count.tif',
-        # 'all_cnt_above2_30METERS.tif': 'm_ReturnNumber_all_count_above_htbreak.tif', # noqa: E501
-        # 'all_cnt_above_mean_30METERS.tif': 'm_ReturnNumber_all_count_above_mean.tif', # noqa: E501
-        # 'all_cnt_above_mode_30METERS.tif': 'm_ReturnNumber_all_count_above_mode.tif', # noqa: E501
-        # 'all_cover_above_mean_30METERS.tif': 'm_ReturnNumber_all_cover_above_mean.tif', # noqa: E501
-        # 'all_cover_above_mode_30METERS.tif': 'm_ReturnNumber_all_cover_above_mode.tif', # noqa: E501
-        # 'profile_area_30METERS.tif': 'm_Z_profile_area.tif',
-        # 'pulsecnt_30METERS.tif': '',
-        # 'r1_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r1_count.tif',
-        # 'r2_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r2_count.tif',
-        # 'r3_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r3_count.tif',
-        # 'r4_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r4_count.tif',
-        # 'r5_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r5_count.tif',
-        # 'r6_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r6_count.tif',
-        # 'r7_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r7_count.tif',
-        # 'elev_canopy_relief_ratio_30METERS.tif': '',
+        'all_cover_above2_30METERS.tif': 'm_ReturnNumber_all_cover_above_htbreak.tif', # noqa: E501
+        '1st_cover_above_mean_30METERS.tif': 'm_Z_1st_cover_above_mean.tif',
+        '1st_cover_above_mode_30METERS.tif': 'm_Z_1st_cover_above_mode.tif',
+        'all_1st_cover_above2_30METERS.tif': 'm_ReturnNumber_all_1st_cover_above_htbreak.tif', # noqa: E501
+        'all_cnt_above2_30METERS.tif': 'm_ReturnNumber_all_count_above_htbreak.tif', # noqa: E501
+        'all_1st_cover_above_mean_30METERS.tif': 'm_Z_all_1st_cover_above_mean.tif', # noqa: E501
+        'all_1st_cover_above_mode_30METERS.tif': 'm_Z_all_1st_cover_above_mode.tif', # noqa: E501
+        'all_cnt_2plus_30METERS.tif': 'm_ReturnNumber_all_count_above_minht.tif', # noqa: E501
+        'all_cnt_30METERS.tif': 'm_ReturnNumber_all_count.tif',
+        'all_cnt_above_mean_30METERS.tif': 'm_Z_all_count_above_mean.tif',
+        'all_cnt_above_mode_30METERS.tif': 'm_Z_all_count_above_mode.tif',
+        'all_cover_above_mean_30METERS.tif': 'm_Z_all_cover_above_mean.tif',
+        'all_cover_above_mode_30METERS.tif': 'm_Z_all_cover_above_mode.tif',
+        'profile_area_30METERS.tif': 'm_Z_profile_area.tif',
+        'r1_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r1_count.tif',
+        'r2_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r2_count.tif',
+        'r3_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r3_count.tif',
+        'r4_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r4_count.tif',
+        'r5_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r5_count.tif',
+        'r6_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r6_count.tif',
+        'r7_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r7_count.tif',
+        # TODO: finish incorporating these from FUSION
+        'elev_canopy_relief_ratio_30METERS.tif': 'm_Z_canopy_relief_ratio.tif',
         # 'grnd_cnt_30METERS.tif': '',
+        # 'pulsecnt_30METERS.tif': '',
     }
     path_mapping = {}
     for k, v in mapping.items():

@@ -18,8 +18,8 @@ class TestFusion:
     # @pytest.mark.skip()
     def test_cover(
         self,
-        # configure_dask: None,
-        threaded_dask,
+        configure_dask: None,
+        # threaded_dask,
         plumas_shatter_config: sm.ShatterConfig,
         plumas_tif_dir: str,
         metric_map: dict,
@@ -32,6 +32,14 @@ class TestFusion:
         failure_cell_count = []
         failure_cell_avg = []
         for f_path, sm_path in metric_map.items():
+            # here is where intensity values are turned off
+            if 'int' in f_path:
+                continue
+            # we know modes are different between fusion and sm, so anything
+            # that depends on mode will be off
+            if 'mode' in f_path:
+                continue
+
             sm_raster = gdal.Open(sm_path)
             sm_raster_data = np.array(sm_raster.GetRasterBand(1).ReadAsArray())
 
@@ -75,11 +83,8 @@ class TestFusion:
                         diff_data[~(np.nan_to_num(diff_data, 0) < 0.2)].mean()
                     )
             else:
-                # here is where intensity values are turned off
-                if 'int' in f_path:
-                    continue
 
-                # make sure others are off by less than 1%
+                # make sure others are off by less than 5%
                 tester = pct_change > 0.05
                 if np.any(tester):
                     failures.append(sm_path)

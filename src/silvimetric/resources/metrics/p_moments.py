@@ -26,12 +26,17 @@ def m_mean(data, *args):
     return m
 
 
-
 def m_variance(data, *args):
     return args[0][0]
 
 
 def m_skewness(data, *args):
+    # GridSkewness +=
+        # (Points[l].Value - GridMean)
+        # * (Points[l].Value - GridMean)
+        # * (Points[l].Value - GridMean);
+    # TODO maybe htis?
+    #((data - data.mean())**3).sum() / ((data.count() - 1) * np.std(data)**3)
     return args[0][1]
 
 
