@@ -71,7 +71,7 @@ class TestMetrics:
         m = s.config.metrics[0]
         assert len(m.filters) == 1
 
-        base = 11 if s.config.alignment == 'pixelispoint' else 10
+        base = 11 if s.config.alignment == 'AlignToCenter' else 10
         maxy = s.config.root.maxy
         confirm_one_entry(s, maxy, base, test_point_count)
 

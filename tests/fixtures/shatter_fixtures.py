@@ -9,6 +9,16 @@ from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
 from silvimetric.resources.attribute import Attribute
 from silvimetric.resources.metric import Metric
 
+@pytest.fixture(scope='session')
+def s3_copc_filepath() -> Generator[str, None, None]:
+    path = os.path.join(
+        os.path.dirname(__file__),
+        '..',
+        'data',
+        'test_data_pixel_point.copc.laz',
+    )
+    assert os.path.exists(path)
+    yield os.path.abspath(path)
 
 @pytest.fixture(scope='function')
 def s3_bucket() -> Generator[str, None, None]:
@@ -26,19 +36,17 @@ def s3_storage_config(
     s3_uri: str,
     bounds: Bounds,
     resolution: int,
-    alignment: int,
     crs: str,
     attrs: list[Attribute],
     metrics: list[Metric],
 ) -> Generator[StorageConfig, None, None]:
     yield StorageConfig(
-        bounds,
-        crs,
-        resolution,
-        alignment,
-        attrs,
-        metrics,
-        svversion,
+        root=bounds,
+        crs=crs,
+        resolution=resolution,
+        attrs=attrs,
+        metrics=metrics,
+        version=svversion,
         tdb_dir=s3_uri,
     )
 
@@ -58,12 +66,12 @@ def s3_storage(
 @pytest.fixture(scope='function')
 def s3_shatter_config(
     s3_storage: Storage,
-    copc_filepath: str,
+    s3_copc_filepath: str,
     date: datetime,
 ) -> Generator[ShatterConfig, None, None]:
     config = s3_storage.config
     yield ShatterConfig(
-        filename=copc_filepath, tdb_dir=config.tdb_dir, date=date
+        filename=s3_copc_filepath, tdb_dir=config.tdb_dir, date=date
     )
 
 

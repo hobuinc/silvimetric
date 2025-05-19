@@ -158,16 +158,16 @@ def resolution() -> Generator[int, None, None]:
     yield 30
 
 
-@pytest.fixture(scope='session', params=['pixelisarea', 'pixelispoint'])
+@pytest.fixture(scope='session', params=['AlignToCenter', 'AlignToCorner'])
 def alignment(request: pytest.FixtureRequest) -> Generator[int, None, None]:
     yield request.param
 
 
 @pytest.fixture(scope='session')
 def test_point_count(alignment: int) -> Generator[int, None, None]:
-    if alignment == 'pixelisarea':
+    if alignment == 'AlignToCorner':
         yield 90000
-    else:  # pixelispoint
+    else:  # AlignToCenter
         yield 108900
 
 

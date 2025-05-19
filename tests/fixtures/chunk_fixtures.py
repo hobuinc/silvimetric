@@ -21,7 +21,7 @@ def unfiltered(extents: Extents) -> Generator[List[Extents], None, None]:
 
 @pytest.fixture(scope='session')
 def copc_filepath(alignment: int) -> Generator[str, None, None]:
-    if alignment == 'pixelispoint':
+    if alignment == 'AlignToCenter':
         path = os.path.join(
             os.path.dirname(__file__),
             '..',
@@ -30,7 +30,7 @@ def copc_filepath(alignment: int) -> Generator[str, None, None]:
         )
         assert os.path.exists(path)
         yield os.path.abspath(path)
-    elif alignment == 'pixelisarea':
+    elif alignment == 'AlignToCorner':
         path = os.path.join(
             os.path.dirname(__file__),
             '..',

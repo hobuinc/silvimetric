@@ -15,7 +15,7 @@ class TestCommands(object):
         assert res['tile_info']['recommended'] == 1
 
         # recommended here should follow cell counts
-        rec = 100 if storage_config.alignment == 'pixelisarea' else 121
+        rec = 100 if storage_config.alignment == 'AlignToCorner' else 121
         res = scan.scan(s.tdb_dir, s.filename, s.bounds, depth=5)
         assert res['tile_info']['recommended'] == rec
 
@@ -95,17 +95,17 @@ class TestCommands(object):
         # test that shatter only operates on cells not in nonempty_domain
         storage = Storage.from_db(shatter_config.tdb_dir)
 
-        # if pixelisarea, then the count is 3/4 of the total when
+        # if AlignToCorner, then the count is 3/4 of the total when
         #     mbr = ((0,4), (0,4)),)
-        # if pixeliscount, extents are shifted half a pixel to the right,
+        # if AlignToCenter, extents are shifted half a pixel to the right,
         #     static pc inserted here
         partial_count = (
-            67500.0 if storage_config.alignment == 'pixelisarea' else 86400
+            67500.0 if storage_config.alignment == 'AlignToCorner' else 86400
         )
 
         # if pixel is area, mbr is 75 (100-25)
         # if pixel is point, mbr is 96 (121-25)
-        mbr_count = 75 if storage_config.alignment == 'pixelisarea' else 96
+        mbr_count = 75 if storage_config.alignment == 'AlignToCorner' else 96
 
         # modify shatter config
         shatter_config.tile_size = 1

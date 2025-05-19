@@ -56,7 +56,7 @@ class Test_Data(object):
         assert data.estimate_count(ll) == no_cell_line_pc
         correct_count = (
             21025
-            if storage_config.alignment.lower() == 'pixelisarea'
+            if storage_config.alignment.lower() == 'aligntocorner'
             else 25600
         )
         assert data.count(ll) == correct_count

@@ -105,15 +105,13 @@ class StorageConfig(Config):
             ]
         if not len(self.metrics):
             gm = grid_metrics.get_grid_metrics()
-            self.metrics = [gm[m] for m in gm.keys()]
+            self.metrics = list(gm.values())
 
         if not self.crs.is_projected:
             raise Exception(
                 'Given coordinate system is not a rectilinear'
                 ' projected coordinate system'
             )
-
-        self.metric_definitions = {m.name: str(m) for m in self.metrics}
 
     def __eq__(self, other):
         # We don't compare logs

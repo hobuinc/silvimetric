@@ -61,7 +61,7 @@ class Test_Shatter(object):
         threaded_dask
     ):
         shatter(shatter_config)
-        base = 11 if storage.config.alignment == 'pixelispoint' else 10
+        base = 11 if storage.config.alignment == 'AlignToCenter' else 10
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
@@ -73,7 +73,7 @@ class Test_Shatter(object):
         threaded_dask
     ):
         shatter(shatter_config)
-        base = 11 if storage.config.alignment == 'pixelispoint' else 10
+        base = 11 if storage.config.alignment == 'AlignToCenter' else 10
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
@@ -170,7 +170,7 @@ class Test_Shatter(object):
 
         # When alignment is point and using uneven_shatter_config, the bounds
         # will be changed so that not all points are grabbed. This is expected.
-        if alignment != 'pixelispoint' or sh_cfg != 'uneven_shatter_config':
+        if alignment != 'AlignToCenter' or sh_cfg != 'uneven_shatter_config':
             assert sum(pcs) == test_point_count
             assert pc == test_point_count
 
@@ -193,7 +193,7 @@ class Test_Shatter(object):
         self, partial_shatter_config: ShatterConfig, alignment: int
     ):
         pc = shatter(partial_shatter_config)
-        actual = 22500 if alignment == 'pixelisarea' else 32400
+        actual = 22500 if alignment == 'AlignToCorner' else 32400
         assert pc == actual
 
     @pytest.mark.skipif(
@@ -205,11 +205,11 @@ class Test_Shatter(object):
         self,
         s3_shatter_config: ShatterConfig,
         s3_storage: Storage,
-        test_point_count: int,
     ):
         # need processes scheduler to accurately test bug fix
         dask.config.set(scheduler='processes')
         maxy = s3_storage.config.root.maxy
-        base = 11 if s3_storage.config.alignment == 'pixelispoint' else 10
+        base = 11
+        point_count = 108900
         shatter(s3_shatter_config)
-        confirm_one_entry(s3_storage, maxy, base, test_point_count, 1)
+        confirm_one_entry(s3_storage, maxy, base, point_count, 1)

@@ -146,7 +146,7 @@ class TestCli(object):
     ) -> None:
         from test_shatter import confirm_one_entry
 
-        base = 11 if storage.config.alignment == 'pixelispoint' else 10
+        base = 11 if storage.config.alignment == 'AlignToCenter' else 10
         maxy = storage.config.root.maxy
 
         res = runner.invoke(
