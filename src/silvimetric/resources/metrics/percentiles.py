@@ -90,7 +90,7 @@ def m_profile_area(data, *args):
         # compute area under normalized percentile height curve using composite
         # trapeziod rule
         grid_pa = p0 / p99
-        pcts = np.array(p[1:98])
+        pcts = np.array(p[1:99])
         areas = pcts * 2 / p99
         pa = grid_pa + areas.sum() + 1
 
