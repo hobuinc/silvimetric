@@ -9,12 +9,6 @@ from .stats import statistics
 from .p_moments import product_moments
 from .aad import aad
 
-_gr_perc = copy.deepcopy(percentiles)
-_gr_l_moments = copy.deepcopy(l_moments)
-_gr_stats = copy.deepcopy(statistics)
-_gr_p_moments = copy.deepcopy(product_moments)
-_gr_aad = copy.deepcopy(aad)
-
 # Make special crr it relies too heavily on other metrics
 # that will have filters applied to them.
 def _grid_crr(data, *args):
@@ -38,8 +32,10 @@ def make_elev_filter(val, elev_key):
 
 
 def _get_grid_metrics(elev_key='Z'):
-    from .covers import covers
-    from .counts import counts
+    from .covers import get_cover_metrics
+    from .counts import get_count_metrics
+    covers = get_cover_metrics(elev_key)
+    counts = get_count_metrics(elev_key)
 
     """
     Return FUSION GridMetrics Metrics dependent on an Elevation key.
@@ -49,40 +45,40 @@ def _get_grid_metrics(elev_key='Z'):
     """
 
     assert elev_key in ['Z', 'HeightAboveGround']
-    for m in (_gr_perc | _gr_l_moments | _gr_p_moments).values():
+    for m in (percentiles | l_moments | product_moments).values():
         m.attributes = [A[elev_key], A['Intensity']]
         for d in m.dependencies:
             d.attributes = [A[elev_key], A['Intensity']]
 
     # give profile_area separate pct_base so we can apply separate filters
-    _gr_perc['profile_area'].attributes = [A[elev_key]]
+    percentiles['profile_area'].attributes = [A[elev_key]]
     pct_base_copy = copy.deepcopy(pct_base)
     pct_base_copy.name = 'pct_base_profile_area'
-    _gr_perc['profile_area'].dependencies = [pct_base_copy]
+    percentiles['profile_area'].dependencies = [pct_base_copy]
 
-    _gr_stats['cumean'].attributes = [A[elev_key]]
-    _gr_stats['sqmean'].attributes = [A[elev_key]]
+    statistics['cumean'].attributes = [A[elev_key]]
+    statistics['sqmean'].attributes = [A[elev_key]]
 
-    _gr_stats['iq'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['min'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['max'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['mode'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['median'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['stddev'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['cv'].attributes = [A[elev_key], A['Intensity']]
-    _gr_stats['crr'] = _grid_crr_metric
-    _gr_stats['crr'].attributes = [A[elev_key]]
+    statistics['iq'].attributes = [A[elev_key], A['Intensity']]
+    statistics['min'].attributes = [A[elev_key], A['Intensity']]
+    statistics['max'].attributes = [A[elev_key], A['Intensity']]
+    statistics['mode'].attributes = [A[elev_key], A['Intensity']]
+    statistics['median'].attributes = [A[elev_key], A['Intensity']]
+    statistics['stddev'].attributes = [A[elev_key], A['Intensity']]
+    statistics['cv'].attributes = [A[elev_key], A['Intensity']]
+    statistics['crr'] = _grid_crr_metric
+    statistics['crr'].attributes = [A[elev_key]]
 
-    _gr_aad['aad'].attributes = [A[elev_key], A['Intensity']]
-    _gr_aad['mad_median'].attributes = [A[elev_key]]
-    _gr_aad['mad_mode'].attributes = [A[elev_key]]
+    aad['aad'].attributes = [A[elev_key], A['Intensity']]
+    aad['mad_median'].attributes = [A[elev_key]]
+    aad['mad_mode'].attributes = [A[elev_key]]
 
     grid_metrics: dict[str, Metric] = dict(
-        _gr_perc
-        | _gr_l_moments
-        | _gr_stats
-        | _gr_p_moments
-        | _gr_aad
+        percentiles
+        | l_moments
+        | statistics
+        | product_moments
+        | aad
         | counts
         | covers
     )

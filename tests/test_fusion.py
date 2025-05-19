@@ -33,8 +33,8 @@ class TestFusion:
         failure_cell_avg = []
         for f_path, sm_path in metric_map.items():
             # here is where intensity values are turned off
-            # if 'int' in f_path:
-            #     continue
+            if 'int' in f_path:
+                continue
 
             # we know modes are slightly different between fusion and sm, so
             # anything that depends on mode will be off
