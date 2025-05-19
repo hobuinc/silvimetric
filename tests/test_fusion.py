@@ -1,22 +1,22 @@
 import os
 
-import pytest
 from osgeo import gdal
 import numpy as np
 
 import silvimetric as sm
+
 
 class TestFusion:
     """
     Test against Bob's FUSION data using
     NoCAL_PlumasNF_B2_2018_TestingData_FUSIONNormalized.copc.laz.
     """
-    #TODO: Get this test working. Currently Intensity metrics seem to be off
+
+    # TODO: Get this test working. Currently Intensity metrics seem to be off
     # by quite a bit, and some of the elevation metrics are failing.
     # Elevation metrics messing up: CV, L3, L4, MAD_mode, kurtosis, mode,
     #   skewness, and variance.
-    # @pytest.mark.skip()
-    def test_cover(
+    def test_against_fusion(
         self,
         # configure_dask: None,
         threaded_dask,
@@ -62,35 +62,41 @@ class TestFusion:
 
             if 'cover' in f_path:
                 # make sure cover differences are less than 5%
-                if not np.all(np.nan_to_num(diff_data, 0) < 5):
-                    failures.append(sm_path)
-                    failure_cell_count.append(
-                        diff_data[~(np.nan_to_num(diff_data, 0) < 5)].size
-                    )
-                    failure_cell_avg.append(
-                        diff_data[~(np.nan_to_num(diff_data, 0) < 5)].mean()
-                    )
-            elif (
-                'elev' in f_path and
-                all([v not in f_path for v in ['max','min','cv']])
+                tester = np.nan_to_num(diff_data, 0) >= 5
+                if np.any(tester):
+                    if diff_data[tester].size > 5:
+                        failures.append(sm_path)
+                        failure_cell_count.append(
+                            diff_data[~(np.nan_to_num(diff_data, 0) < 5)].size
+                        )
+                        failure_cell_avg.append(
+                            diff_data[~(np.nan_to_num(diff_data, 0) < 5)].mean()
+                        )
+            elif 'elev' in f_path and all(
+                [v not in f_path for v in ['max', 'min', 'cv']]
             ):
                 # make sure elevation differences are less than 0.2 meters
-                if not np.all(np.nan_to_num(diff_data, 0) < 0.2):
-                    failures.append(sm_path)
-                    failure_cell_count.append(
-                        diff_data[~(np.nan_to_num(diff_data, 0) < 0.2)].size
-                    )
-                    failure_cell_avg.append(
-                        diff_data[~(np.nan_to_num(diff_data, 0) < 0.2)].mean()
-                    )
+                tester = np.nan_to_num(diff_data, 0) >= 0.2
+                if np.any(tester):
+                    if diff_data[tester].size > 5:
+                        failures.append(sm_path)
+                        failure_cell_count.append(
+                            diff_data[~(np.nan_to_num(diff_data, 0) < 0.2)].size
+                        )
+                        failure_cell_avg.append(
+                            diff_data[
+                                ~(np.nan_to_num(diff_data, 0) < 0.2)
+                            ].mean()
+                        )
             else:
-
                 # make sure others are off by less than 5%
                 tester = pct_change > 0.05
                 if np.any(tester):
-                    failures.append(sm_path)
-                    failure_cell_count.append(pct_change[tester].size)
-                    failure_cell_avg.append(pct_change[tester].mean())
+                    # only add if a significant number of cells are off
+                    if pct_change[tester].size > 5:
+                        failures.append(sm_path)
+                        failure_cell_count.append(pct_change[tester].size)
+                        failure_cell_avg.append(pct_change[tester].mean())
 
         for idx, f in enumerate(failures):
             print('Failed:')

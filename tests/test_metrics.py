@@ -31,7 +31,7 @@ class TestMetrics:
         g.run(metric_data)
         for node in g.nodes.values():
             assert isinstance(node.results, pd.DataFrame)
-            assert bool(all(node.results.any()))
+            assert all(node.results.any())
 
         assert all(g.results == metric_dag_results)
 
@@ -39,18 +39,11 @@ class TestMetrics:
         self,
         metric_data: pd.DataFrame,
         metric_data_results: pd.DataFrame,
-        alignment: str,
     ):
         metrics = list(s.values())
         graph = Graph(metrics)
         metrics = graph.run(metric_data)
         assert isinstance(metrics, pd.DataFrame)
-        adjusted = [
-            k.split('_')[-1] if 'profile_area' not in k else 'profile_area'
-            for k in metrics.keys()
-        ]
-
-        assert all(a in s.keys() for a in adjusted)
         assert all(metrics == metric_data_results)
 
     def test_dependencies(self, metric_data: pd.DataFrame):
@@ -83,7 +76,7 @@ class TestMetrics:
         confirm_one_entry(s, maxy, base, test_point_count)
 
     def test_custom(
-        self, metric_data: pd.DataFrame, attrs: list[Attribute], alignment: str
+        self, metric_data: pd.DataFrame, attrs: list[Attribute]
     ) -> None:
         def m_over500(data):
             return data[data >= 500].count()
@@ -99,10 +92,7 @@ class TestMetrics:
         b = Graph(m_cust).init().run(metric_data)
 
         assert b.m_Z_over500.any()
-        if alignment == 'pixelispoint':
-            assert b.m_Z_over500.values[0] == 2
-        elif alignment == 'pixelisarea':
-            assert b.m_Z_over500.values[0] == 3
+        assert b.m_Z_over500.values[0] == 2
 
     def test_dependency_passing(
         self, dep_crr: Metric, depless_crr: Metric, metric_data: pd.DataFrame

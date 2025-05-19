@@ -19,6 +19,8 @@ def lmom4(data, *args):
 
     data = data.values
     n = len(data)
+    idx = np.arange(n)
+
     # sort in descending order
     data = np.sort(data.reshape(n))[::-1]
 
@@ -29,38 +31,64 @@ def lmom4(data, *args):
     if n < 2:
         l2 = np.nan
     else:
-        b1 = np.array(
-            [(n - j - 1) * data[j].item() / n / (n - 1) for j in range(n)]
+        b1 = (
+            data
+            * (n - idx - 1)
+            / n
+            / (n - 1)
         ).sum()
+        # b1_old = np.array(
+        #     [(n - j - 1) * data[j].item() / n / (n - 1) for j in range(n)]
+        # ).sum()
+        # assert b1 == b1_old
         l2: float = 2 * b1 - b0
 
     if n < 3:
         l3 = np.nan
     else:
-        b2 = np.array(
-            [
-                (n - j - 1)
-                * (n - j - 2)
-                * data[j].item()
-                / (n * (n - 1) * (n - 2))
-                for j in range(n - 1)
-            ]
+        b2_data = data[:-1]
+        b2_idx = idx[:-1]
+        b2 = (
+            b2_data
+            * (n - b2_idx - 1)
+            * (n - b2_idx - 2)
+            / (n * (n - 1) * (n - 2))
         ).sum()
+        # b2_old = np.array(
+        #     [
+        #         (n - j - 1)
+        #         * (n - j - 2)
+        #         * data[j].item()
+        #         / (n * (n - 1) * (n - 2))
+        #         for j in range(n - 1)
+        #     ]
+        # ).sum()
+        # assert b2 == b2_old
         l3: float = 6 * (b2 - b1) + b0
 
     if n < 4:
         l4 = np.nan
     else:
-        b3 = np.array(
-            [
-                (n - j - 1)
-                * (n - j - 2)
-                * (n - j - 3)
-                * data[j].item()
-                / (n * (n - 1) * (n - 2) * (n - 3))
-                for j in range(n - 2)
-            ]
+        b3_data = b2_data[:-1]
+        b3_idx = b2_idx[:-1]
+        b3 = (
+            b3_data
+            * (n - b3_idx - 1)
+            * (n - b3_idx - 2)
+            * (n - b3_idx - 3)
+            / (n * (n - 1) * (n - 2) * (n-3))
         ).sum()
+        # b3_old = np.array(
+        #     [
+        #         (n - j - 1)
+        #         * (n - j - 2)
+        #         * (n - j - 3)
+        #         * data[j].item()
+        #         / (n * (n - 1) * (n - 2) * (n - 3))
+        #         for j in range(n - 2)
+        #     ]
+        # ).sum()
+        # assert b3 == b3_old
         l4: float = 20 * b3 - 30 * b2 + 12 * b1 - b0
 
     return l1, l2, l3, l4

@@ -79,11 +79,7 @@ class StorageConfig(Config):
     """List of :class:`silvimetric.resources.attribute.Attribute` attributes
     that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
     Intensity"""
-    metrics: list[Metric] = field(
-        default_factory=lambda: [
-            grid_metrics.default[m] for m in grid_metrics.default.keys()
-        ]
-    )
+    metrics: list[Metric] = field(default_factory=lambda: [])
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
     that represent derived data, defaults to values in grid_metrics object"""
     version: str = __version__
@@ -108,7 +104,8 @@ class StorageConfig(Config):
                 for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
             ]
         if not len(self.metrics):
-            self.metrics = [grid_metrics[m] for m in grid_metrics.keys()]
+            gm = grid_metrics.get_grid_metrics()
+            self.metrics = [gm[m] for m in gm.keys()]
 
         if not self.crs.is_projected:
             raise Exception(

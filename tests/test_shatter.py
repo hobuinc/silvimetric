@@ -58,6 +58,7 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
+        threaded_dask
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'pixelispoint' else 10
@@ -69,6 +70,7 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
+        threaded_dask
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'pixelispoint' else 10
@@ -120,6 +122,7 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
+        threaded_dask
     ):
         shatter(shatter_config)
         try:
@@ -139,7 +142,8 @@ class Test_Shatter(object):
         test_point_count: int,
         request: pytest.FixtureRequest,
         maxy: float,
-        alignment: str
+        alignment: str,
+        threaded_dask
     ):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)

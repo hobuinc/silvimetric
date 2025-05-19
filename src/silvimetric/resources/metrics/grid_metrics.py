@@ -9,7 +9,7 @@ from .stats import statistics
 from .p_moments import product_moments
 from .aad import aad
 
-# Make special crr it relies too heavily on other metrics
+# Make special crr. It relies too heavily on other metrics
 # that will have filters applied to them.
 def _grid_crr(data, *args):
     mean = data.mean()
