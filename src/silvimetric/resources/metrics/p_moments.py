@@ -27,6 +27,7 @@ def m_mean(data, *args):
 
 
 def m_variance(data, *args):
+    return ((data - data.mean())**2).sum() / (data.count() - 1)
     return args[0][0]
 
 
@@ -36,11 +37,12 @@ def m_skewness(data, *args):
         # * (Points[l].Value - GridMean)
         # * (Points[l].Value - GridMean);
     # TODO maybe htis?
-    #((data - data.mean())**3).sum() / ((data.count() - 1) * np.std(data)**3)
-    return args[0][1]
+    return ((data - data.mean())**3).sum() / ((data.count() - 1) * np.std(data)**3)
+    # return args[0][1]
 
 
 def m_kurtosis(data, *args):
+    return ((data - data.mean())**4).sum() / ((data.count() - 1) * np.std(data)**4)
     return args[0][2]
 
 
@@ -52,7 +54,7 @@ variance = Metric(
     name='variance',
     dtype=np.float32,
     method=m_variance,
-    dependencies=[moment_base],
+    dependencies=[],
 )
 skewness = Metric(
     name='skewness',

@@ -18,8 +18,8 @@ class TestFusion:
     # @pytest.mark.skip()
     def test_cover(
         self,
-        configure_dask: None,
-        # threaded_dask,
+        # configure_dask: None,
+        threaded_dask,
         plumas_shatter_config: sm.ShatterConfig,
         plumas_tif_dir: str,
         metric_map: dict,
@@ -33,10 +33,11 @@ class TestFusion:
         failure_cell_avg = []
         for f_path, sm_path in metric_map.items():
             # here is where intensity values are turned off
-            if 'int' in f_path:
-                continue
-            # we know modes are different between fusion and sm, so anything
-            # that depends on mode will be off
+            # if 'int' in f_path:
+            #     continue
+
+            # we know modes are slightly different between fusion and sm, so
+            # anything that depends on mode will be off
             if 'mode' in f_path:
                 continue
 

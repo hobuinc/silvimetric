@@ -88,7 +88,7 @@ first_count_above_mode = Metric(
 )
 """number of first returns"""
 first_count = Metric(
-    '1st_count_above',
+    '1st_count',
     np.int32,
     count_fn,
     filters=[first_returns_filter],
