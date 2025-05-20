@@ -185,8 +185,8 @@ def metric_map(plumas_tif_dir: str, fusion_tif_dir: str):
         'r5_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r5_count.tif',
         'r6_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r6_count.tif',
         'r7_cnt_2plus_30METERS.tif': 'm_ReturnNumber_r7_count.tif',
-        # TODO: finish incorporating these from FUSION
         'elev_canopy_relief_ratio_30METERS.tif': 'm_Z_canopy_relief_ratio.tif',
+        # TODO: finish incorporating these from FUSION
         # 'grnd_cnt_30METERS.tif': '',
         # 'pulsecnt_30METERS.tif': '',
     }

@@ -2,12 +2,14 @@ from .metric import Metric
 
 
 class Graph:
-    def __init__(self, metrics: list[Metric] | Metric):
-        """
-        Task graph for Metrics.
-        """
+    """Task graph for Metrics.
 
-        # TODO: add mutex to Graph so it can be run in parallel
+    Coordinate usage of tasks and their dependencies.
+    """
+
+    def __init__(self, metrics: list[Metric] | Metric):
+        """Initialize task Graph class.
+        """
         if isinstance(metrics, Metric):
             metrics = [metrics]
 
@@ -43,6 +45,8 @@ class Graph:
 
 
 class Node:
+    """Class for coordinating a task run, its dependencies, and the results.
+    """
     # TODO add mutex to Node so it can be run in parallel
     def __init__(self, metric, graph):
         self.metric = metric
@@ -52,8 +56,9 @@ class Node:
         self.initialized = False
 
     def init(self):
-        """
-        Iterate through dependencies. If node is already in graph, reference
+        """Iterate through dependencies.
+
+        If node is already in graph, reference
         that. If not, create an entry in the graph and then reference it. Nodes
         represent arguments to pass to the Metric method, in the order that
         they're presented in the set.
@@ -75,9 +80,10 @@ class Node:
         return self
 
     def run(self, data_in):
-        """
-        Iterate dependency Nodes and run them. If this Node has already been run
-        then return the results instead of running again.
+        """Iterate dependency Nodes and run them.
+
+        If this Node has already been run then return the results instead of
+        running again.
         """
         if not self.initialized:
             self.init()

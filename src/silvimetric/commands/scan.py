@@ -31,6 +31,7 @@ def scan(
     :param depth: Tree depth threshold., defaults to 6
     :param filter_empty: Remove empty Extents. This takes longer, but is more
     accurate., defaults to False
+
     :return: Returns list of point counts.
     """
 
@@ -65,7 +66,7 @@ def scan(
             num_cells = np.sum(cell_counts).item()
             std = np.std(cell_counts)
             mean = np.mean(cell_counts)
-            rec = int(mean + std)
+            rec = int(mean)
 
             pc_info = dict(
                 pc_info=dict(
@@ -107,6 +108,7 @@ def extent_handle(
     :param res_threshold: Resolution threshold., defaults to 100
     :param pc_threshold: Point count threshold., defaults to 600000
     :param depth_threshold: Tree depth threshold., defaults to 6
+
     :return: Returns list of Extents that fit thresholds.
     """
 
@@ -174,6 +176,7 @@ def tile_info(
     :param pc_threshold: Point count threshold., defaults to 600000
     :param depth_threshold: Tree depth threshold., defaults to 6
     :param depth: Current Tree depth., defaults to 0
+
     :return: Returns list of Extents that fit thresholds.
     """
 

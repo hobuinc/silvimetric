@@ -10,6 +10,8 @@ import pandas as pd
 
 @pd.api.extensions.register_extension_dtype
 class AttributeDtype(pd.api.extensions.ExtensionDtype):
+    """Pandas Attribute extension for PDAL point data.
+    """
     type = np.generic
 
     def __init__(self, subtype=np.float32):
@@ -48,6 +50,8 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
 
 
 class AttributeArray(pd.api.extensions.ExtensionArray):
+    """Pandas Array Extension for easier insertion of PDAL point data to TileDB.
+    """
     def __init__(self, arrays, dtype):
         assert isinstance(dtype, AttributeDtype)
         self._dtype = dtype

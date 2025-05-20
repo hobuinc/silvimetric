@@ -126,13 +126,17 @@ Usage:
 ```console
 Usage: silvimetric initialize [OPTIONS]
 
+  Initialize silvimetrics DATABASE
+
 Options:
---bounds BOUNDS         Root bounds that encapsulates all data  [required]
---crs CRS               Coordinate system of data  [required]
--a, --attributes ATTRS  List of attributes to include in Database
--m, --metrics METRICS   List of metrics to include in Database
---resolution FLOAT      Summary pixel resolution
---help                  Show this message and exit.
+  --bounds BOUNDS         Root bounds that encapsulates all data  [required]
+  --crs CRS               Coordinate system of data  [required]
+  -a, --attributes ATTRS  List of attributes to include in Database
+  -m, --metrics METRICS   List of metrics to include in output, eg. '-m
+                          stats,percentiles'
+  --resolution FLOAT      Summary pixel resolution
+  --alignment TEXT        Pixel alignment: 'AlignToCenter' or 'AlignToCorner'
+  --help                  Show this message and exit.
 ```
 
 (udm)=
@@ -212,16 +216,17 @@ Usage:
 ```console
 Usage: silvimetric scan [OPTIONS] POINTCLOUD
 
-Scan point cloud and determine the optimal tile size.
+  Scan point cloud, output information on it, and determine the optimal tile
+  size.
 
 Options:
---resolution FLOAT     Summary pixel resolution
---filter               Remove empty space in computation. Will take extra
-                        time.
---point_count INTEGER  Point count threshold.
---depth INTEGER        Quadtree depth threshold.
---bounds BOUNDS        Bounds to scan.
---help                 Show this message and exit.
+  --resolution FLOAT     Summary pixel resolution
+  --filter_empty         Remove empty space in computation. Will take extra
+                         time.
+  --point_count INTEGER  Point count threshold.
+  --depth INTEGER        Quadtree depth threshold.
+  --bounds BOUNDS        Bounds to scan.
+  --help                 Show this message and exit.
 ```
 
 Example:
@@ -246,14 +251,14 @@ Usage:
 Usage: silvimetric shatter [OPTIONS] POINTCLOUD
 
 Options:
---bounds BOUNDS                 Bounds for data to include in processing
---tilesize INTEGER              Number of cells to include per tile
---report                        Whether or not to write a report of the
-                                process, useful for debugging
---date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
-                                Date the data was produced.
---dates <DATETIME DATETIME>...  Date range the data was produced during
---help                          Show this message and exit.
+  --bounds BOUNDS                 Bounds for data to include in processing
+  --tilesize INTEGER              Number of cells to include per tile
+  --report                        Whether or not to write a report of the
+                                  process, useful for debugging
+  --date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
+                                  Date the data was produced.
+  --dates <DATETIME DATETIME>...  Date range the data was produced during
+  --help                          Show this message and exit.
 ```
 
 Example:
@@ -279,12 +284,12 @@ Usage:
 Usage: silvimetric info [OPTIONS]
 
 Options:
---bounds BOUNDS                 Bounds to filter by
---date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
-                                Select processes with this date
---dates <DATETIME DATETIME>...  Select processes within this date range
---name TEXT                     Select processes with this name
---help                          Show this message and exit.
+  --bounds BOUNDS                 Bounds to filter by
+  --date [%Y-%m-%d|%Y-%m-%dT%H:%M:%SZ]
+                                  Select processes with this date
+  --dates <DATETIME DATETIME>...  Select processes within this date range
+  --name TEXT                     Select processes with this name
+  --help                          Show this message and exit.
 ```
 
 Example:
@@ -359,11 +364,11 @@ Usage: silvimetric extract [OPTIONS]
 Extract silvimetric metrics from DATABASE
 
 Options:
--a, --attributes ATTRS  List of attributes to include output
--m, --metrics METRICS   List of metrics to include in output
---bounds BOUNDS         Bounds for data to include in output
--o, --outdir PATH       Output directory.  [required]
---help                  Show this message and exit.
+  -a, --attributes ATTRS  List of attributes to include output
+  -m, --metrics METRICS   List of metrics to include in output
+  --bounds BOUNDS         Bounds for data to include in output
+  -o, --outdir PATH       Output directory.  [required]
+  --help                  Show this message and exit.
 ```
 
 Example:

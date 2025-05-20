@@ -1,6 +1,5 @@
 import os
 
-import pytest
 from osgeo import gdal
 import numpy as np
 
@@ -12,12 +11,9 @@ class TestFusion:
     Test against Bob's FUSION data using
     NoCAL_PlumasNF_B2_2018_TestingData_FUSIONNormalized.copc.laz.
     """
-
-    # TODO: Get this test working. Currently Intensity metrics seem to be off
-    # by quite a bit, and some of the elevation metrics are failing.
-    # Elevation metrics messing up: CV, L3, L4, MAD_mode, kurtosis, mode,
-    #   skewness, and variance.
-    @pytest.mark.skip()
+    # Intensity values and Mode values are slightly off from FUSION.
+    # Intensity values are scaled in FUSION, and Mode is selected slightly
+    # differently, so values are expected to be off.
     def test_against_fusion(
         self,
         # configure_dask: None,

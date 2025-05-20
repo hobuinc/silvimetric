@@ -47,6 +47,8 @@ docstring-code-format = true
 select=[
   "A",
   "B",
+  "D101",
+  "D201",
   "E",
   "F",
   "ISC",

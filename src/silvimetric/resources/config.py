@@ -18,11 +18,6 @@ from .attribute import Attribute, Attributes
 from .. import __version__
 
 
-class SilviMetricJSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        return o.__dict__
-
-
 @dataclass(kw_only=True)
 class Config(ABC):
     """Base config"""

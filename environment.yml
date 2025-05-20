@@ -17,5 +17,4 @@ dependencies:
   - python-json-logger
   - dill
   - pandas
-  - lmoments3
   - typing_extensions
