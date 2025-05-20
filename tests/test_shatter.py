@@ -189,7 +189,7 @@ class Test_Shatter(object):
                     # check that each cell only has one allocation
                     assert curr.size == 1.0
 
-    def test_partial_overlap( #noqa: D102
+    def test_partial_overlap(
         self, partial_shatter_config: ShatterConfig, alignment: int
     ):
         pc = shatter(partial_shatter_config)
@@ -201,7 +201,7 @@ class Test_Shatter(object):
         or os.environ.get('AWS_ACCESS_KEY_ID') is None,
         reason='Missing necessary AWS environment variables',
     )
-    def test_remote_creation(  # noqa: D102
+    def test_remote_creation(
         self,
         s3_shatter_config: ShatterConfig,
         s3_storage: Storage,

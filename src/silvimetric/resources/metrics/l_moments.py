@@ -8,6 +8,7 @@ def lmom4(data, *args):
     Adapted from https://xiaoganghe.github.io/python-climate-visuals/chapters/data-analytics/scipy-basic.html
     """
 
+    data = data.values
     n = len(data)
     idx = np.arange(n)
 
