@@ -3,7 +3,10 @@ from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 
 class Test_Configuration(object):
     def test_serialization(
-        self, storage_config, shatter_config, extract_config
+        self,
+        storage_config: StorageConfig,
+        shatter_config: ShatterConfig,
+        extract_config: ExtractConfig,
     ):
         # storage
         j = str(storage_config)

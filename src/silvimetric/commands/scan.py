@@ -17,7 +17,7 @@ def scan(
     point_count: int = 600000,
     resolution: float = 100,
     depth: int = 6,
-    filter: bool = False,
+    filter_empty: bool = False,
     log: Log = None,
 ):
     """
@@ -29,7 +29,9 @@ def scan(
     :param point_count: Point count threshold., defaults to 600000
     :param resolution: Resolution threshold., defaults to 100
     :param depth: Tree depth threshold., defaults to 6
-    :param filter: Remove empty Extents. This takes longer, but is more accurage., defaults to False
+    :param filter_empty: Remove empty Extents. This takes longer, but is more
+    accurate., defaults to False
+
     :return: Returns list of point counts.
     """
 
@@ -52,7 +54,7 @@ def scan(
             logger.info('Gathering initial chunks...')
             count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
-            if filter:
+            if filter_empty:
                 chunks = extents.chunk(data, resolution, point_count, depth)
                 cell_counts = [ch.cell_count for ch in chunks]
 
@@ -64,7 +66,7 @@ def scan(
             num_cells = np.sum(cell_counts).item()
             std = np.std(cell_counts)
             mean = np.mean(cell_counts)
-            rec = int(mean + std)
+            rec = int(mean)
 
             pc_info = dict(
                 pc_info=dict(
@@ -106,6 +108,7 @@ def extent_handle(
     :param res_threshold: Resolution threshold., defaults to 100
     :param pc_threshold: Point count threshold., defaults to 600000
     :param depth_threshold: Tree depth threshold., defaults to 6
+
     :return: Returns list of Extents that fit thresholds.
     """
 
@@ -127,7 +130,9 @@ def extent_handle(
     miny = bmaxy - (extent.y2 * extent.resolution)
     maxy = bmaxy - (extent.y1 * extent.resolution)
 
-    chunk = Extents(Bounds(minx, miny, maxx, maxy), extent.resolution, r)
+    chunk = Extents(
+        Bounds(minx, miny, maxx, maxy), extent.resolution, extent.alignment, r
+    )
 
     if extent.bounds == extent.root:
         extent.root = chunk.bounds
@@ -171,6 +176,7 @@ def tile_info(
     :param pc_threshold: Point count threshold., defaults to 600000
     :param depth_threshold: Tree depth threshold., defaults to 6
     :param depth: Current Tree depth., defaults to 0
+
     :return: Returns list of Extents that fit thresholds.
     """
 

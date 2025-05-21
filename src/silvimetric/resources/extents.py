@@ -17,14 +17,16 @@ IndexDomainList = tuple[IndexDomain, IndexDomain]
 class Extents(object):
     """Handles bounds operations for point cloud data."""
 
-    def __init__(self, bounds: Bounds, resolution: float, root: Bounds):
+    def __init__(
+        self, bounds: Bounds, resolution: float, alignment: str, root: Bounds
+    ):
         self.bounds = bounds
         """Bounding box of this section of data."""
         self.root = root
         """Root bounding box of the database."""
 
-        # adjust bounds so they're matching up with cell lines
-        self.bounds.adjust_to_cell_lines(resolution)
+        # adjust bounds so they're matching up with cell lines or cell centers
+        self.bounds.adjust_alignment(resolution, alignment)
         minx, miny, maxx, maxy = self.bounds.get()
 
         self.rangex = maxx - minx
@@ -33,7 +35,9 @@ class Extents(object):
         """Range of Y indices"""
         self.resolution = resolution
         """Resolution of database."""
-        self.cell_count = int(self.rangex * self.rangey / self.resolution**2)
+        self.alignment = alignment
+        """Alignment of pixels in database."""
+        self.cell_count = int((self.rangex * self.rangey) / self.resolution**2)
         """Number of cells in this Extents"""
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
@@ -125,7 +129,9 @@ class Extents(object):
         miny = bmaxy - (self.y2 * self.resolution)
         maxy = bmaxy - (self.y1 * self.resolution)
 
-        chunk = Extents(Bounds(minx, miny, maxx, maxy), self.resolution, r)
+        chunk = Extents(
+            Bounds(minx, miny, maxx, maxy), self.resolution, self.alignment, r
+        )
 
         if self.bounds == self.root:
             self.root = chunk.bounds
@@ -174,16 +180,28 @@ class Extents(object):
 
         exts = [
             Extents(
-                Bounds(minx, miny, midx, midy), self.resolution, self.root
+                Bounds(minx, miny, midx, midy),
+                self.resolution,
+                self.alignment,
+                self.root,
             ),  # lower left
             Extents(
-                Bounds(midx, miny, maxx, midy), self.resolution, self.root
+                Bounds(midx, miny, maxx, midy),
+                self.resolution,
+                self.alignment,
+                self.root,
             ),  # lower right
             Extents(
-                Bounds(minx, midy, midx, maxy), self.resolution, self.root
+                Bounds(minx, midy, midx, maxy),
+                self.resolution,
+                self.alignment,
+                self.root,
             ),  # top left
             Extents(
-                Bounds(midx, midy, maxx, maxy), self.resolution, self.root
+                Bounds(midx, midy, maxx, maxy),
+                self.resolution,
+                self.alignment,
+                self.root,
             ),  # top right
         ]
         return exts
@@ -295,7 +313,12 @@ class Extents(object):
             [[*x, *y] for x in dx for y in dy], dtype=np.float64
         )
         yield from [
-            Extents(Bounds(minx, miny, maxx, maxy), self.resolution, self.root)
+            Extents(
+                Bounds(minx, miny, maxx, maxy),
+                self.resolution,
+                self.alignment,
+                self.root,
+            )
             for minx, maxx, miny, maxy in coords_list
         ]
 
@@ -309,7 +332,7 @@ class Extents(object):
         """
         storage = Storage.from_db(tdb_dir)
         meta = storage.getConfig()
-        return Extents(meta.root, meta.resolution, meta.root)
+        return Extents(meta.root, meta.resolution, meta.alignment, meta.root)
 
     @staticmethod
     def from_sub(tdb_dir: str, sub: Bounds):
@@ -324,10 +347,11 @@ class Extents(object):
 
         meta = storage.getConfig()
         res = meta.resolution
-        base_extents = Extents(meta.root, res, meta.root)
+        align = meta.alignment
+        base_extents = Extents(meta.root, res, align, meta.root)
         base = base_extents.bounds
 
-        return Extents(sub, res, base)
+        return Extents(sub, res, align, base)
 
     def __repr__(self):
         minx, miny, maxx, maxy = self.bounds.get()

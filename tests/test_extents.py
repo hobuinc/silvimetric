@@ -1,12 +1,16 @@
+from typing import List
 import numpy as np
 import datetime
 
 from silvimetric import Extents
 from silvimetric.commands.shatter import run
+from silvimetric.resources.config import ShatterConfig
+from silvimetric.resources.storage import Storage
+
 
 
 def check_for_overlap(leaves: list[Extents], chunk: Extents):
-    idx = [i for l in leaves for i in l.get_indices()]
+    idx = [i for l in leaves for i in l.get_indices()]  # noqa: E741
     u, c = np.unique(idx, return_counts=True)
     assert not np.any(np.where(c > 1))
 
@@ -98,11 +102,16 @@ def check_indexing(extents: Extents, leaf_list):
     dup = u[c > 1]
     b = np.any([dup['x'], dup['y']])
 
-    assert b == False, f'Indices duplicated: {dup}'
+    assert not b, f'Indices duplicated: {dup}'
 
 
 class TestExtents(object):
-    def test_indexing(self, extents, filtered, unfiltered):
+    def test_indexing(
+        self,
+        extents: Extents,
+        filtered: List[Extents],
+        unfiltered: List[Extents],
+    ):
         check_indexing(extents, filtered)
         check_for_holes(filtered, extents)
         check_for_overlap(filtered, extents)
@@ -129,12 +138,17 @@ class TestExtents(object):
     #         else:
     #             flag = True
     #             bad_chunks.append(leaf)
-    #     assert flag == False, f"{[str(leaf) for leaf in bad_chunks]} are bad chunks"
+    #     assert flag == False, f"{[str(leaf) for leaf in bad_chunks]} are bad"
 
     def test_pointcount(
-        self, filtered, unfiltered, test_point_count, shatter_config, storage
+        self,
+        filtered: List[Extents],
+        unfiltered: List[Extents],
+        test_point_count: int,
+        shatter_config: ShatterConfig,
+        storage: Storage,
     ):
-        with storage.open('w') as tdb:
+        with storage.open('w'):
             shatter_config.start_time = (
                 datetime.datetime.now().timestamp() * 1000
             )

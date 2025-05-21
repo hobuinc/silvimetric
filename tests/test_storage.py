@@ -10,7 +10,6 @@ from silvimetric import (
     Attribute,
     Attributes,
     StorageConfig,
-    Log,
 )
 from silvimetric import __version__ as svversion
 
@@ -47,24 +46,32 @@ class Test_Storage(object):
         storage.saveConfig()
         config = storage.getConfig()
         assert config.resolution == storage.config.resolution
+        assert config.alignment == storage.config.alignment
         assert config.root == storage.config.root
         assert config.crs == storage.config.crs
         assert storage.config.version == svversion
 
     def test_metric_dependencies(
-        self, tmp_path_factory, metrics, crs, resolution, attrs, bounds
+        self,
+        tmp_path_factory,
+        metrics,
+        crs,
+        resolution,
+        alignment,
+        attrs,
+        bounds,
     ):
         ms = copy.deepcopy(metrics)
 
         path = tmp_path_factory.mktemp('test_tdb')
         p = os.path.abspath(path)
-        log = Log('DEBUG')
 
         ms[0].dependencies = [Attributes['HeightAboveGround']]
         sc = StorageConfig(
             tdb_dir=p,
             crs=crs,
             resolution=resolution,
+            alignment=alignment,
             attrs=attrs,
             metrics=ms,
             root=bounds,
@@ -89,10 +96,10 @@ class Test_Storage(object):
             for m in m_list:
                 assert m.name in all_metrics.keys()
 
-                def e_name(att):
-                    return s.attr(m.entry_name(att.name))
+                def e_name(att, met):
+                    return s.attr(met.entry_name(att.name))
 
-                def schema(att):
-                    return all_metrics[m.name].schema(att)
+                def schema(att, met):
+                    return all_metrics[met.name].schema(att)
 
-                assert all([e_name(a) == schema(a) for a in a_list])
+                assert all([e_name(a, m) == schema(a, m) for a in a_list])

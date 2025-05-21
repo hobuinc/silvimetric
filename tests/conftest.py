@@ -24,18 +24,17 @@ pytest_plugins = [
     'fixtures.fusion_fixtures',
     'fixtures.metric_fixtures',
     'fixtures.dask_fixtures',
+    'fixtures.fusion_fixtures',
 ]
 
 
 @pytest.fixture(scope='function')
-def tdb_filepath(storage_config) -> Generator[str, None, None]:
+def tdb_filepath(storage_config: StorageConfig) -> Generator[str, None, None]:
     yield storage_config.tdb_dir
 
 
 @pytest.fixture(scope='function')
-def app_config(
-    tdb_filepath, debug=True
-) -> Generator[ApplicationConfig, None, None]:
+def app_config(tdb_filepath: str) -> Generator[ApplicationConfig, None, None]:
     log = Log(20)  # INFO
     app = ApplicationConfig(tdb_dir=tdb_filepath, log=log)
     yield app
@@ -43,11 +42,17 @@ def app_config(
 
 @pytest.fixture(scope='function')
 def storage_config(
-    tmp_path_factory, bounds, resolution, crs, attrs, metrics
+    tmp_path_factory: pytest.TempPathFactory,
+    bounds: Bounds,
+    resolution: int,
+    crs: str,
+    attrs: list[Attribute],
+    metrics: list[Metric],
+    alignment: int,
 ) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
-    log = Log('DEBUG')
+    log = Log('INFO')
 
     sc = StorageConfig(
         tdb_dir=p,
@@ -57,30 +62,32 @@ def storage_config(
         resolution=resolution,
         attrs=attrs,
         metrics=metrics,
+        alignment=alignment,
         version=svversion,
     )
     Storage.create(sc)
     yield sc
 
 
+
 @pytest.fixture(scope='function')
-def storage(storage_config):
-    yield Storage.from_db(storage_config.tdb_dir)
+def storage(storage_config: StorageConfig):
+    yield Storage(storage_config)
 
 
 @pytest.fixture(scope='function')
 def shatter_config(
-    copc_filepath, storage_config, bounds, date
+    copc_filepath: str,
+    storage_config: StorageConfig,
+    bounds: Bounds,
+    date: datetime,
 ) -> Generator[ShatterConfig, None, None]:
     log = Log('INFO')  # INFO
     s = ShatterConfig(
         tdb_dir=storage_config.tdb_dir,
         log=log,
         filename=copc_filepath,
-        attrs=storage_config.attrs,
-        metrics=storage_config.metrics,
         bounds=bounds,
-        debug=True,
         date=date,
         tile_size=10,
     )
@@ -89,7 +96,12 @@ def shatter_config(
 
 
 @pytest.fixture(scope='function')
-def extract_config(tif_filepath, metrics, shatter_config, extract_attrs):
+def extract_config(
+    tif_filepath: str,
+    metrics: list[Metric],
+    shatter_config: ShatterConfig,
+    extract_attrs: list[str],
+):
     from silvimetric.commands import shatter
 
     tdb_dir = shatter_config.tdb_dir
@@ -114,18 +126,22 @@ def metrics() -> Generator[list[Metric], None, None]:
 
 
 @pytest.fixture(scope='function')
-def bounds(minx, maxx, miny, maxy) -> Generator[Bounds, None, None]:
+def bounds(
+    minx: float, maxx: float, miny: float, maxy: float
+) -> Generator[Bounds, None, None]:
     b = Bounds(minx, miny, maxx, maxy)
     yield b
 
 
 @pytest.fixture(scope='function')
-def extents(resolution, bounds) -> Generator[Extents, None, None]:
-    yield Extents(bounds, resolution, bounds)
+def extents(
+    resolution: int, alignment: int, bounds: Bounds
+) -> Generator[Extents, None, None]:
+    yield Extents(bounds, resolution, alignment, bounds)
 
 
 @pytest.fixture(scope='function')
-def attrs(dims) -> Generator[list[Attribute], None, None]:
+def attrs(dims: dict) -> Generator[list[Attribute], None, None]:
     yield [
         Attribute(a, dims[a])
         for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
@@ -142,9 +158,18 @@ def resolution() -> Generator[int, None, None]:
     yield 30
 
 
+@pytest.fixture(scope='session', params=['AlignToCenter', 'AlignToCorner'])
+def alignment(request: pytest.FixtureRequest) -> Generator[int, None, None]:
+    yield request.param
+
+
 @pytest.fixture(scope='session')
-def test_point_count() -> Generator[int, None, None]:
-    yield 90000
+def test_point_count(alignment: int) -> Generator[int, None, None]:
+    if alignment == 'AlignToCorner':
+        yield 90000
+    else:  # AlignToCenter
+        yield 108900
+
 
 
 @pytest.fixture(scope='session')

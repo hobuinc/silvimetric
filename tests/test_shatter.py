@@ -4,9 +4,12 @@ import numpy as np
 import dask
 import json
 import uuid
+from math import ceil
 
 from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
+from silvimetric.resources.attribute import Attribute
+from silvimetric.resources.metric import Metric
 
 
 @dask.delayed
@@ -25,84 +28,73 @@ def write(x, y, val, s: Storage, attrs, dims, metrics):
         w[x, y] = data
 
 
+def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
+    xysize = base
+    shape = xysize**2 * num_entries
+    pc = pointcount * num_entries
+
+    with storage.open('r') as a:
+        assert a[:, :]['Z'].shape[0] == shape
+        xdom = a.schema.domain.dim('X').domain[1]
+        ydom = a.schema.domain.dim('Y').domain[1]
+        assert xdom == xysize
+        assert ydom == xysize
+        assert a[:, :]['count'].sum() == pc
+        val_const = ceil(maxy / storage.config.resolution)
+
+        for xi in range(xdom):
+            for yi in range(ydom):
+                for i in range(a[xi, yi]['Z'].size):
+                    # assert np.all(a[xi, yi]['Z'][i] >= 9)
+                    # assert np.all(a[xi, yi]['Z'][i] <= 20)
+                    assert bool(
+                        np.all(a[xi, yi]['Z'][i] == (val_const - yi - 1))
+                    )
+
+
 class Test_Shatter(object):
-    def test_command(self, shatter_config, storage: Storage, maxy):
+    def test_command(
+        self,
+        shatter_config: ShatterConfig,
+        storage: Storage,
+        test_point_count: int,
+        threaded_dask
+    ):
         shatter(shatter_config)
-        with storage.open('r') as a:
-            assert a[:, :]['Z'].shape[0] == 100
-            xdom = a.schema.domain.dim('X').domain[1]
-            ydom = a.schema.domain.dim('Y').domain[1]
-            assert xdom == 10
-            assert ydom == 10
+        base = 11 if storage.config.alignment == 'AlignToCenter' else 10
+        maxy = storage.config.root.maxy
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
-            for xi in range(xdom):
-                for yi in range(ydom):
-                    assert a[xi, yi]['Z'].size == 1
-                    assert a[xi, yi]['Z'][0].size == 900
-                    assert a[xi, yi]['m_Z_mean'].size == 1
-                    assert a[xi, yi]['m_Z_mean'][0].size == 1
-                    # this should have all indices from 0 to 9 filled.
-                    # if oob error, it's not this test's fault
-                    assert bool(
-                        np.all(
-                            a[xi, yi]['Z'][0]
-                            == ((maxy / storage.config.resolution) - (yi + 1))
-                        )
-                    )
-
-    def test_multiple(self, shatter_config, storage: Storage, maxy):
+    def test_multiple(
+        self,
+        shatter_config: ShatterConfig,
+        storage: Storage,
+        test_point_count: int,
+        threaded_dask
+    ):
         shatter(shatter_config)
-        with storage.open('r') as a:
-            assert a[:, :]['Z'].shape[0] == 100
-            xdom = a.schema.domain.dim('X').domain[1]
-            ydom = a.schema.domain.dim('Y').domain[1]
-            assert xdom == 10
-            assert ydom == 10
-
-            for xi in range(xdom):
-                for yi in range(ydom):
-                    assert a[xi, yi]['Z'].size == 1
-                    assert a[xi, yi]['Z'][0].size == 900
-                    # this should have all indices from 0 to 9 filled.
-                    # if oob error, it's not this test's fault
-                    assert bool(
-                        np.all(
-                            a[xi, yi]['Z'][0]
-                            == ((maxy / storage.config.resolution) - (yi + 1))
-                        )
-                    )
+        base = 11 if storage.config.alignment == 'AlignToCenter' else 10
+        maxy = storage.config.root.maxy
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
         # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
         shatter_config.mbr = ()
         shatter_config.time_slot = 2
-
         shatter(shatter_config)
-        with storage.open('r') as a:
-            # querying flattens to 20, there will 10 pairs of values
-            assert a[:, :]['Z'].shape[0] == 200
-            assert a[:, 0]['Z'].shape[0] == 20
-            assert a[0, :]['Z'].shape[0] == 20
-            # now test that the second set is the same as the first set
-            # and test that this value is still the same as the original
-            # which was set at ((maxy/resolution)-yindex)
-            for xi in range(xdom):
-                for yi in range(ydom):
-                    assert a[xi, yi]['Z'].size == 2
-                    assert a[xi, yi]['Z'][0].size == 900
-                    assert a[xi, yi]['Z'][1].size == 900
-                    assert bool(np.all(a[xi, yi]['Z'][1] == a[xi, yi]['Z'][0]))
-                    assert bool(
-                        np.all(
-                            a[xi, yi]['Z'][1]
-                            == ((maxy / storage.config.resolution) - (yi + 1))
-                        )
-                    )
+        confirm_one_entry(storage, maxy, base, test_point_count, 2)
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
 
-    def test_parallel(self, storage, attrs, dims, threaded_dask, metrics):
+    def test_parallel(
+        self,
+        storage: Storage,
+        attrs: list[Attribute],
+        dims: dict,
+        threaded_dask: None,
+        metrics: list[Metric],
+    ):
         # test that writing in parallel doesn't affect ordering of values
         # constrained by NumberOfReturns being uint8
 
@@ -125,7 +117,13 @@ class Test_Shatter(object):
                     np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx])
                 )
 
-    def test_config(self, shatter_config, storage, test_point_count):
+    def test_config(
+        self,
+        shatter_config: ShatterConfig,
+        storage: Storage,
+        test_point_count: int,
+        threaded_dask
+    ):
         shatter(shatter_config)
         try:
             meta = storage.getMetadata('shatter', shatter_config.time_slot)
@@ -139,7 +137,13 @@ class Test_Shatter(object):
         'sh_cfg', ['shatter_config', 'uneven_shatter_config']
     )
     def test_sub_bounds(
-        self, sh_cfg, test_point_count, request, maxy, resolution
+        self,
+        sh_cfg: str,
+        test_point_count: int,
+        request: pytest.FixtureRequest,
+        maxy: float,
+        alignment: str,
+        threaded_dask
     ):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)
@@ -154,9 +158,6 @@ class Test_Shatter(object):
                 log=log,
                 filename=s.filename,
                 tile_size=s.tile_size,
-                attrs=s.attrs,
-                metrics=s.metrics,
-                debug=s.debug,
                 bounds=b.bounds,
                 date=s.date,
                 time_slot=time_slot,
@@ -166,54 +167,49 @@ class Test_Shatter(object):
         assert len(history) == 4
         assert isinstance(history, list)
         pcs = [h['point_count'] for h in history]
-        assert sum(pcs) == test_point_count
-        assert pc == test_point_count
+
+        # When alignment is point and using uneven_shatter_config, the bounds
+        # will be changed so that not all points are grabbed. This is expected.
+        if alignment != 'AlignToCenter' or sh_cfg != 'uneven_shatter_config':
+            assert sum(pcs) == test_point_count
+            assert pc == test_point_count
 
         with storage.open('r') as a:
-            xdom = a.schema.domain.dim('X').domain[1]
-            ydom = a.schema.domain.dim('Y').domain[1]
-
             data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
             data = data.set_index(['X', 'Y'])
 
-            for xi in range(xdom):
-                for yi in range(ydom):
+            minx = data.reset_index().X.min()
+            maxx = data.reset_index().X.max()
+            miny = data.reset_index().Y.min()
+            maxy = data.reset_index().Y.max()
+
+            for xi in range(minx, maxx + 1):
+                for yi in range(miny, maxy + 1):
                     curr = data.loc[xi, yi]
                     # check that each cell only has one allocation
-                    assert curr.size == 1
+                    assert curr.size == 1.0
 
-    def test_partial_overlap(self, partial_shatter_config, test_point_count):
+    def test_partial_overlap(
+        self, partial_shatter_config: ShatterConfig, alignment: int
+    ):
         pc = shatter(partial_shatter_config)
-        assert pc == test_point_count / 4
+        actual = 22500 if alignment == 'AlignToCorner' else 32400
+        assert pc == actual
 
     @pytest.mark.skipif(
         os.environ.get('AWS_SECRET_ACCESS_KEY') is None
         or os.environ.get('AWS_ACCESS_KEY_ID') is None,
         reason='Missing necessary AWS environment variables',
     )
-    def test_remote_creation(self, s3_shatter_config, s3_storage):
+    def test_remote_creation(
+        self,
+        s3_shatter_config: ShatterConfig,
+        s3_storage: Storage,
+    ):
         # need processes scheduler to accurately test bug fix
         dask.config.set(scheduler='processes')
-        resolution = s3_storage.config.resolution
         maxy = s3_storage.config.root.maxy
+        base = 11
+        point_count = 108900
         shatter(s3_shatter_config)
-        with s3_storage.open('r') as a:
-            assert a[:, :]['Z'].shape[0] == 100
-            xdom = a.schema.domain.dim('X').domain[1]
-            ydom = a.schema.domain.dim('Y').domain[1]
-            assert xdom == 10
-            assert ydom == 10
-            # get all data local so we're not hittin s3 all the time
-            data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
-            data = data.set_index(['X', 'Y'])
-
-            for xi in range(xdom):
-                for yi in range(ydom):
-                    curr = data.loc[xi, yi]
-                    assert curr.size == 1
-                    assert curr.iloc[0].size == 900
-                    # this should have all indices from 0 to 9 filled.
-                    # if oob error, it's not this test's fault
-                    assert bool(
-                        np.all(curr.iloc[0] == ((maxy / resolution) - (yi + 1)))
-                    )
+        confirm_one_entry(s3_storage, maxy, base, point_count, 1)

@@ -1,43 +1,60 @@
 from ..metric import Metric
 import numpy as np
-from lmoments3 import distr
-
-import warnings
-
-# TODO: provide link to documentation on L-Moments
 
 
-def lmom4(data):
-    # suppress warnings from dividing by 0, these are handled in the metric creation
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', category=RuntimeWarning)
-        n = data.count()
-        try:
-            paras = distr.gam.lmom_fit(data)
-            if n < 1:
-                return [np.nan, np.nan, np.nan, np.nan]
-            elif n < 2:
-                return [data.mean, np.nan, np.nan, np.nan]
-            elif n < 3:
-                return [
-                    *distr.gam.lmom(nmom=2, **paras),
-                    np.nan,
-                    np.nan,
-                    np.nan,
-                ]
-            elif n < 4:
-                return [
-                    *distr.gam.lmom(nmom=3, **paras),
-                    np.nan,
-                    np.nan,
-                    np.nan,
-                ]
-            return [*distr.gam.lmom(nmom=4, **paras)]
-        except Exception:
-            return [data.mean(), np.nan, np.nan, np.nan]
+def lmom4(data, *args):
+    """
+    Create approximations of first 4 L-Moments of the cell (sample) data.
+    Adapted from https://xiaoganghe.github.io/python-climate-visuals/chapters/data-analytics/scipy-basic.html
+    """
+
+    data = data.values
+    n = len(data)
+    idx = np.arange(n)
+
+    # sort in descending order
+    data = np.sort(data.reshape(n))[::-1]
+
+    b0 = data.mean()
+    l1: float = b0
+
+    # cannot compute l-moments greater than the number of points
+    if n < 2:
+        l2 = np.nan
+    else:
+        b1 = (data * (n - idx - 1) / n / (n - 1)).sum()
+        l2: float = 2 * b1 - b0
+
+    if n < 3:
+        l3 = np.nan
+    else:
+        b2_data = data[:-1]
+        b2_idx = idx[:-1]
+        b2 = (
+            b2_data
+            * (n - b2_idx - 1)
+            * (n - b2_idx - 2)
+            / (n * (n - 1) * (n - 2))
+        ).sum()
+        l3: float = 6 * (b2 - b1) + b0
+
+    if n < 4:
+        l4 = np.nan
+    else:
+        b3_data = b2_data[:-1]
+        b3_idx = b2_idx[:-1]
+        b3 = (
+            b3_data
+            * (n - b3_idx - 1)
+            * (n - b3_idx - 2)
+            * (n - b3_idx - 3)
+            / (n * (n - 1) * (n - 2) * (n - 3))
+        ).sum()
+        l4: float = 20 * b3 - 30 * b2 + 12 * b1 - b0
+
+    return l1, l2, l3, l4
 
 
-# L1 is same as mean...computed using np.mean in L-moment base for speed
 def m_l1(data, *args):
     return args[0][0]
 
@@ -100,57 +117,3 @@ l_moments: dict[str, Metric] = {
     'lskewness': lskewness,
     'lkurtosis': lkurtosis,
 }
-
-# adapted from: https://xiaoganghe.github.io/python-climate-visuals/chapters/data-analytics/scipy-basic.html
-# added b3 and l4 from:
-#   Vogel, R. M. and Fennessey, N. M.: L moment diagrams should replace product moment diagrams,
-#   Water Resour. Res., 29, 1745–1752, https://doi.org/10.1029/93WR00341, 1993.
-# def lmom4_og(data, *args):
-#     # lmom4 returns the first four L-moments of data
-#     # data is the 1-d array
-#     # n is the total number of points in data, j is the j_th point
-#     #
-#     # j range in for loops starts with 1 so we need to subtract 1 for all b# equations
-
-#     data = data.values
-#     n = len(data)
-#     # sort in descending order
-#     data = np.sort(data.reshape(n))[::-1]
-
-#     b0 = args[0]
-#     l1: float = b0
-
-#     # cannot compute l-moments greater than the number of points
-#     if n < 2:
-#         l2 = np.nan
-#     else:
-#         b1 = np.array([(n - j - 1) * data[j] / n / (n - 1)
-#                     for j in range(n)]).sum()
-#         l2: float = 2 * b1 - b0
-
-#     if n < 3:
-#         l3 = np.nan
-#     else:
-#         b2 = np.array([(n - j - 1) * (n - j - 2) * data[j] / n / (n - 1) / (n - 2)
-#                     for j in range(n - 1)]).sum()
-#         l3: float = 6 * (b2 - b1) + b0
-
-#     if n < 4:
-#         l4 = np.nan
-#     else:
-#         b3 = np.array([(n - j - 1) * (n - j - 2) * (n - j - 3) * data[j] / n / (n - 1) / (n - 2) / (n - 3)
-#                     for j in range(n - 2)]).sum()
-#         l4: float = 20 * b3 - 30 * b2 + 12 * b1 - b0
-
-
-#     return l1, l2, l3, l4
-
-# TODO compute L-moments. These are done separately because we only add
-# a single element to TileDB. This is very inefficient since we have to
-# compute all L-moments at once. Ideally, we would have a single metric
-# function that returns an array with 7 values
-
-# added code to compute first 4 l-moments in lmom4.py. There is a package,
-# lmoments3 that can compute the same values but I wanted to avoid the
-# package as it has some IBM copyright requirements (need to include copyright
-# statement with derived works)

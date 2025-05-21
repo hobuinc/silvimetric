@@ -1,12 +1,10 @@
 import click
 import pyproj
 import webbrowser
-from contextlib import nullcontext
 
 import dask
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
-from distributed.client import _get_global_client as get_client
 
 from ..resources.metrics import (
     l_moments,
@@ -20,6 +18,14 @@ from .. import Bounds, Attribute, Metric, Attributes, Log
 
 
 class BoundsParamType(click.ParamType):
+    """Click parameter type for the Bounds class.
+
+    Accepts bounds as a stringified JSON object or bbox array. Examples:
+    "([1,101],[2,102],[3,103])"
+    "{\"minx\": 1,\"miny\": 2,\"maxx\": 101,\"maxy\": 102}"
+    "[1,2,101,102]"
+    "[1,2,3,101,102,103]"
+    """
     name = 'Bounds'
 
     def convert(self, value, param, ctx):
@@ -31,6 +37,10 @@ class BoundsParamType(click.ParamType):
 
 
 class CRSParamType(click.ParamType):
+    """Click parameter type for the Coordinate Reference System of a project.
+
+    Accepts a string and returns an instance of the pyproj.CRS class.
+    """
     name = 'CRS'
 
     def convert(self, value, param, ctx) -> pyproj.CRS:
@@ -42,6 +52,10 @@ class CRSParamType(click.ParamType):
 
 
 class AttrParamType(click.ParamType):
+    """Click parameter for SilviMetric Attributes.
+
+    Returns list of PDAL dimensions that match the strings input.
+    """
     name = 'Attrs'
 
     # TODO add import similar to metrics
@@ -56,10 +70,15 @@ class AttrParamType(click.ParamType):
         elif isinstance(value, str):
             return Attributes[value]
         else:
-            self.fail(f'{value!r} is of an invalid type, {e}', param, ctx)
+            self.fail(f'{value!r} is of an invalid type.', param, ctx)
 
 
 class MetricParamType(click.ParamType):
+    """Custom Click parameter type.
+
+    This param accepts names of metric groups or a path to a file containing
+    custom metrics.
+    """
     name = 'metrics'
 
     def convert(self, value, param, ctx) -> list[Metric]:
@@ -80,7 +99,7 @@ class MetricParamType(click.ParamType):
                     if not p.exists():
                         self.fail(
                             'Failed to find import file for metrics at'
-                            f' {str(p)}',
+                            f' {p}',
                             param,
                             ctx,
                         )
@@ -93,7 +112,7 @@ class MetricParamType(click.ParamType):
                     ms = user_metrics.metrics()
                 except Exception as e:
                     self.fail(
-                        f'Failed to import metrics from {str(p)} with error {e}',
+                        f'Failed to import metrics from {p} with error {e}',
                         param,
                         ctx,
                     )
@@ -126,7 +145,7 @@ class MetricParamType(click.ParamType):
                             metrics.add(m)
                         else:
                             metrics.udpate(list(m))
-                except Exception as e:
+                except Exception:
                     self.fail(
                         f'{val!r} is not available in Metrics', param, ctx
                     )

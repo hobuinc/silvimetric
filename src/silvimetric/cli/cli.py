@@ -255,6 +255,12 @@ def scan_cmd(
 @click.option(
     '--resolution', type=float, default=30.0, help='Summary pixel resolution'
 )
+@click.option(
+    '--alignment',
+    type=str,
+    default='AlignToCenter',
+    help="Pixel alignment: 'AlignToCenter' or 'AlignToCorner'",
+)
 @click.pass_obj
 def initialize_cmd(
     app: ApplicationConfig,
@@ -263,6 +269,7 @@ def initialize_cmd(
     attributes: list[Attribute],
     resolution: float,
     metrics: list[Metric],
+    alignment: str
 ):
     """Initialize silvimetrics DATABASE"""
 
@@ -274,6 +281,7 @@ def initialize_cmd(
         attrs=attributes,
         metrics=metrics,
         resolution=resolution,
+        alignment=alignment
     )
     return initialize.initialize(storageconfig)
 

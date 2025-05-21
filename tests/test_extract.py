@@ -1,9 +1,10 @@
 from pathlib import Path
 from osgeo import gdal
 from pyproj import CRS
+from math import ceil
 
 from silvimetric import (
-    grid_metrics,
+    all_metrics,
     ExtractConfig,
     Extents,
     Log,
@@ -16,13 +17,16 @@ def tif_test(extract_config):
     minx, miny, maxx, maxy = extract_config.bounds.get()
     resolution = extract_config.resolution
     filenames = [
-        grid_metrics[m.name].entry_name(a.name)
+        all_metrics[m.name].entry_name(a.name)
         for m in extract_config.metrics
         for a in extract_config.attrs
     ]
     storage = Storage.from_db(extract_config.tdb_dir)
     e = Extents(
-        extract_config.bounds, extract_config.resolution, storage.config.root
+        extract_config.bounds,
+        extract_config.resolution,
+        storage.config.alignment,
+        storage.config.root,
     )
     root_maxy = storage.config.root.maxy
 
@@ -50,7 +54,7 @@ def tif_test(extract_config):
         r = raster.ReadAsArray()
         assert all(
             [
-                r[y, x] == ((root_maxy / resolution) - y - 1)
+                r[y, x] == (ceil(root_maxy / resolution) - y - 1)
                 for y in range(e.y1, e.y2)
                 for x in range(e.x1, e.x2)
             ]
@@ -59,7 +63,11 @@ def tif_test(extract_config):
 
 class Test_Extract(object):
     def test_config(
-        self, extract_config, tdb_filepath, tif_filepath, extract_attrs
+        self,
+        extract_config: ExtractConfig,
+        tdb_filepath: str,
+        tif_filepath: str,
+        extract_attrs: list[str],
     ):
         assert all(
             [a in [*extract_attrs, 'count'] for a in extract_config.attrs]
@@ -68,11 +76,11 @@ class Test_Extract(object):
         assert extract_config.tdb_dir == tdb_filepath
         assert extract_config.out_dir == tif_filepath
 
-    def test_extract(self, extract_config):
+    def test_extract(self, extract_config: ExtractConfig):
         extract(extract_config)
         tif_test(extract_config)
 
-    def test_sub_bounds_extract(self, extract_config):
+    def test_sub_bounds_extract(self, extract_config: ExtractConfig):
         s = extract_config
         e = Extents.from_storage(s.tdb_dir)
         log = Log(20)
@@ -89,6 +97,6 @@ class Test_Extract(object):
             extract(ec)
             tif_test(ec)
 
-    def test_multi_value(self, multivalue_config):
+    def test_multi_value(self, multivalue_config: ExtractConfig):
         extract(multivalue_config)
         tif_test(multivalue_config)

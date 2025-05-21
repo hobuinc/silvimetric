@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          lfs: 'true'
       - uses: mamba-org/setup-micromamba@v2
         with:
           init-shell: bash

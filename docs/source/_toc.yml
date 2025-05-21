@@ -7,7 +7,6 @@ parts:
 - caption: Getting Started
   chapters:
   - file: about
-  - file: quickstart
 - caption: CLI
   chapters:
   - file: cli/extract

@@ -18,11 +18,6 @@ from .attribute import Attribute, Attributes
 from .. import __version__
 
 
-class SilviMetricJSONEncoder(json.JSONEncoder):
-    def default(self, o):
-        return o.__dict__
-
-
 @dataclass(kw_only=True)
 class Config(ABC):
     """Base config"""
@@ -66,6 +61,9 @@ class StorageConfig(Config):
     """Coordinate reference system, same for all data in a project"""
     resolution: float = 30.0
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
+    alignment: str = 'AlignToCenter'
+    """Alignment of pixels in database, same for all data in a project,
+    options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
 
     attrs: list[Attribute] = field(
         default_factory=lambda: [
@@ -76,9 +74,7 @@ class StorageConfig(Config):
     """List of :class:`silvimetric.resources.attribute.Attribute` attributes
     that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
     Intensity"""
-    metrics: list[Metric] = field(
-        default_factory=lambda: [grid_metrics[m] for m in grid_metrics.keys()]
-    )
+    metrics: list[Metric] = field(default_factory=lambda: [])
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
     that represent derived data, defaults to values in grid_metrics object"""
     version: str = __version__
@@ -103,15 +99,14 @@ class StorageConfig(Config):
                 for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
             ]
         if not len(self.metrics):
-            self.metrics = [grid_metrics[m] for m in grid_metrics.keys()]
+            gm = grid_metrics.get_grid_metrics()
+            self.metrics = list(gm.values())
 
         if not self.crs.is_projected:
             raise Exception(
                 'Given coordinate system is not a rectilinear'
                 ' projected coordinate system'
             )
-
-        self.metric_definitions = {m.name: str(m) for m in self.metrics}
 
     def __eq__(self, other):
         # We don't compare logs
@@ -154,6 +149,7 @@ class StorageConfig(Config):
             root=root,
             log=Log(**x['log']),
             resolution=x['resolution'],
+            alignment=x['alignment'],
             attrs=attrs,
             crs=crs,
             metrics=ms,
@@ -225,12 +221,6 @@ class ShatterConfig(Config):
     """Input filename referencing a PDAL pipeline or point cloud file."""
     date: Union[datetime, Tuple[datetime, datetime]]
     """A date or date range representing data collection times."""
-    attrs: list[Attribute] = field(default_factory=list)
-    """List of attributes to use in shatter. If this is not set it will be
-    filled by the attributes in the database instance."""
-    metrics: list[Metric] = field(default_factory=list)
-    """A list of metrics to use in shatter. If this is not set it will be filled
-    by the metrics in the database instance."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
@@ -266,10 +256,6 @@ class ShatterConfig(Config):
                 f'Truncating tile size to integer({self.tile_size})'
             )
             pass
-        if not self.attrs:
-            self.attrs = s.getAttributes()
-        if not self.metrics:
-            self.metrics = s.getMetrics()
 
         del s
 
@@ -297,8 +283,6 @@ class ShatterConfig(Config):
         d['name'] = str(self.name)
         d['time_slot'] = self.time_slot
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
-        d['attrs'] = [a.to_json() for a in self.attrs]
-        d['metrics'] = [m.to_json() for m in self.metrics]
         d['mbr'] = list(self.mbr)
 
         if isinstance(self.date, tuple):
@@ -316,8 +300,6 @@ class ShatterConfig(Config):
     def from_dict(cls, data: dict):
         x = data
 
-        ms = list([Metric.from_dict(m) for m in x['metrics']])
-        attrs = list([Attribute.from_dict(a) for a in x['attrs']])
         if isinstance(x['date'], list):
             date = tuple(
                 (datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in x['date'])
@@ -331,8 +313,6 @@ class ShatterConfig(Config):
         n = cls(
             tdb_dir=x['tdb_dir'],
             filename=x['filename'],
-            attrs=attrs,
-            metrics=ms,
             debug=x['debug'],
             name=uuid.UUID(x['name']),
             bounds=Bounds(*x['bounds']),
