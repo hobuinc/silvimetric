@@ -136,7 +136,7 @@ class MetricParamType(click.ParamType):
                     elif val == 'aad':
                         metrics.update(list(aad.aad.values()))
                     elif val == 'grid_metrics':
-                        metrics.update(list(grid_metrics.values()))
+                        metrics.update(list(grid_metrics.get_grid_metrics().values()))
                     elif val == 'all':
                         metrics.update(list(all_metrics.values()))
                     else:
@@ -158,7 +158,6 @@ def dask_handle(
     workers: int,
     threads: int,
     watch: bool,
-    log: Log,
 ) -> None:
     dask_config = {}
 

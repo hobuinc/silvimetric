@@ -35,8 +35,8 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
 
     with storage.open('r') as a:
         assert a[:, :]['Z'].shape[0] == shape
-        xdom = a.schema.domain.dim('X').domain[1]
-        ydom = a.schema.domain.dim('Y').domain[1]
+        xdom = int(a.schema.domain.dim('X').domain[1])
+        ydom = int(a.schema.domain.dim('Y').domain[1])
         assert xdom == xysize
         assert ydom == xysize
         assert a[:, :]['count'].sum() == pc
@@ -178,10 +178,10 @@ class Test_Shatter(object):
             data = a.query(attrs=['Z'], coords=True, use_arrow=False).df[:]
             data = data.set_index(['X', 'Y'])
 
-            minx = data.reset_index().X.min()
-            maxx = data.reset_index().X.max()
-            miny = data.reset_index().Y.min()
-            maxy = data.reset_index().Y.max()
+            minx = int(data.reset_index().X.min())
+            maxx = int(data.reset_index().X.max())
+            miny = int(data.reset_index().Y.min())
+            maxy = int(data.reset_index().Y.max())
 
             for xi in range(minx, maxx + 1):
                 for yi in range(miny, maxy + 1):

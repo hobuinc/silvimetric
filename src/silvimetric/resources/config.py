@@ -1,5 +1,6 @@
 import pyproj
 
+import os
 import json
 import uuid
 
@@ -33,7 +34,14 @@ class Config(ABC):
         keys = self.__dataclass_fields__.keys()
         d = {}
         for k in keys:
-            d[k] = self.__dict__[k]
+            if k == 'tdb_dir':
+                tdb_dir = self.__dict__[k]
+                if "://" not in tdb_dir:
+                    d[k] = os.path.abspath(tdb_dir)
+                else:
+                    d[k] = tdb_dir
+            else:
+                d[k] = self.__dict__[k]
         if not isinstance(d['log'], dict):
             d['log'] = d['log'].to_json()
         return d

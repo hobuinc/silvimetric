@@ -59,14 +59,10 @@ class Extents(object):
 
         :return: Indices of this bounding box
         """
-        return np.array(
-            [
-                (i, j)
-                for i in range(self.x1, self.x2)
-                for j in range(self.y1, self.y2)
-            ],
-            dtype=[('x', np.int32), ('y', np.int32)],
-        )
+        xis = np.arange(self.x1, self.x2, dtype=np.int32)
+        yis = np.arange(self.y1, self.y2, dtype=np.int32)
+        xys = np.array(np.meshgrid(xis,yis)).T.reshape(-1,2)
+        return xys
 
     def disjoint_by_mbr(self, mbr):
         """

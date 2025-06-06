@@ -1,7 +1,7 @@
 from pathlib import Path
-from itertools import chain
 
-
+from dask.diagnostics import ProgressBar
+from distributed.client import _get_global_client as get_client
 from typing_extensions import Union
 from osgeo import gdal, osr
 import dask
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 
-from .. import Storage, Extents, ExtractConfig
+from .. import Storage, Extents, ExtractConfig, Bounds, Graph
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -27,8 +27,7 @@ np_to_gdal_types = {
 
 
 def write_tif(
-    xsize: int,
-    ysize: int,
+    bounds: Bounds,
     data: np.ndarray,
     nan_val: float | int,
     name: str,
@@ -48,13 +47,14 @@ def write_tif(
     crs = config.crs
     srs = osr.SpatialReference()
     srs.ImportFromWkt(crs.to_wkt())
-    b = config.bounds
+    minx, miny, maxx, maxy = bounds.get()
+    ysize, xsize = data.shape
 
     transform = [
-        b.minx,
+        minx,
         config.resolution,
         0,
-        b.maxy,
+        maxy,
         0,
         -1 * config.resolution,
     ]
@@ -70,8 +70,8 @@ def write_tif(
     )
     tif.SetGeoTransform(transform)
     tif.SetProjection(srs.ExportToWkt())
-    tif.GetRasterBand(1).WriteArray(data)
     tif.GetRasterBand(1).SetNoDataValue(nan_val)
+    tif.GetRasterBand(1).WriteArray(data)
     tif.FlushCache()
     tif = None
 
@@ -98,17 +98,20 @@ def get_metrics(
 
     # set index so we can apply to the whole dataset without needing to skip X
     # and Y then reset in the index because that's what metric.do expects
-    exploded = data_in.set_index(['X', 'Y']).apply(expl)[attrs].reset_index()
-    metric_data = dask.persist(
-        *[m.do(exploded) for m in storage.config.metrics]
-    )
+    data_in = data_in.set_index(['Y', 'X'])
+    exploded = data_in.apply(expl)[attrs].reset_index()
 
-    data_out = data_in.set_index(['X', 'Y']).join([m for m in metric_data])
-    return data_out
+    exploded.rename(columns={'X': 'xi', 'Y': 'yi'}, inplace=True)
+    graph = Graph(storage.config.metrics)
+    metric_data = graph.run(exploded)
+    #rename index from xi,yi to X,Y
+    metric_data.index = metric_data.index.rename(['Y','X'])
+
+    return metric_data
 
 
 def handle_overlaps(
-    config: ExtractConfig, storage: Storage, indices: np.ndarray
+    config: ExtractConfig, storage: Storage, extents: Extents
 ) -> pd.DataFrame:
     """
     Handle cells that have overlapping data. We have to re-run metrics over
@@ -124,10 +127,10 @@ def handle_overlaps(
     ma_list = storage.getDerivedNames()
     att_list = [a.name for a in config.attrs]
 
-    minx = indices['x'].min()
-    maxx = indices['x'].max()
-    miny = indices['y'].min()
-    maxy = indices['y'].max()
+    minx = extents.x1
+    maxx = extents.x2
+    miny = extents.y1
+    maxy = extents.y2
 
     att_meta = {}
     att_meta['X'] = np.int32
@@ -137,36 +140,35 @@ def handle_overlaps(
         att_meta[a.name] = a.dtype
 
     with storage.open('r') as tdb:
-        # TODO this can be more efficient. Use count to find indices, then work
-        # with that smaller set from there. Working as is for now, but slow.
-        dit = tdb.query(
-            attrs=[*att_list, *ma_list],
+        storage.config.log.info('Looking for overlaps...')
+        data = tdb.query(
+            attrs=[*ma_list],
             order='F',
             coords=True,
-            return_incomplete=True,
-            use_arrow=False,
         ).df[minx:maxx, miny:maxy]
-        data = pd.DataFrame()
-
-        storage.config.log.info('Collecting database information...')
-        for d in dit:
-            if data.empty:
-                data = d
-            else:
-                data = pd.concat([data, d])
+        data = data
 
         # find values that are not unique, means they have multiple entries
-        data = data.set_index(['X', 'Y'])
+        data = data.set_index(['Y', 'X'])
         redo_indices = data.index[data.index.duplicated(keep='first')]
         if redo_indices.empty:
-            return data.reset_index()
+            storage.config.log.info('No overlapping data. Continuing...')
+            return data
+
+        redo_data = (
+            tdb.query(
+                attrs=[*att_list],
+                order='F',
+                coords=True,
+                use_arrow=False,
+            )
+            .df[:, :]
+            .set_index(['Y', 'X'])
+        )
 
         # data with overlaps
-        redo_data = (
-            data.loc[redo_indices][att_list]
-            .groupby(['X', 'Y'])
-            .agg(lambda x: list(chain(*x)))
-        )
+        redo_data = redo_data.loc[redo_indices]
+
         # data that has no overlaps
         clean_data = data.loc[data.index[~data.index.duplicated(False)]]
 
@@ -174,7 +176,7 @@ def handle_overlaps(
             'Overlapping data detected. Rerunning metrics over these cells...'
         )
         new_metrics = get_metrics(redo_data.reset_index(), storage)
-    return pd.concat([clean_data, new_metrics]).reset_index()
+    return pd.concat([clean_data, new_metrics])
 
 
 def extract(config: ExtractConfig) -> None:
@@ -197,28 +199,43 @@ def extract(config: ExtractConfig) -> None:
         storage.config.alignment,
         root=root_bounds,
     )
-    i = e.get_indices()
-    xsize = e.x2
-    ysize = e.y2
 
     # figure out if there are any overlaps and handle them
-    final = handle_overlaps(config, storage, i).sort_values(['Y', 'X'])
+    final = handle_overlaps(config, storage, e)
+
+    xis = final.index.get_level_values(1).astype(np.int64)
+    yis = final.index.get_level_values(0).astype(np.int64)
+    new_idx = pd.MultiIndex.from_product(
+        (range(yis.min(), yis.max() + 1), range(xis.min(), xis.max() + 1))
+    ).rename(['Y','X'])
+    final = final.reindex(new_idx)
+
+    xs = root_bounds.minx + xis * config.resolution
+    ys = root_bounds.maxy - yis * config.resolution
+    final_bounds = Bounds(xs.min(), ys.min(), xs.max(), ys.max())
 
     # output metric data to tifs
     config.log.info(f'Writing rasters to {config.out_dir}')
+    futures = []
     for ma in ma_list:
         # TODO should output in sections so we don't run into memory problems
         dtype = final[ma].dtype
-        if dtype.kind in ['u', 'i']:
-            nan_val = np.iinfo(dtype).max
-        elif dtype.kind == 'f':
-            nan_val = np.nan
+        if dtype.kind == 'u':
+            nan_val = 0
+        elif dtype.kind in ['i', 'f']:
+            nan_val = -9999
         else:
-            raise ValueError('Invalid Raster data type {dtype}.')
+            nan_val = 0
+        unstacked = final[ma].unstack()
+        m_data = unstacked.to_numpy()
 
-        m_data = np.full(shape=(ysize, xsize), fill_value=nan_val, dtype=dtype)
-        a = final[['X', 'Y', ma]].to_numpy()
-        for x, y, md in a[:]:
-            m_data[int(y)][int(x)] = md
+        futures.append(
+            dask.delayed(write_tif)(final_bounds, m_data, nan_val, ma, config)
+        )
 
-        write_tif(xsize, ysize, m_data, nan_val, ma, config)
+    dc = get_client()
+    if dc is not None:
+        dask.compute(*futures)
+    else:
+        with ProgressBar():
+            dask.compute(*futures)

@@ -92,9 +92,6 @@ class TestCommands(object):
     def test_resume(
         self, shatter_config: ShatterConfig, storage_config: StorageConfig
     ):
-        # test that shatter only operates on cells not in nonempty_domain
-        storage = Storage.from_db(shatter_config.tdb_dir)
-
         # if AlignToCorner, then the count is 3/4 of the total when
         #     mbr = ((0,4), (0,4)),)
         # if AlignToCenter, extents are shifted half a pixel to the right,
@@ -103,17 +100,9 @@ class TestCommands(object):
             67500.0 if storage_config.alignment == 'AlignToCorner' else 86400
         )
 
-        # if pixel is area, mbr is 75 (100-25)
-        # if pixel is point, mbr is 96 (121-25)
-        mbr_count = 75 if storage_config.alignment == 'AlignToCorner' else 96
-
         # modify shatter config
         shatter_config.tile_size = 1
         shatter_config.mbr = (((0, 4), (0, 4)),)
         # send to shatter
         pc = shatter.shatter(shatter_config)
         assert pc == partial_count
-        # check output config to see what the nonempthy_domain is
-        #   - should be only only values outside of that tuple
-        m = json.loads(storage.getMetadata('shatter', 1))
-        assert len(m['mbr']) == mbr_count

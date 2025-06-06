@@ -9,9 +9,15 @@ def m_mode(data, *args):
     # split into 64 bins, return highest bin count
     # if there is a tie, return first entry (lowest bin index)
 
-    counts, bins = np.histogram(data, 64, range=(data.min(), data.max()))
+    try:
+        counts, bins = np.histogram(data, 64)
+    except ValueError:
+        try:
+            counts, bins = np.histogram(data)
+        except ValueError:
+            return np.nan
     mode = bins[:-1][counts == counts.max()]
-    return mode[0].item()
+    return mode[0]
 
 
 def m_median(data, *args):

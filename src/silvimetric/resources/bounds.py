@@ -127,9 +127,12 @@ class Bounds(dict):  # for JSON serializing
         :param other: Bounds this object is being compared to
         :return: True if this box shares no point with the other
         """
-        if other.minx > self.maxx or other.maxx < self.minx:
+        # disjoint varies minorly from normal because we don't use points
+        # on the maxx or maxy lines, so they can be equal to the min vals
+        # and stil functionally disjoint
+        if other.minx >= self.maxx or other.maxx <= self.minx:
             return True
-        if other.miny > self.maxy or other.maxy < self.miny:
+        if other.miny >= self.maxy or other.maxy <= self.miny:
             return True
         return False
 

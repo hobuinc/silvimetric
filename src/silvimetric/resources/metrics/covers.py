@@ -8,14 +8,14 @@ from .counts import first_returns_filter, get_count_metrics
 ##### Methods ######
 def cover_fn(data, *args):
     count = args[0]
-    return data.count() / count * 100
-
-def cover_fn2(data, *args):
-    count = args[0]
+    if count == 0:
+        return np.nan
     return data.count() / count * 100
 
 def cover_above_val(data, *args):
     count = args[0]
+    if data.count() == 0:
+        return np.nan
     return count / data.count() * 100
 
 
@@ -50,7 +50,7 @@ def get_cover_metrics(elev_key='Z'):
     first_cover = Metric(
         '1st_cover_above_htbreak',
         np.float32,
-        cover_fn2,
+        cover_fn,
         dependencies=[counts['1st_count']],
         filters=[first_returns_filter],
         attributes=[A['ReturnNumber']],

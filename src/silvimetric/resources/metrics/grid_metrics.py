@@ -71,6 +71,7 @@ def _get_grid_metrics(elev_key='Z'):
 
     aad['aad'].attributes = [A[elev_key], A['Intensity']]
     aad['mad_median'].attributes = [A[elev_key]]
+    aad['mad_mean'].attributes = [A[elev_key]]
     aad['mad_mode'].attributes = [A[elev_key]]
 
     grid_metrics: dict[str, Metric] = dict(
