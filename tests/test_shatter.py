@@ -1,10 +1,13 @@
 import os
+import json
+import uuid
+import datetime
+from math import ceil
+
 import pytest
 import numpy as np
 import dask
-import json
-import uuid
-from math import ceil
+import tiledb
 
 from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
@@ -24,6 +27,8 @@ def write(x, y, val, s: Storage, attrs, dims, metrics):
         data[m] = [val]
 
     data['count'] = [val]
+    data['start_datetime'] = [0]
+    data['end_datetime'] = [datetime.datetime.now().timestamp()]
     with s.open('w') as w:
         w[x, y] = data
 
@@ -81,8 +86,16 @@ class Test_Shatter(object):
         shatter_config.name = uuid.uuid4()
         shatter_config.mbr = ()
         shatter_config.time_slot = 2
+        shatter_config.date = (datetime.datetime(2009,1,1),datetime.datetime(2010,1,1))
         shatter(shatter_config)
         confirm_one_entry(storage, maxy, base, test_point_count, 2)
+
+        # check that you can query results by datetime
+        with storage.open('r') as a:
+            a:tiledb.SparseArray
+            query_time = datetime.datetime(2009,1,1).timestamp()
+            q = a.query(cond=f'start_datetime >= {query_time}')
+            assert q.df[:,:]['start_datetime'].size == base ** 2
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2

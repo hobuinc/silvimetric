@@ -73,6 +73,12 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name='count', dtype=np.int32)
+        start_dt_att = tiledb.Attr(
+            name='start_datetime', dtype=np.datetime64('', 's').dtype
+        )
+        end_dt_att = tiledb.Attr(
+            name='end_datetime', dtype=np.datetime64('', 's').dtype
+        )
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [
@@ -100,7 +106,7 @@ class Storage:
         schema = tiledb.ArraySchema(
             domain=domain,
             sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts],
+            attrs=[count_att, start_dt_att, end_dt_att, *dim_atts, *metric_atts],
             allows_duplicates=True,
             capacity=1000,
         )
@@ -117,7 +123,7 @@ class Storage:
         return s
 
     @staticmethod
-    def from_db(tdb_dir: str, ctx: tiledb.Ctx=None):
+    def from_db(tdb_dir: str, ctx: tiledb.Ctx = None):
         """
         Create Storage object from information stored in a database.
 

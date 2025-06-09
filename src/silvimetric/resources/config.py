@@ -227,7 +227,7 @@ class ShatterConfig(Config):
 
     filename: str
     """Input filename referencing a PDAL pipeline or point cloud file."""
-    date: Union[datetime, Tuple[datetime, datetime]]
+    date: Union[Tuple[datetime, datetime]]
     """A date or date range representing data collection times."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
@@ -257,6 +257,12 @@ class ShatterConfig(Config):
         from .storage import Storage
 
         s = Storage.from_db(self.tdb_dir)
+        if isinstance(self.date, datetime):
+            self.date = (self.date, self.date)
+        if len(self.date) > 2 or len(self.date) < 1:
+            raise ValueError('Date range for must be either 1 or 2 values.')
+        if len(self.date) == 1:
+            self.date = (self.date[0], self.date[0])
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
@@ -271,10 +277,10 @@ class ShatterConfig(Config):
         # removing a attrs and metrics, since they'll be in the storage log
         # removing mbr because it's too big to do json pretty printing with
         # could add a custom json logger to handle mbr logging in the future
-        if isinstance(self.date, tuple):
-            date = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
-        else:
-            date = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
+        date = (
+            self.date[0].strftime('%Y-%m-%dT%H:%M:%SZ'),
+            self.date[1].strftime('%Y-%m-%dT%H:%M:%SZ'),
+        )
         d = dict(
             filename=self.filename,
             name=str(self.name),

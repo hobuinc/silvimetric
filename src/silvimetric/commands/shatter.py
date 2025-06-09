@@ -71,7 +71,7 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in):
+def agg_list(data_in, dates):
     """
     Make variable-length point data attributes into lists
     """
@@ -81,14 +81,18 @@ def agg_list(data_in):
     old_dtypes = data_in.dtypes
     xyi_dtypes = {'xi': np.float64, 'yi': np.float64}
     o = np.dtype('O')
+    first_col_name = data_in.columns[0]
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
     a = coerced.groupby(['xi', 'yi']).agg(
         lambda x: np.array(x, old_dtypes[x.name])
     )
-    return a.assign(count=lambda x: [len(z) for z in a.Z])
-
+    return a.assign(
+        count=lambda x: [len(z) for z in a[first_col_name]],
+        start_datetime=lambda st: [dates[0] for z in a[first_col_name]],
+        end_datetime=lambda st: [dates[1] for z in a[first_col_name]],
+    )
 
 def join(list_data: pd.DataFrame, metric_data):
     """
@@ -112,7 +116,6 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    # data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
@@ -180,7 +183,7 @@ def get_processes(
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     filtered: db.Bag = arranged.filter(pc_filter)
     metrics: db.Bag = filtered.map(run_graph, storage.config.metrics)
-    lists: db.Bag = filtered.map(agg_list)
+    lists: db.Bag = filtered.map(agg_list, config.date)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
