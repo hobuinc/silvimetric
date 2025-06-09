@@ -93,9 +93,9 @@ class Test_Shatter(object):
         # check that you can query results by datetime
         with storage.open('r') as a:
             a:tiledb.SparseArray
-            query_time = datetime.datetime(2009,1,1).timestamp()
+            query_time = datetime.datetime(2009,6,1).timestamp()
             q = a.query(cond=f'start_datetime >= {query_time}')
-            assert q.df[:,:]['start_datetime'].size == base ** 2
+            assert len(q.df[:,:]['start_datetime']) == base ** 2
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
