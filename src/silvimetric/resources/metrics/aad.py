@@ -1,7 +1,7 @@
 import numpy as np
-from scipy import stats
 from ..metric import Metric
-from .p_moments import product_moments
+from .p_moments import product_moments, mean
+from .stats import mode, median
 
 
 def m_aad(data, *args):
@@ -10,23 +10,26 @@ def m_aad(data, *args):
 
 
 def m_madmedian(data, *args):
-    return stats.median_abs_deviation(data)
+    median = args[0]
+    return np.median(abs(data - median))
 
 
 def m_madmean(data, *args):
-    return stats.median_abs_deviation(data, center=np.mean)
+    mean = args[0]
+    return np.median(abs(data - mean))
 
 
-def m_madmode(data):
-    def mode_center(data, axis):
-        return stats.mode(data, axis=axis).mode
-
-    return stats.median_abs_deviation(data, center=mode_center)
+def m_madmode(data, *args):
+    mode = args[0]
+    return np.median(abs(data - mode))
 
 
 aad: dict[str, Metric] = {}
 aad['aad'] = Metric(
     'aad', np.float32, m_aad, dependencies=[product_moments['mean']]
 )
-aad['mad_median'] = Metric('mad_median', np.float32, m_madmedian)
-aad['mad_mode'] = Metric('mad_mode', np.float32, m_madmode)
+aad['mad_median'] = Metric(
+    'mad_median', np.float32, m_madmedian, dependencies=[median]
+)
+aad['mad_mode'] = Metric('mad_mode', np.float32, m_madmode, dependencies=[mode])
+aad['mad_mean'] = Metric('mad_mean', np.float32, m_madmean, dependencies=[mean])

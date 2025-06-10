@@ -71,7 +71,7 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in):
+def agg_list(data_in, dates):
     """
     Make variable-length point data attributes into lists
     """
@@ -81,14 +81,18 @@ def agg_list(data_in):
     old_dtypes = data_in.dtypes
     xyi_dtypes = {'xi': np.float64, 'yi': np.float64}
     o = np.dtype('O')
+    first_col_name = data_in.columns[0]
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
     a = coerced.groupby(['xi', 'yi']).agg(
         lambda x: np.array(x, old_dtypes[x.name])
     )
-    return a.assign(count=lambda x: [len(z) for z in a.Z])
-
+    return a.assign(
+        count=lambda x: [len(z) for z in a[first_col_name]],
+        start_datetime=lambda st: [dates[0] for z in a[first_col_name]],
+        end_datetime=lambda st: [dates[1] for z in a[first_col_name]],
+    )
 
 def join(list_data: pd.DataFrame, metric_data):
     """
@@ -112,7 +116,6 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    # data_in = data_in.reset_index()
     data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
@@ -126,6 +129,12 @@ def write(data_in, storage, timestamp):
 
     varlen_types = {a.dtype for a in storage.config.attrs}
 
+    fillna_dict = {
+        f'{m.entry_name(a.name)}': m.nan_value
+        for m in storage.config.metrics
+        for a in storage.config.attrs
+    }
+
     tiledb.from_pandas(
         uri=storage.config.tdb_dir,
         sparse=True,
@@ -134,6 +143,7 @@ def write(data_in, storage, timestamp):
         timestamp=timestamp,
         column_types=dtype_dict,
         varlen_types=varlen_types,
+        fillna = fillna_dict
     )
 
     pc = data_in['count'].sum().item()
@@ -173,7 +183,7 @@ def get_processes(
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     filtered: db.Bag = arranged.filter(pc_filter)
     metrics: db.Bag = filtered.map(run_graph, storage.config.metrics)
-    lists: db.Bag = filtered.map(agg_list)
+    lists: db.Bag = filtered.map(agg_list, config.date)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
@@ -217,7 +227,6 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         for batch in as_completed(pc_futures, with_results=True).batches():
             for _, pack in batch:
                 if isinstance(pack, CancelledError):
-                    print('asdfasdf')
                     continue
                 for pc in pack:
                     config.point_count = config.point_count + pc
@@ -229,16 +238,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     else:
         # Handle non-distributed dask scenarios
         with ProgressBar():
-            config.point_count = sum(processes)
+            point_count = sum(processes)
 
-    # modify config to reflect result of shattter process
-    config.mbr = storage.mbrs(config.time_slot)
-    config.log.debug('Saving shatter metadata')
-    config.end_time = datetime.datetime.now().timestamp() * 1000
-    config.finished = True
-
-    storage.saveMetadata('shatter', str(config), config.time_slot)
-    return config.point_count
+    return point_count
 
 
 def shatter(config: ShatterConfig) -> int:
@@ -269,16 +271,31 @@ def shatter(config: ShatterConfig) -> int:
     if config.bounds is None:
         config.bounds = extents.bounds
 
-    config.log.debug('Grabbing leaf nodes...')
+    config.log.info('Grabbing leaf nodes...')
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
         leaves = extents.chunk(data, 100)
 
     # Begin main operations
-    config.log.debug('Fetching and arranging data...')
-    pc = run(leaves, config, storage)
+    config.log.info('Fetching and arranging data...')
+    try:
+        pc = run(leaves, config, storage)
+    except Exception as e:
+        config.mbr = storage.mbrs(config.time_slot)
+        config.finished = False
+        storage.saveMetadata('shatter', str(config), config.time_slot)
+        raise e
 
     # consolidate the fragments in this time slot down to just one
     storage.consolidate_shatter(config.time_slot)
+
+    # modify config to reflect result of shattter process
+    config.log.info('Saving shatter metadata')
+    config.point_count = pc
+    config.mbr = storage.mbrs(config.time_slot)
+    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.finished = True
+
+    storage.saveMetadata('shatter', str(config), config.time_slot)
     return pc

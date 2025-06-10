@@ -1,4 +1,5 @@
 from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
+import numpy as np
 
 
 class Test_Configuration(object):
@@ -15,7 +16,7 @@ class Test_Configuration(object):
         mean = [m for m in c.metrics if m.name == 'mean']
         assert len(mean) == 1
 
-        assert int(mean[0]._method([2, 2, 2, 2])) == 2
+        assert int(mean[0]._method(np.array([2, 2, 2, 2]))) == 2
         cd = c.to_json()
         scd = storage_config.to_json()
         cd.pop('log')

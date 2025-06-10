@@ -75,6 +75,8 @@ def m_lcv(data, *args):
     lmom: tuple[float, float, float, float] = args[0]
 
     try:
+        if lmom[0] == 0:
+            return np.nan
         return lmom[1] / lmom[0]
     except ZeroDivisionError:
         return np.nan
@@ -83,6 +85,8 @@ def m_lcv(data, *args):
 def m_lskewness(data, *args):
     lmom: tuple[float, float, float, float] = args[0]
     try:
+        if lmom[1] == 0:
+            return np.nan
         return lmom[2] / lmom[1]
     except ZeroDivisionError:
         return np.nan
@@ -91,6 +95,8 @@ def m_lskewness(data, *args):
 def m_lkurtosis(data, *args):
     lmom: tuple[float, float, float, float] = args[0]
     try:
+        if lmom[1] == 0:
+            return np.nan
         return lmom[3] / lmom[1]
     except ZeroDivisionError:
         return np.nan

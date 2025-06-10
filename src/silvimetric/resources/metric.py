@@ -1,7 +1,15 @@
 import json
 import base64
 
-from typing_extensions import Self, Callable, Optional, Any, Union, List
+from typing_extensions import (
+    Self,
+    Callable,
+    Optional,
+    Any,
+    Union,
+    List,
+    Literal,
+)
 from functools import reduce
 from threading import Lock
 
@@ -15,25 +23,29 @@ from .attribute import Attribute
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
+NanPolicy = Union[Literal['propagate'], Literal['raise']]
+
 mutex = Lock()
 
-class Metric():
+
+class Metric:
     """
     A Metric is a TileDB entry representing derived cell data. There is a base
     set of metrics available through Silvimetric, or you can create your own.
     A Metric object has all the information necessary to facilitate the
     derivation of data as well as its insertion into the database.
     """
+
     def __init__(
         self,
         name: str,
         dtype: np.dtype,
         method: MetricFn,
-        dependencies: Optional[list[Self]]=None,
-        filters: Optional[List[FilterFn]]=None,
-        attributes: Optional[List[Attribute]]=None
+        dependencies: Optional[list[Self]] = None,
+        filters: Optional[List[FilterFn]] = None,
+        attributes: Optional[List[Attribute]] = None,
+        nan_policy: NanPolicy = 'propagate',
     ) -> None:
-
         self.name = name
         """Metric name. eg. mean"""
         self.dtype = np.dtype(dtype).str
@@ -49,14 +61,37 @@ class Metric():
             self.filters = filters
         else:
             self.filters = []
-        """List of user-defined filters to perform before performing method."""
+            """
+            List of user-defined filters to perform before performing method.
+            """
         if attributes is not None:
             self.attributes = attributes
         else:
             self.attributes = []
         """List of Attributes this Metric applies to. If empty it's used for all
         Attributes"""
+        self.nan_policy = nan_policy
+        """Describe how metric should handle NaN found in dependencies.
 
+        - propagate: if a NaN is present in the dependencies, return NaN for
+        this metric as well.
+        - raise: if a NaN is present, a ValueError will be raised.
+        """
+        self.nan_value = -9999
+        """ Value to denote empty space or invalid values. """
+        kind = np.dtype(self.dtype).kind
+        if kind in ['i', 'f']:
+            self.nan_value = -9999
+        elif kind == 'u':
+            self.nan_value = 0
+        elif kind == 'O':
+            self.nan_value = []
+        else:
+            # uncertain if we want to limit to numbers, more convenient for now
+            raise ValueError(
+                f'Invalid metric data type "{kind}", must be a number or'
+                ' object.'
+            )
 
     def __eq__(self, other):
         if self.name != other.name:
@@ -126,9 +161,19 @@ class Metric():
                 pass_args = []
                 for a in attrs:
                     try:
-                        pass_args.append(args.at[(xi,yi), a])
-                    except Exception:
-                        pass_args.append(args[a])
+                        arg = args.at[(yi, xi), a]
+                        if isinstance(arg, list) or isinstance(arg, tuple):
+                            pass_args.append(arg)
+                        elif np.isnan(arg):
+                            return self.nan_value
+                        else:
+                            pass_args.append(arg)
+
+                    except Exception as e:
+                        if self.nan_policy == 'propagate':
+                            return self.nan_value
+                        else:
+                            raise (e)
         else:
             pass_args = args
 
@@ -144,9 +189,9 @@ class Metric():
         if isinstance(data, Future):
             data = data.result()
 
-        idx = ['xi', 'yi']
+        idx = ['yi', 'xi']
         if any([i not in data.columns for i in idx]):
-            idx = ['X', 'Y']
+            idx = ['Y', 'X']
 
         # run metric filters over the data first
         data = self.run_filters(data)
@@ -186,10 +231,18 @@ class Metric():
 
         # remove hierarchical columns
         val.columns = val.columns.droplevel(0)
+
+        # set nans to values for datatype and return value as the dtype
+        if np.dtype(self.dtype).kind not in ['f', 'O']:
+            np.nan_to_num(
+                val,
+                nan=self.nan_value,
+                posinf=self.nan_value,
+                neginf=self.nan_value,
+            )
+
         return val
 
-    # TODO make dict with key for each Attribute effected? {att: [fn]}
-    # for now these filters apply to all Attributes
     def add_filter(self, fn: FilterFn):
         """
         Add filter method to list of filters to run before calling main method.

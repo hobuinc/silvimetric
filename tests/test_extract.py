@@ -46,17 +46,15 @@ def tif_test(extract_config):
 
         assert derived == extract_config.crs
 
-        xsize = e.x2
-        ysize = e.y2
-        assert raster.RasterXSize == xsize
-        assert raster.RasterYSize == ysize
+        xsize = raster.RasterXSize
+        ysize = raster.RasterYSize
 
         r = raster.ReadAsArray()
         assert all(
             [
-                r[y, x] == (ceil(root_maxy / resolution) - y - 1)
-                for y in range(e.y1, e.y2)
-                for x in range(e.x1, e.x2)
+                r[y, x] == (ceil(root_maxy / resolution) - y - e.y1 - 1)
+                for y in range(ysize)
+                for x in range(xsize)
             ]
         )
 

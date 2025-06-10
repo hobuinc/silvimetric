@@ -76,6 +76,8 @@ def metric_data_results() -> Generator[pd.DataFrame, None, None]:
 
     result_bytes.seek(0)
     df = pickle.load(result_bytes)
+    df = df.reset_index()
+    df = df.set_index(['yi','xi'])
     yield df
 
 
@@ -86,6 +88,8 @@ def metric_dag_results() -> Generator[pd.DataFrame, None, None]:
     )
     result_bytes.seek(0)
     df = pickle.load(result_bytes)
+    df = df.reset_index()
+    df = df.set_index(['yi','xi'])
     yield df
 
 

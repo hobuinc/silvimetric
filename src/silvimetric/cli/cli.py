@@ -110,23 +110,22 @@ def cli(
 )
 @click.option(
     '--history',
-    type=bool,
     is_flag=True,
-    default=False,
     help='Show the history section of the output.',
 )
 @click.option(
     '--metadata',
-    type=bool,
     is_flag=True,
-    default=False,
     help='Show the metadata section of the output.',
 )
 @click.option(
-    '--attributes',
-    type=bool,
+    '--metrics',
     is_flag=True,
-    default=False,
+    help='Show the metrics section of the output.',
+)
+@click.option(
+    '--attributes',
+    is_flag=True,
     help='Show the attributes section of the output.',
 )
 @click.option(
@@ -144,7 +143,9 @@ def cli(
     '--name', type=str, default=None, help='Select processes with this name'
 )
 @click.pass_obj
-def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
+def info_cmd(
+    app, bounds, date, dates, name, history, metadata, attributes, metrics
+):
     import json
 
     if date is not None and dates is not None:
@@ -164,7 +165,18 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
         concise=True,
     )
 
-    if any([history, metadata, attributes]):
+    ms = [
+        {
+            'name': v['name'],
+            'dtype': v['dtype'],
+            'dependencies': [dep['name'] for dep in  v['dependencies']],
+        }
+        for v in i['metadata']['metrics']
+    ]
+
+    i['metadata'].pop('metrics')
+    # print(metrics.keys())
+    if any([history, metadata, attributes, metrics]):
         filtered = {}
         if history:
             filtered['history'] = i['history']
@@ -172,6 +184,8 @@ def info_cmd(app, bounds, date, dates, name, history, metadata, attributes):
             filtered['metadata'] = i['metadata']
         if attributes:
             filtered['attributes'] = i['attributes']
+        if metrics:
+            filtered['metrics'] = ms
 
         app.log.info(json.dumps(filtered, indent=2))
 
@@ -211,7 +225,6 @@ def scan_cmd(
         app.workers,
         app.threads,
         app.watch,
-        app.log,
     )
     return scan.scan(
         app.tdb_dir,
@@ -269,7 +282,7 @@ def initialize_cmd(
     attributes: list[Attribute],
     resolution: float,
     metrics: list[Metric],
-    alignment: str
+    alignment: str,
 ):
     """Initialize silvimetrics DATABASE"""
 
@@ -281,7 +294,7 @@ def initialize_cmd(
         attrs=attributes,
         metrics=metrics,
         resolution=resolution,
-        alignment=alignment
+        alignment=alignment,
     )
     return initialize.initialize(storageconfig)
 
@@ -333,7 +346,6 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
         app.workers,
         app.threads,
         app.watch,
-        app.log,
     )
 
     if date is not None and dates is not None:
@@ -404,14 +416,13 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 
     # TODO only allow metrics and attributes to be added if they're present
     # in the storage config.
-    dask_handle(
-        app.dasktype,
-        app.scheduler,
-        app.workers,
-        app.threads,
-        app.watch,
-        app.log,
-    )
+    # dask_handle(
+    #     app.dasktype,
+    #     app.scheduler,
+    #     app.workers,
+    #     app.threads,
+    #     app.watch,
+    # )
 
     config = ExtractConfig(
         tdb_dir=app.tdb_dir,

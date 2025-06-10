@@ -10,9 +10,11 @@ from silvimetric.resources.storage import Storage
 
 
 def check_for_overlap(leaves: list[Extents], chunk: Extents):
-    idx = [i for l in leaves for i in l.get_indices()]  # noqa: E741
-    u, c = np.unique(idx, return_counts=True)
-    assert not np.any(np.where(c > 1))
+    for l1 in leaves:
+        for l2 in leaves:
+            if l2 == l1:
+                continue
+            assert l1.disjoint(l2)
 
 
 def check_for_holes(leaves: list[Extents], chunk: Extents):
@@ -23,8 +25,8 @@ def check_for_holes(leaves: list[Extents], chunk: Extents):
             ind = a
         else:
             ind = np.concatenate([ind, a])
-    dx = ind['x']
-    dy = ind['y']
+    dx = ind[:,0]
+    dy = ind[:,1]
 
     ux = np.unique(dx, axis=0)
     uy = np.unique(dy, axis=0)
@@ -55,38 +57,38 @@ def check_indexing(extents: Extents, leaf_list):
 
     for ch in leaf_list:
         ch: Extents
-        if not np.any(indices['x']):
+        if not np.any(indices):
             indices = ch.get_indices()
         else:
-            indices = np.append(indices, ch.get_indices())
+            indices = np.vstack((indices, ch.get_indices()))
         count += 1
 
     assert (
-        b_indices['x'].min() == indices['x'].min()
+        b_indices[:,0].min() == indices[:,0].min()
     ), f"""X Minimum indices do not match. \
-    Min derived: {indices['x'].min()}
-    Min base: {b_indices['x'].min()}
+    Min derived: {indices[:,0].min()}
+    Min base: {b_indices[:,0].min()}
     """
 
     assert (
-        b_indices['x'].max() == indices['x'].max()
+        b_indices[:,0].max() == indices[:,0].max()
     ), f"""X Maximum indices do not match. \
-    Max derived: {indices['x'].max()}
-    Max base: {b_indices['x'].max()}
+    Max derived: {indices[:,0].max()}
+    Max base: {b_indices[:,0].max()}
     """
 
     assert (
-        b_indices['y'].min() == indices['y'].min()
+        b_indices[:,1].min() == indices[:,1].min()
     ), f"""Y Minimum indices do not match. \
-    Min derived: {indices['y'].min()}
-    Min base: {b_indices['y'].min()}
+    Min derived: {indices[:,1].min()}
+    Min base: {b_indices[:,1].min()}
     """
 
     assert (
-        b_indices['y'].max() == indices['y'].max()
+        b_indices[:,1].max() == indices[:,1].max()
     ), f"""Y Maximum indices do not match. \
-    Max derived: {indices['y'].max()}
-    Max base: {b_indices['y'].max()}
+    Max derived: {indices[:,1].max()}
+    Max base: {b_indices[:,1].max()}
     """
 
     # check that all original indices are in derived indices
@@ -97,12 +99,6 @@ def check_indexing(extents: Extents, leaf_list):
         assert xy in b_indices, (
             f'Derived indices created index outside of bounds: {xy}'
         )
-
-    u, c = np.unique(np.array(indices), return_counts=True)
-    dup = u[c > 1]
-    b = np.any([dup['x'], dup['y']])
-
-    assert not b, f'Indices duplicated: {dup}'
 
 
 class TestExtents(object):

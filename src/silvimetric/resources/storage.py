@@ -1,11 +1,9 @@
-import os
 import tiledb
 import numpy as np
 from datetime import datetime
 import pathlib
 import contextlib
 import json
-import urllib
 from typing_extensions import Generator, Optional
 
 from math import floor
@@ -18,7 +16,7 @@ from .bounds import Bounds
 class Storage:
     """Handles storage of shattered data in a TileDB Database."""
 
-    def __init__(self, config: StorageConfig, ctx: tiledb.Ctx = None):
+    def __init__(self, config: StorageConfig):
         if not tiledb.object_type(config.tdb_dir) == 'array':
             raise Exception(
                 f"Given database directory '{config.tdb_dir}' does not exist"
@@ -57,7 +55,7 @@ class Storage:
 
         # TODO make any changes to tiledb setup here.
 
-        if not ctx:
+        if ctx is None:
             ctx = tiledb.default_ctx()
 
         # adjust cell bounds if necessary
@@ -70,11 +68,17 @@ class Storage:
             (config.root.maxy - config.root.miny) / float(config.resolution)
         )
 
-        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.int32)
-        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.int32)
+        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.float64)
+        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.float64)
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name='count', dtype=np.int32)
+        start_dt_att = tiledb.Attr(
+            name='start_datetime', dtype=np.datetime64('', 's').dtype
+        )
+        end_dt_att = tiledb.Attr(
+            name='end_datetime', dtype=np.datetime64('', 's').dtype
+        )
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [
@@ -102,7 +106,7 @@ class Storage:
         schema = tiledb.ArraySchema(
             domain=domain,
             sparse=True,
-            attrs=[count_att, *dim_atts, *metric_atts],
+            attrs=[count_att, start_dt_att, end_dt_att, *dim_atts, *metric_atts],
             allows_duplicates=True,
             capacity=1000,
         )
@@ -113,20 +117,23 @@ class Storage:
             meta = str(config)
             a.meta['config'] = meta
 
-        s = Storage(config, ctx)
+        s = Storage(config)
         s.saveConfig()
 
         return s
 
     @staticmethod
-    def from_db(tdb_dir: str):
+    def from_db(tdb_dir: str, ctx: tiledb.Ctx = None):
         """
         Create Storage object from information stored in a database.
 
         :param tdb_dir: TileDB database directory.
         :return: Returns the derived storage.
         """
-        with tiledb.open(tdb_dir, 'r') as a:
+        if ctx is None:
+            ctx = tiledb.default_ctx()
+
+        with tiledb.open(tdb_dir, 'r', ctx=ctx) as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
 
@@ -151,7 +158,7 @@ class Storage:
 
         return config
 
-    def getMetadata(self, key: str, timestamp: int) -> str:
+    def getMetadata(self, key: str, timestamp: Optional[int] = None) -> str:
         """
         Return metadata at given key.
 
@@ -159,22 +166,29 @@ class Storage:
         :param timestamp: Time stamp for querying database.
         :return: Metadata value found in storage.
         """
-
+        if timestamp is None:
+            with self.open('r') as r:
+                val = r.meta[f'{key}']
         with self.open('r', (timestamp, timestamp)) as r:
             val = r.meta[f'{key}']
 
         return val
 
-    def saveMetadata(self, key: str, data: str, timestamp: int) -> None:
+    def saveMetadata(
+        self, key: str, data: str, timestamp: Optional[int] = None, retries=0
+    ) -> None:
         """
         Save metadata to storage.
 
         :param key: Metadata key to save to.
         :param data: Data to save to metadata.
         """
-        with self.open('w', (timestamp, timestamp)) as w:
-            w.meta[f'{key}'] = data
-        return
+        if timestamp is None:
+            with self.open('w') as w:
+                w.meta[f'{key}'] = data
+        else:
+            with self.open('w', (timestamp, timestamp)) as w:
+                w.meta[f'{key}'] = data
 
     def getAttributes(self) -> list[Attribute]:
         """
@@ -250,13 +264,13 @@ class Storage:
 
         :return: Time slot.
         """
-        with tiledb.open(self.config.tdb_dir, 'r') as r:
+        with self.open('r') as r:
             latest = json.loads(r.meta['config'])
 
         time = latest['next_time_slot']
         latest['next_time_slot'] = time + 1
 
-        with tiledb.open(self.config.tdb_dir, 'w') as w:
+        with self.open('w') as w:
             w.meta['config'] = json.dumps(latest)
 
         return time
@@ -383,12 +397,9 @@ class Storage:
         :param proc_num: Time slot associated with shatter process.
         """
         try:
-            afs = self.get_fragments_by_time(proc_num)
-            uris = [
-                os.path.split(urllib.parse.urlparse(f.uri).path)[-1]
-                for f in afs
-            ]
-            tiledb.consolidate(self.config.tdb_dir, fragment_uris=uris)
+            tiledb.consolidate(
+                self.config.tdb_dir, timestamp=(proc_num, proc_num)
+            )
             c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
             tiledb.vacuum(self.config.tdb_dir, c)
             self.config.log.info(f'Consolidated time slot {proc_num}.')
