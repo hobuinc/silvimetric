@@ -198,5 +198,5 @@ def crs() -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope='session')
-def date() -> Generator[datetime, None, None]:
-    yield datetime(2011, 1, 1)
+def date() -> Generator[list[datetime], None, None]:
+    yield [datetime(2011, 1, 1), datetime(2012,1,1)]

@@ -36,7 +36,7 @@ class Config(ABC):
         for k in keys:
             if k == 'tdb_dir':
                 tdb_dir = self.__dict__[k]
-                if "://" not in tdb_dir:
+                if '://' not in tdb_dir:
                     d[k] = os.path.abspath(tdb_dir)
                 else:
                     d[k] = tdb_dir
@@ -227,8 +227,8 @@ class ShatterConfig(Config):
 
     filename: str
     """Input filename referencing a PDAL pipeline or point cloud file."""
-    date: Union[Tuple[datetime, datetime]]
-    """A date or date range representing data collection times."""
+    date: Tuple[datetime, datetime]
+    """A date range representing data collection times."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
@@ -259,17 +259,21 @@ class ShatterConfig(Config):
         s = Storage.from_db(self.tdb_dir)
         if isinstance(self.date, datetime):
             self.date = (self.date, self.date)
+        if isinstance(self.date, list):
+            self.date = tuple(d for d in self.date)
         if len(self.date) > 2 or len(self.date) < 1:
-            raise ValueError('Date range for must be either 1 or 2 values.')
+            raise ValueError(
+                f'Invalid date range ({self.date}). Must be either 1 or 2 values.'
+            )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
+        self.timestamp = (int(self.date[0].timestamp()), int(self.date[0].timestamp()))
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
             self.log.warning(
                 f'Truncating tile size to integer({self.tile_size})'
             )
-            pass
 
         del s
 
@@ -298,11 +302,8 @@ class ShatterConfig(Config):
         d['time_slot'] = self.time_slot
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['mbr'] = list(self.mbr)
+        d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
 
-        if isinstance(self.date, tuple):
-            d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
-        else:
-            d['date'] = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
         return d
 
     @classmethod

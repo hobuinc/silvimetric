@@ -68,16 +68,13 @@ class Storage:
             (config.root.maxy - config.root.miny) / float(config.resolution)
         )
 
-        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.float64)
-        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.float64)
+        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.int32)
+        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.int32)
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name='count', dtype=np.int32)
-        start_dt_att = tiledb.Attr(
-            name='start_datetime', dtype=np.datetime64('', 's').dtype
-        )
-        end_dt_att = tiledb.Attr(
-            name='end_datetime', dtype=np.datetime64('', 's').dtype
+        proc_att = tiledb.Attr(
+            name='shatter_process_num', dtype=np.uint64
         )
         dim_atts = [attr.schema() for attr in config.attrs]
 
@@ -105,10 +102,15 @@ class Storage:
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(
             domain=domain,
-            sparse=True,
-            attrs=[count_att, start_dt_att, end_dt_att, *dim_atts, *metric_atts],
+            attrs=[
+                count_att,
+                proc_att,
+                *dim_atts,
+                *metric_atts,
+            ],
             allows_duplicates=True,
-            capacity=1000,
+            sparse=True,
+            # capacity=1000
         )
         schema.check()
 
@@ -118,7 +120,7 @@ class Storage:
             a.meta['config'] = meta
 
         s = Storage(config)
-        s.saveConfig()
+        s.save_config()
 
         return s
 
@@ -133,20 +135,20 @@ class Storage:
         if ctx is None:
             ctx = tiledb.default_ctx()
 
-        with tiledb.open(tdb_dir, 'r', ctx=ctx) as a:
+        with tiledb.open(tdb_dir, 'r') as a:
             s = a.meta['config']
             config = StorageConfig.from_string(s)
 
         return Storage(config)
 
-    def saveConfig(self) -> None:
+    def save_config(self) -> None:
         """
         Save StorageConfig to the Database
         """
         with self.open('w') as w:
             w.meta['config'] = str(self.config)
 
-    def getConfig(self) -> StorageConfig:
+    def get_config(self) -> StorageConfig:
         """
         Get the StorageConfig currently in use by the Storage.
 
@@ -158,7 +160,13 @@ class Storage:
 
         return config
 
-    def getMetadata(self, key: str, timestamp: Optional[int] = None) -> str:
+    # def save_shatter_meta(self, process_num: int, config: ShatterConfig):
+    #     key = f'shatter_{process_num}'
+    #     data = json.dumps(config.to_json())
+    #     self.save_metadata()
+
+
+    def get_metadata(self, key: str, timestamp: Optional[int] = None) -> str:
         """
         Return metadata at given key.
 
@@ -169,12 +177,12 @@ class Storage:
         if timestamp is None:
             with self.open('r') as r:
                 val = r.meta[f'{key}']
-        with self.open('r', (timestamp, timestamp)) as r:
+        with self.open('r', timestamp) as r:
             val = r.meta[f'{key}']
 
         return val
 
-    def saveMetadata(
+    def save_metadata(
         self, key: str, data: str, timestamp: Optional[int] = None, retries=0
     ) -> None:
         """
@@ -187,26 +195,26 @@ class Storage:
             with self.open('w') as w:
                 w.meta[f'{key}'] = data
         else:
-            with self.open('w', (timestamp, timestamp)) as w:
+            with self.open('w', timestamp) as w:
                 w.meta[f'{key}'] = data
 
-    def getAttributes(self) -> list[Attribute]:
+    def get_attributes(self) -> list[Attribute]:
         """
         Find list of attribute names from storage config.
 
         :return: List of attribute names.
         """
-        return self.getConfig().attrs
+        return self.get_config().attrs
 
-    def getMetrics(self) -> list[Metric]:
+    def get_metrics(self) -> list[Metric]:
         """
         Find List of metric names from storage config
 
         :return: List of metric names.
         """
-        return self.getConfig().metrics
+        return self.get_config().metrics
 
-    def getDerivedNames(self) -> list[str]:
+    def get_derived_names(self) -> list[str]:
         # if no attributes are set in the metric, use all
         return [
             m.entry_name(a.name)
@@ -224,7 +232,7 @@ class Storage:
 
         :param mode: Mode to open TileDB stream in. Valid options are
             'w', 'r', 'm', 'd'., defaults to 'r'.
-        :param timestamp: Timestamp to open database at., defaults to None.
+        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         :raises Exception: Incorrect Mode, only valid modes are 'w' and 'r'.
         :raises Exception: Path exists and is not a TileDB array.
         :raises Exception: Path does not exist.
@@ -306,7 +314,7 @@ class Storage:
                 time_range = time_range[0]
 
             try:
-                s_str = self.getMetadata('shatter', time_range)
+                s_str = self.get_metadata('shatter', time_range)
             except KeyError:
                 continue
             s = ShatterConfig.from_string(s_str)
@@ -336,43 +344,44 @@ class Storage:
 
         return m
 
-    def mbrs(self, proc_num: int):
+    def mbrs(self, timestamp):
         """
         Get minimum bounding rectangle of a given shatter process. If this
         process has been finished and consolidated the mbr will be much less
         granulated than if the fragments are still intact. Mbrs are represented
         as tuples in the form of ((minx, maxx), (miny, maxy))
 
-        :param proc_num: Process number or time slot of the shatter process.
+        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         :return: Returns mbrs that match the given process number.
         """
-        af_all = self.get_fragments_by_time(proc_num)
+        af_all = self.get_fragments_by_time(timestamp)
         mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
         mbrs = tuple(
             tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list
         )
         return mbrs
 
-    def get_fragments_by_time(self, proc_num: int) -> list[tiledb.FragmentInfo]:
+    def get_fragments_by_time(self, timestamp) -> list[tiledb.FragmentInfo]:
         """
         Get TileDB array fragments from the time slot specified.
 
-        :param proc_num: Requested time slot.
+        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         :return: Array fragments from time slot.
         """
         af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
-        return [a for a in af if a.timestamp_range == (proc_num, proc_num)]
+        return [a for a in af if a.timestamp_range == timestamp]
 
-    def delete(self, proc_num: int) -> ShatterConfig:
+    def delete(self, timestamp) -> ShatterConfig:
         """
         Delete Shatter process and all associated data from database.
 
-        :param proc_num: Shatter process time slot
+        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         :return: Config of deleted Shatter process
         """
 
-        self.config.log.debug(f'Deleting time slot {proc_num}...')
-        with self.open('r', (proc_num, proc_num)) as r:
+        start_dt, end_dt = timestamp
+        self.config.log.debug(f'Deleting time slot {timestamp}...')
+        with self.open('r', timestamp) as r:
             sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
@@ -380,38 +389,37 @@ class Storage:
         self.config.log.debug('Deleting fragments...')
         tiledb.Array.delete_fragments(
             self.config.tdb_dir,
-            timestamp_start=proc_num,
-            timestamp_end=proc_num,
+            timestamp_start=start_dt,
+            timestamp_end=end_dt,
         )
         self.config.log.debug('Rewriting config.')
-        with self.open('w', (proc_num, proc_num)) as w:
+        with self.open('w', timestamp) as w:
             w.meta['shatter'] = json.dumps(sh_cfg.to_json())
         return sh_cfg
 
-    def consolidate_shatter(self, proc_num: int, retries=0) -> None:
+    def consolidate_shatter(self, timestamp, retries=0) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
         time traveling.
-
-        :param proc_num: Time slot associated with shatter process.
+        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         """
         try:
             tiledb.consolidate(
-                self.config.tdb_dir, timestamp=(proc_num, proc_num)
+                self.config.tdb_dir, timestamp=timestamp
             )
             c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
             tiledb.vacuum(self.config.tdb_dir, c)
-            self.config.log.info(f'Consolidated time slot {proc_num}.')
+            self.config.log.info(f'Consolidated time slot {timestamp}.')
         except Exception as e:
             if retries >= 3:
                 self.config.log.warning(
                     'Failed to consolidate time slot '
-                    f'{proc_num} {retries} time(s). Stopping.'
+                    f'{timestamp} {retries} time(s). Stopping.'
                 )
                 raise e
             self.config.log.warning(
                 'Failed to consolidate time slot '
-                f'{proc_num} {retries + 1} time. Retrying...'
+                f'{timestamp} {retries + 1} time. Retrying...'
             )
-            self.consolidate_shatter(proc_num, retries + 1)
+            self.consolidate_shatter(timestamp, retries + 1)

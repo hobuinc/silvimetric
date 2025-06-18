@@ -13,7 +13,7 @@ from typing_extensions import (
 from functools import reduce
 from threading import Lock
 
-from tiledb import Attr
+from tiledb import Attr, FilterList, ZstdFilter
 import numpy as np
 import dill
 import pandas as pd
@@ -138,7 +138,11 @@ class Metric:
         :return: TileDB Attribute
         """
         entry_name = self.entry_name(attr.name)
-        return Attr(name=entry_name, dtype=self.dtype)
+        return Attr(
+            name=entry_name,
+            dtype=self.dtype,
+            filters=FilterList([ZstdFilter()]),
+        )
 
     def entry_name(self, attr: str) -> str:
         """Name for use in TileDB and extract file generation."""

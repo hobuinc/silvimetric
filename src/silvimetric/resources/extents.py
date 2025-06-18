@@ -327,7 +327,7 @@ class Extents(object):
         :return: Returns resulting Extents.
         """
         storage = Storage.from_db(tdb_dir)
-        meta = storage.getConfig()
+        meta = storage.get_config()
         return Extents(meta.root, meta.resolution, meta.alignment, meta.root)
 
     @staticmethod
@@ -341,7 +341,7 @@ class Extents(object):
         """
         storage = Storage.from_db(tdb_dir)
 
-        meta = storage.getConfig()
+        meta = storage.get_config()
         res = meta.resolution
         align = meta.alignment
         base_extents = Extents(meta.root, res, align, meta.root)

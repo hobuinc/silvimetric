@@ -7,7 +7,6 @@ from math import ceil
 import pytest
 import numpy as np
 import dask
-import tiledb
 
 from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
@@ -27,8 +26,7 @@ def write(x, y, val, s: Storage, attrs, dims, metrics):
         data[m] = [val]
 
     data['count'] = [val]
-    data['start_datetime'] = [0]
-    data['end_datetime'] = [datetime.datetime.now().timestamp()]
+    data['shatter_process_num'] = 1
     with s.open('w') as w:
         w[x, y] = data
 
@@ -39,22 +37,19 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
     pc = pointcount * num_entries
 
     with storage.open('r') as a:
-        assert a[:, :]['Z'].shape[0] == shape
+        assert a.df[:,:].Z.shape[0] == shape
         xdom = int(a.schema.domain.dim('X').domain[1])
         ydom = int(a.schema.domain.dim('Y').domain[1])
         assert xdom == xysize
         assert ydom == xysize
-        assert a[:, :]['count'].sum() == pc
+        assert a.df[:, :]['count'].sum() == pc
         val_const = ceil(maxy / storage.config.resolution)
 
         for xi in range(xdom):
             for yi in range(ydom):
-                for i in range(a[xi, yi]['Z'].size):
-                    # assert np.all(a[xi, yi]['Z'][i] >= 9)
-                    # assert np.all(a[xi, yi]['Z'][i] <= 20)
-                    assert bool(
-                        np.all(a[xi, yi]['Z'][i] == (val_const - yi - 1))
-                    )
+                assert bool(
+                    np.all(a.df[xi, yi].Z[0] == (val_const - yi - 1))
+                )
 
 
 class Test_Shatter(object):
@@ -82,20 +77,31 @@ class Test_Shatter(object):
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
+        og_timestamp = shatter_config.timestamp
+
+        d2 = (datetime.datetime(2009,1,1),datetime.datetime(2010,1,1))
+        dt_timestamp = tuple(int(d.timestamp()) for d in d2)
         # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
         shatter_config.mbr = ()
         shatter_config.time_slot = 2
-        shatter_config.date = (datetime.datetime(2009,1,1),datetime.datetime(2010,1,1))
+        shatter_config.date = d2
+        shatter_config.timestamp = dt_timestamp
         shatter(shatter_config)
         confirm_one_entry(storage, maxy, base, test_point_count, 2)
 
         # check that you can query results by datetime
-        with storage.open('r') as a:
-            a:tiledb.SparseArray
-            query_time = datetime.datetime(2009,6,1).timestamp()
-            q = a.query(cond=f'start_datetime >= {query_time}')
-            assert len(q.df[:,:]['start_datetime']) == base ** 2
+        with storage.open('r', timestamp=dt_timestamp) as a:
+            assert np.all(a.df[:,:].shatter_process_num == 2)
+            assert len(a.df[:,:]) == base ** 2
+
+        with storage.open('r', timestamp=og_timestamp) as a2:
+            assert np.all(a2.df[:,:].shatter_process_num == 1)
+            assert len(a2.df[:,:]) == base ** 2
+
+        with storage.open('r', timestamp=(dt_timestamp[0], og_timestamp[1])) as a3:
+            assert len(a3.query(cond='shatter_process_num == 1').df[:,:]) == base ** 2
+            assert len(a3.query(cond='shatter_process_num == 2').df[:,:]) == base ** 2
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
@@ -139,7 +145,7 @@ class Test_Shatter(object):
     ):
         shatter(shatter_config)
         try:
-            meta = storage.getMetadata('shatter', shatter_config.time_slot)
+            meta = storage.get_metadata('shatter', shatter_config.time_slot)
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
         meta_j = json.loads(meta)

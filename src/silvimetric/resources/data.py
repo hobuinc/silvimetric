@@ -1,12 +1,15 @@
-from .bounds import Bounds
-from .config import StorageConfig
-import numpy as np
-import copy
-
-import pdal
-
 import pathlib
 import json
+import copy
+from urllib.parse import urlparse
+from typing import Optional
+
+import boto3
+import pdal
+import numpy as np
+
+from .bounds import Bounds
+from .config import StorageConfig
 
 
 class Data:
@@ -14,7 +17,10 @@ class Data:
     operations necessary to understand and execute a Shatter process."""
 
     def __init__(
-        self, filename: str, storageconfig: StorageConfig, bounds: Bounds = None
+        self,
+        filename: str,
+        storageconfig: StorageConfig,
+        bounds: Optional[Bounds] = None,
     ):
         self.filename = filename
         """Path to either PDAL pipeline or point cloud file"""
@@ -25,10 +31,16 @@ class Data:
         self.reader_thread_count = 2
         """Thread count for PDAL reader. Keep to 2 so we don't hog threads"""
 
+        self.storageconfig = storageconfig
+        """:class:`silvimetric.resources.StorageConfig`"""
+
+        self.pipeline = self.get_pipeline()
+        """PDAL pipeline"""
+
         self.reader = self.get_reader()
         """PDAL reader"""
 
-        if self.bounds is None:
+        if bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 
         # adjust bounds if necessary
@@ -36,11 +48,6 @@ class Data:
             storageconfig.resolution, storageconfig.alignment
         )
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
-
-        self.storageconfig = storageconfig
-        """:class:`silvimetric.resources.StorageConfig`"""
-        self.pipeline = self.get_pipeline()
-        """PDAL pipeline"""
 
         self.log = storageconfig.log
 
@@ -62,7 +69,12 @@ class Data:
         :return: Return true if input is a pipeline
         """
 
-        p = pathlib.Path(self.filename)
+        if '://' in self.filename:
+            parsed = urlparse(self.filename)
+            p = pathlib.Path(parsed.path)
+        else:
+            p = pathlib.Path(self.filename)
+
         if p.suffix == '.json' and p.name != 'ept.json':
             return True
         return False
@@ -79,19 +91,6 @@ class Data:
             reader._options['bounds'] = str(self.bounds)
 
         return reader.pipeline()
-        ## TODO
-        ## Remove these filters.assign stages for now
-        ## Waiting for a pdal/pdal-python fix to this
-        ## https://github.com/PDAL/python/issues/174
-
-        # class_zero = pdal.Filter.assign(value="Classification = 0")
-        # rn = pdal.Filter.assign(
-        #     value="ReturnNumber = 1 WHERE ReturnNumber < 1")
-        # nor = pdal.Filter.assign(
-        #     value="NumberOfReturns = 1 WHERE NumberOfReturns < 1")
-        # ferry = pdal.Filter.ferry(dimensions="X=>xi, Y=>yi")
-
-        # return reader | class_zero | rn | nor
 
     def get_pipeline(self) -> pdal.Pipeline:
         """Fetch the pipeline for the instance
@@ -105,8 +104,16 @@ class Data:
         # aren't, go make_pipeline using some options that
         # process the data
         if self.is_pipeline():
-            p = pathlib.Path(self.filename)
-            j = p.read_bytes().decode('utf-8')
+            if 's3://' in self.filename:
+                s3 = boto3.client('s3')
+                parsed = urlparse(self.filename)
+                bucket = parsed.netloc
+                key = parsed.path[1:]
+                res = s3.get_object(Bucket=bucket, Key=key)
+                j = res['Body'].read().decode('utf-8')
+            else:
+                p = pathlib.Path(self.filename)
+                j = p.read_bytes().decode('utf-8')
             stages = pdal.pipeline._parse_stages(j)
             pipeline = pdal.Pipeline(stages)
         else:
@@ -140,7 +147,6 @@ class Data:
                         self.bounds.maxy + res,
                     )
                     stage._options['bounds'] = str(collar)
-                    # stage._options['bounds'] = str(self.bounds)
 
             # We strip off any writers from the pipeline that were
             # given to us and drop them  on the floor
@@ -164,12 +170,10 @@ class Data:
             value=f'yi = (({self.storageconfig.root.maxy} - Y) / '
             f'{resolution}) - 1'
         )
-        # hag = pdal.Filter.hag_nn()
 
         stages.append(ferry)
         stages.append(assign_x)
         stages.append(assign_y)
-        # stages.append(hag)
 
         # return our pipeline
         return pdal.Pipeline(stages)
@@ -205,11 +209,7 @@ class Data:
         :return: get PDAL reader for input
         """
         if self.is_pipeline():
-            p = pathlib.Path(self.filename)
-            j = p.read_bytes().decode('utf-8')
-            stages = pdal.pipeline._parse_stages(j)
-            pipeline = pdal.Pipeline(stages)
-            for stage in pipeline.stages:
+            for stage in self.pipeline.stages:
                 stage_type, stage_kind = stage.type.split('.')
                 if stage_type == 'readers':
                     return stage
@@ -250,7 +250,7 @@ class Data:
 
         return pc
 
-    def count(self, bounds: Bounds) -> int:
+    def count(self, bounds: Optional[Bounds] = None) -> int:
         """For the provided bounds, read and count the number of points that are
         inside them for this instance.
 
@@ -259,8 +259,9 @@ class Data:
         """
 
         reader = copy.deepcopy(self.get_reader())
-        if bounds:
-            reader._options['bounds'] = str(bounds)
+        if bounds is not None:
+            shared = Bounds.shared_bounds(self.bounds, bounds)
+            reader._options['bounds'] = str(shared)
 
         pipeline = reader.pipeline()
         pipeline.execute()

@@ -124,7 +124,7 @@ def handle_overlaps(
     :return: Dataframe of rerun data.
     """
 
-    ma_list = storage.getDerivedNames()
+    ma_list = storage.get_derived_names()
     att_list = [a.name for a in config.attrs]
 
     minx = extents.x1
@@ -189,7 +189,7 @@ def extract(config: ExtractConfig) -> None:
     dask.config.set({'dataframe.convert-string': False})
 
     storage = Storage.from_db(config.tdb_dir)
-    ma_list = storage.getDerivedNames()
+    ma_list = storage.get_derived_names()
     config.log.debug(f'Extracting metrics {[m for m in ma_list]}')
     root_bounds = storage.config.root
 

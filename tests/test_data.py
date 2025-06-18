@@ -44,6 +44,7 @@ class Test_Data(object):
         data = Data(no_cell_line_pipeline, storage_config, bounds=ll)
 
         # data will be collared upon execution, extra data will be grabbed
+
         minx, miny, maxx, maxy = data.bounds.get()
         collared = Bounds(minx - 30, miny - 30, maxx + 30, maxy + 30)
 

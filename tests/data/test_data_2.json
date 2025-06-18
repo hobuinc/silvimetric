@@ -3,10 +3,6 @@
         {
             "type": "readers.copc",
             "filename": "./tests/data/test_data_2.copc.laz"
-        },
-        {
-            "type": "writers.las",
-            "filename": "autzen-copc.las"
         }
     ]
 }

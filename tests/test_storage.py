@@ -33,6 +33,8 @@ class Test_Storage(object):
     def test_local(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
             sc = st.schema
+            assert sc.has_attr('shatter_process_num')
+            assert sc.attr('shatter_process_num').dtype == np.uint16
             assert sc.has_attr('count')
             assert sc.attr('count').dtype == np.int32
 
@@ -43,8 +45,8 @@ class Test_Storage(object):
     def test_config(self, storage: Storage):
         """Check that instantiation metadata is properly written"""
 
-        storage.saveConfig()
-        config = storage.getConfig()
+        storage.save_config()
+        config = storage.get_config()
         assert config.resolution == storage.config.resolution
         assert config.alignment == storage.config.alignment
         assert config.root == storage.config.root
@@ -88,8 +90,8 @@ class Test_Storage(object):
         ms[0].dependencies = []
 
     def test_metrics(self, storage: Storage):
-        m_list = storage.getMetrics()
-        a_list = storage.getAttributes()
+        m_list = storage.get_metrics()
+        a_list = storage.get_attributes()
 
         with storage.open('r') as st:
             s: tiledb.ArraySchema = st.schema

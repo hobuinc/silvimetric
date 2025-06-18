@@ -71,7 +71,7 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in, dates):
+def agg_list(data_in, process_num):
     """
     Make variable-length point data attributes into lists
     """
@@ -85,13 +85,12 @@ def agg_list(data_in, dates):
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    a = coerced.groupby(['xi', 'yi']).agg(
+    listed = coerced.groupby(['xi', 'yi']).agg(
         lambda x: np.array(x, old_dtypes[x.name])
     )
-    return a.assign(
-        count=lambda x: [len(z) for z in a[first_col_name]],
-        start_datetime=lambda st: [dates[0] for z in a[first_col_name]],
-        end_datetime=lambda st: [dates[1] for z in a[first_col_name]],
+    return listed.assign(
+        count=lambda x: [len(z) for z in listed[first_col_name]],
+        shatter_process_num=lambda x: [process_num for z in listed[first_col_name]],
     )
 
 def join(list_data: pd.DataFrame, metric_data):
@@ -143,7 +142,7 @@ def write(data_in, storage, timestamp):
         timestamp=timestamp,
         column_types=dtype_dict,
         varlen_types=varlen_types,
-        fillna = fillna_dict
+        fillna = fillna_dict,
     )
 
     pc = data_in['count'].sum().item()
@@ -163,7 +162,7 @@ def get_processes(
 
     ## Handle dask bag transitions through work states
     attrs = [a.name for a in storage.config.attrs]
-    timestamp = (config.time_slot, config.time_slot)
+    timestamp = config.timestamp
 
     # remove any extents that have already been done, only skip if full overlap
     leaf_bag: db.Bag = db.from_sequence(leaves)
@@ -183,7 +182,7 @@ def get_processes(
     arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
     filtered: db.Bag = arranged.filter(pc_filter)
     metrics: db.Bag = filtered.map(run_graph, storage.config.metrics)
-    lists: db.Bag = filtered.map(agg_list, config.date)
+    lists: db.Bag = filtered.map(agg_list, config.time_slot)
     joined: db.Bag = lists.map(join, metrics)
     writes: db.Bag = joined.map(write, storage, timestamp)
 
@@ -207,13 +206,13 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
             client.close()
         end_time = datetime.datetime.now().timestamp() * 1000
 
-        storage.consolidate_shatter(config.time_slot)
+        storage.consolidate_shatter(config.timestamp)
         config.end_time = end_time
-        config.mbrs = storage.mbrs(config.time_slot)
+        config.mbrs = storage.mbrs(config.timestamp)
         config.finished = False
         config.log.info('Saving config before quitting...')
 
-        storage.saveMetadata('shatter', str(config), config.time_slot)
+        storage.save_metadata('shatter', str(config), config.timestamp)
         config.log.info('Quitting.')
 
     signal.signal(signal.SIGINT, kill_gracefully)
@@ -282,20 +281,21 @@ def shatter(config: ShatterConfig) -> int:
     try:
         pc = run(leaves, config, storage)
     except Exception as e:
-        config.mbr = storage.mbrs(config.time_slot)
+        config.mbr = storage.mbrs(config.timestamp)
         config.finished = False
-        storage.saveMetadata('shatter', str(config), config.time_slot)
+        storage.save_metadata('shatter', str(config), config.timestamp)
         raise e
 
     # consolidate the fragments in this time slot down to just one
-    storage.consolidate_shatter(config.time_slot)
+    config.log.info('Consolidating db.')
+    storage.consolidate_shatter(config.timestamp)
 
     # modify config to reflect result of shattter process
     config.log.info('Saving shatter metadata')
     config.point_count = pc
-    config.mbr = storage.mbrs(config.time_slot)
+    config.mbr = storage.mbrs(config.timestamp)
     config.end_time = datetime.datetime.now().timestamp() * 1000
     config.finished = True
 
-    storage.saveMetadata('shatter', str(config), config.time_slot)
+    storage.save_metadata('shatter', str(config), config.timestamp)
     return pc

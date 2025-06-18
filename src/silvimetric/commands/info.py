@@ -76,8 +76,8 @@ def info(
                 name = UUID(name)
 
         # We always have these
-        meta = tdb.getConfig()
-        atts = tdb.getAttributes()
+        meta = tdb.get_config()
+        atts = tdb.get_attributes()
 
         info = {
             'attributes': [a.to_json() for a in atts],
