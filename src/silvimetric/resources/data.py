@@ -34,13 +34,10 @@ class Data:
         self.storageconfig = storageconfig
         """:class:`silvimetric.resources.StorageConfig`"""
 
-        self.pipeline = self.get_pipeline()
-        """PDAL pipeline"""
-
         self.reader = self.get_reader()
         """PDAL reader"""
 
-        if bounds is None:
+        if self.bounds is None:
             self.bounds = Data.get_bounds(self.reader)
 
         # adjust bounds if necessary
@@ -48,6 +45,9 @@ class Data:
             storageconfig.resolution, storageconfig.alignment
         )
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
+
+        self.pipeline = self.get_pipeline()
+        """PDAL pipeline"""
 
         self.log = storageconfig.log
 
@@ -260,8 +260,7 @@ class Data:
 
         reader = copy.deepcopy(self.get_reader())
         if bounds is not None:
-            shared = Bounds.shared_bounds(self.bounds, bounds)
-            reader._options['bounds'] = str(shared)
+            reader._options['bounds'] = str(bounds)
 
         pipeline = reader.pipeline()
         pipeline.execute()

@@ -141,11 +141,10 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
     ):
         shatter(shatter_config)
         try:
-            meta = storage.get_metadata('shatter', shatter_config.time_slot)
+            meta = storage.get_metadata('shatter', shatter_config.timestamp)
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
         meta_j = json.loads(meta)
