@@ -212,7 +212,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         config.finished = False
         config.log.info('Saving config before quitting...')
 
-        storage.save_metadata('shatter', str(config), config.timestamp)
+        storage.save_shatter_meta(config)
         config.log.info('Quitting.')
 
     signal.signal(signal.SIGINT, kill_gracefully)
@@ -283,7 +283,7 @@ def shatter(config: ShatterConfig) -> int:
     except Exception as e:
         config.mbr = storage.mbrs(config.timestamp)
         config.finished = False
-        storage.save_metadata('shatter', str(config), config.timestamp)
+        storage.save_shatter_meta(config)
         raise e
 
     # consolidate the fragments in this time slot down to just one
@@ -297,5 +297,5 @@ def shatter(config: ShatterConfig) -> int:
     config.end_time = datetime.datetime.now().timestamp() * 1000
     config.finished = True
 
-    storage.save_metadata('shatter', str(config), config.timestamp)
+    storage.save_shatter_meta(config)
     return pc

@@ -1,5 +1,4 @@
 import os
-import json
 import uuid
 import datetime
 from math import ceil
@@ -37,18 +36,19 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
     pc = pointcount * num_entries
 
     with storage.open('r') as a:
-        assert a.df[:,:].Z.shape[0] == shape
+        vals = a.df[:,:].set_index(['X','Y'])
+        assert vals.Z.shape[0] == shape
         xdom = int(a.schema.domain.dim('X').domain[1])
         ydom = int(a.schema.domain.dim('Y').domain[1])
         assert xdom == xysize
         assert ydom == xysize
-        assert a.df[:, :]['count'].sum() == pc
+        assert vals['count'].sum() == pc
         val_const = ceil(maxy / storage.config.resolution)
 
         for xi in range(xdom):
             for yi in range(ydom):
                 assert bool(
-                    np.all(a.df[xi, yi].Z[0] == (val_const - yi - 1))
+                    np.all(vals.loc[xi, yi].Z[0] == (val_const - yi - 1))
                 )
 
 
@@ -84,7 +84,7 @@ class Test_Shatter(object):
         # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
         shatter_config.mbr = ()
-        shatter_config.time_slot = 2
+        shatter_config.time_slot = storage.reserve_time_slot()
         shatter_config.date = d2
         shatter_config.timestamp = dt_timestamp
         shatter(shatter_config)
@@ -144,12 +144,11 @@ class Test_Shatter(object):
     ):
         shatter(shatter_config)
         try:
-            meta = storage.get_metadata('shatter', shatter_config.timestamp)
+            meta = storage.get_shatter_meta(shatter_config.time_slot)
+            pc = meta.point_count
+            assert pc == test_point_count
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
-        meta_j = json.loads(meta)
-        pc = meta_j['point_count']
-        assert pc == test_point_count
 
     @pytest.mark.parametrize(
         'sh_cfg', ['shatter_config', 'uneven_shatter_config']

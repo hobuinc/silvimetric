@@ -98,7 +98,7 @@ def info(
 
             info['history'] = history
         except KeyError:
-            history = {}
+            info['history'] = {}
     # remove unnecessary keys for printing to logs
     if concise:
         info['metadata'].pop('attrs')

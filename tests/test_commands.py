@@ -45,19 +45,18 @@ class TestCommands(object):
     def test_delete(self, tdb_filepath: str, config_split: List[ShatterConfig]):
         ids = [c.name for c in config_split]
 
-        for i in range(1, len(ids) + 1):
-            h = info.info(tdb_dir=tdb_filepath)
+        for i, pid in enumerate(ids):
+            manage.delete(tdb_filepath, pid)
 
-            assert bool(h['history'])
-            assert len(h['history']) == 5 - i
-            idx = i - 1
-            manage.delete(tdb_filepath, ids[idx])
+            h = info.info(tdb_dir=tdb_filepath, name=pid)
+            assert h['history']
+            assert h['history'][0]['name'] == str(pid)
+            assert not h['history'][0]['finished']
+            assert h['history'][0]['time_slot'] == i + 1
+
 
         s = Storage.from_db(tdb_filepath)
         assert s.config.next_time_slot == 5
-
-        h = info.info(tdb_dir=tdb_filepath)
-        assert len(h['history']) == 0
 
     # TODO: re-add this once we figure out how to run certain tests serially
     # def test_311_failure(self, shatter_config, dask_proc_client):
@@ -78,16 +77,18 @@ class TestCommands(object):
     ):
         ids = [c.name for c in config_split]
 
-        for i in range(1, len(ids) + 1):
-            h = info.info(tdb_dir=tdb_filepath)
+        for pid in ids:
+            h1 = info.info(tdb_dir = tdb_filepath, name=pid)
+            mbr1 = h1['history'][0]['mbr']
 
-            assert bool(h['history'])
-            assert len(h['history']) == len(ids)
-            manage.restart(tdb_filepath, ids[i - 1])
+            manage.restart(tdb_filepath, pid)
+            h2 = info.info(tdb_dir = tdb_filepath, name=pid)
+            mbr2 = h2['history'][0]['mbr']
 
-        h = info.info(tdb_dir=tdb_filepath)
-        assert bool(h['history'])
-        assert len(h['history']) == 4
+            assert mbr1 == mbr2
+            assert h2['history'][0]['name'] == str(pid)
+            assert h2['history'][0]['finished']
+
 
     def test_resume(
         self, shatter_config: ShatterConfig, storage_config: StorageConfig

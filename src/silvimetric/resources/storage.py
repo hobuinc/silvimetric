@@ -13,6 +13,13 @@ from .metric import Metric, Attribute
 from .bounds import Bounds
 
 
+def ts_overlap(first, second):
+    if first[0] > second[1]:
+        return False
+    if first[1] < second[0]:
+        return False
+    return True
+
 class Storage:
     """Handles storage of shattered data in a TileDB Database."""
 
@@ -73,9 +80,7 @@ class Storage:
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(name='count', dtype=np.int32)
-        proc_att = tiledb.Attr(
-            name='shatter_process_num', dtype=np.uint64
-        )
+        proc_att = tiledb.Attr(name='shatter_process_num', dtype=np.uint64)
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [
@@ -160,11 +165,23 @@ class Storage:
 
         return config
 
-    # def save_shatter_meta(self, process_num: int, config: ShatterConfig):
-    #     key = f'shatter_{process_num}'
-    #     data = json.dumps(config.to_json())
-    #     self.save_metadata()
+    def save_shatter_meta(self, config: ShatterConfig):
+        """
+        Save shatter metadata to the base TileDB metadata with the name
+        convention `shatter_{proc_num}`
+        """
+        key = f'shatter_{config.time_slot}'
+        data = json.dumps(config.to_json())
+        return self.save_metadata(key, data)
 
+    def get_shatter_meta(self, time_slot: int):
+        """
+        Get shatter metadata from the base TileDB metadata with the name
+        convention `shatter_{proc_num}`
+        """
+        key = f'shatter_{time_slot}'
+        m = self.get_metadata(key)
+        return ShatterConfig.from_string(m)
 
     def get_metadata(self, key: str, timestamp: Optional[int] = None) -> str:
         """
@@ -281,6 +298,7 @@ class Storage:
         with self.open('w') as w:
             w.meta['config'] = json.dumps(latest)
 
+        self.config.next_time_slot = latest['next_time_slot']
         return time
 
     def get_history(
@@ -305,19 +323,25 @@ class Storage:
         # Get metadata configs from each timestamp that contains array fragments
         # In future may want to collect all configs regardless, since they're
         # still being stored there.
-        af = tiledb.array_fragments(self.config.tdb_dir, True)
+        # configs = [
+        #     self.get_shatter_meta(time_slot)
+        #     for time_slot in range(self.config.next_time_slot)
+        # ]
+        # af = tiledb.array_fragments(self.config.tdb_dir, True)
         m = []
-        for idx in range(len(af)):
-            time_range = af[idx].timestamp_range
+        for idx in range(1,self.config.next_time_slot):
+            s = self.get_shatter_meta(idx)
+            # time_range = s.timestamp
+            # time_range = af[idx].timestamp_range
             # all shatter processes should be input as a point in time, eg (1,1)
-            if isinstance(time_range, tuple):
-                time_range = time_range[0]
+            # if isinstance(time_range, tuple):
+            #     time_range = time_range[0]
 
-            try:
-                s_str = self.get_metadata('shatter', time_range)
-            except KeyError:
-                continue
-            s = ShatterConfig.from_string(s_str)
+            # try:
+            #     s_str = self.get_metadata('shatter', time_range)
+            # except KeyError:
+            #     continue
+            # s = ShatterConfig.from_string(s_str)
             if s.bounds.disjoint(bounds):
                 continue
 
@@ -368,10 +392,11 @@ class Storage:
         :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         :return: Array fragments from time slot.
         """
-        af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
-        return [a for a in af if a.timestamp_range == timestamp]
 
-    def delete(self, timestamp) -> ShatterConfig:
+        af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
+        return [a for a in af if ts_overlap(a.timestamp_range, timestamp)]
+
+    def delete(self, time_slot: int) -> ShatterConfig:
         """
         Delete Shatter process and all associated data from database.
 
@@ -379,22 +404,20 @@ class Storage:
         :return: Config of deleted Shatter process
         """
 
-        start_dt, end_dt = timestamp
-        self.config.log.debug(f'Deleting time slot {timestamp}...')
-        with self.open('r', timestamp) as r:
-            sh_cfg: ShatterConfig = ShatterConfig.from_string(r.meta['shatter'])
+        self.config.log.debug(f'Deleting time slot {time_slot}...')
+        with self.open('r') as r:
+            sh_cfg = ShatterConfig.from_string(r.meta[f'shatter_{time_slot}'])
             sh_cfg.mbr = ()
             sh_cfg.finished = False
 
         self.config.log.debug('Deleting fragments...')
-        tiledb.Array.delete_fragments(
-            self.config.tdb_dir,
-            timestamp_start=start_dt,
-            timestamp_end=end_dt,
-        )
+        with self.open('d') as d:
+            d.query(cond=f"shatter_process_num=={time_slot}").submit()
+
         self.config.log.debug('Rewriting config.')
-        with self.open('w', timestamp) as w:
-            w.meta['shatter'] = json.dumps(sh_cfg.to_json())
+        with self.open('w') as w:
+            w.meta[f'shatter_{time_slot}'] = json.dumps(sh_cfg.to_json())
+
         return sh_cfg
 
     def consolidate_shatter(self, timestamp, retries=0) -> None:
@@ -405,9 +428,7 @@ class Storage:
         :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
         """
         try:
-            tiledb.consolidate(
-                self.config.tdb_dir, timestamp=timestamp
-            )
+            tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp)
             c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
             tiledb.vacuum(self.config.tdb_dir, c)
             self.config.log.info(f'Consolidated time slot {timestamp}.')

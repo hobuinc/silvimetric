@@ -79,6 +79,7 @@ def storage(storage_config: StorageConfig):
 def shatter_config(
     copc_filepath: str,
     storage_config: StorageConfig,
+    storage: Storage,
     bounds: Bounds,
     date: datetime,
 ) -> Generator[ShatterConfig, None, None]:

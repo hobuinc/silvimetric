@@ -32,7 +32,7 @@ def delete(tdb_dir: str, name: str, log: Log = None) -> ShatterConfig:
         raise KeyError(f'Shatter process with ID {name} does not exist') from e
 
     try:
-        timestamp = config.timestamp
+        time_slot = config.time_slot
     except KeyError as e:
         raise ValueError(
             f'Shatter process with ID {name} is missing a timestamp.'
@@ -41,7 +41,7 @@ def delete(tdb_dir: str, name: str, log: Log = None) -> ShatterConfig:
     storage = Storage.from_db(tdb_dir)
 
     logger.info(f'Deleting task {name}.')
-    return storage.delete(timestamp)
+    return storage.delete(time_slot)
 
 
 def restart(tdb_dir: str, name: str, log: Log = None) -> int:

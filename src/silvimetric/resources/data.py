@@ -34,6 +34,9 @@ class Data:
         self.storageconfig = storageconfig
         """:class:`silvimetric.resources.StorageConfig`"""
 
+        self.pipeline = None
+        """PDAL pipeline"""
+
         self.reader = self.get_reader()
         """PDAL reader"""
 
@@ -47,7 +50,6 @@ class Data:
         self.bounds = Bounds.shared_bounds(self.bounds, storageconfig.root)
 
         self.pipeline = self.get_pipeline()
-        """PDAL pipeline"""
 
         self.log = storageconfig.log
 
@@ -209,7 +211,22 @@ class Data:
         :return: get PDAL reader for input
         """
         if self.is_pipeline():
-            for stage in self.pipeline.stages:
+            if self.pipeline is None:
+                if 's3://' in self.filename:
+                    s3 = boto3.client('s3')
+                    parsed = urlparse(self.filename)
+                    bucket = parsed.netloc
+                    key = parsed.path[1:]
+                    res = s3.get_object(Bucket=bucket, Key=key)
+                    j = res['Body'].read().decode('utf-8')
+                else:
+                    p = pathlib.Path(self.filename)
+                    j = p.read_bytes().decode('utf-8')
+                stages = pdal.pipeline._parse_stages(j)
+            else:
+                stages = self.pipeline.stages
+
+            for stage in stages:
                 stage_type, stage_kind = stage.type.split('.')
                 if stage_type == 'readers':
                     return stage

@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 import os
 import copy
+import datetime
 
 from silvimetric import (
     Storage,
@@ -12,6 +13,7 @@ from silvimetric import (
     StorageConfig,
 )
 from silvimetric import __version__ as svversion
+from silvimetric.resources.config import ShatterConfig
 
 
 class Test_Storage(object):
@@ -34,7 +36,7 @@ class Test_Storage(object):
         with storage.open('r') as st:
             sc = st.schema
             assert sc.has_attr('shatter_process_num')
-            assert sc.attr('shatter_process_num').dtype == np.uint16
+            assert sc.attr('shatter_process_num').dtype == np.uint64
             assert sc.has_attr('count')
             assert sc.attr('count').dtype == np.int32
 
@@ -105,3 +107,25 @@ class Test_Storage(object):
                     return all_metrics[met.name].schema(att)
 
                 assert all([e_name(a, m) == schema(a, m) for a in a_list])
+
+    def test_metadata(self, storage: Storage, shatter_config: ShatterConfig):
+        shatter_config.time_slot = storage.reserve_time_slot()
+        storage.save_shatter_meta(shatter_config)
+        shc_copy = copy.deepcopy(shatter_config)
+        shc_copy.time_slot = storage.reserve_time_slot()
+        storage.save_shatter_meta(shc_copy)
+
+        sh_c = storage.get_shatter_meta(shatter_config.time_slot)
+        assert sh_c == shatter_config
+        sh_c_2 = storage.get_shatter_meta(shc_copy.time_slot)
+        assert sh_c_2 == shc_copy
+
+        history = storage.get_history(
+            start_time=datetime.datetime(1970, 1, 1),
+            end_time=datetime.datetime.now(),
+            bounds=storage.config.root,
+        )
+        assert len(history) == 2
+
+        assert ShatterConfig.from_json(history[0])== shatter_config
+        assert ShatterConfig.from_json(history[1]) == shc_copy

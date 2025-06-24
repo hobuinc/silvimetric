@@ -240,7 +240,11 @@ class TestCli(object):
     def test_cli_delete(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
     ) -> None:
-        i = shatter_config.name
+        pid = shatter_config.name
+
+        i = info.info(shatter_config.tdb_dir)
+        assert i['history'][0]['finished']
+
         res = runner.invoke(
             cli.cli,
             [
@@ -250,13 +254,13 @@ class TestCli(object):
                 'single-threaded',
                 'delete',
                 '--id',
-                i,
+                pid,
             ],
         )
         assert res.exit_code == 0
 
         i = info.info(shatter_config.tdb_dir)
-        assert len(i['history']) == 0
+        assert not i['history'][0]['finished']
 
     def test_cli_restart(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
@@ -282,7 +286,8 @@ class TestCli(object):
     def test_cli_resume(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
     ) -> None:
-        i = shatter_config.name
+        pid = shatter_config.name
+
         res = runner.invoke(
             cli.cli,
             [
@@ -292,10 +297,12 @@ class TestCli(object):
                 'single-threaded',
                 'restart',
                 '--id',
-                i,
+                pid,
             ],
         )
         assert res.exit_code == 0
         i = info.info(shatter_config.tdb_dir)
         assert len(i['history']) == 1
-        assert ShatterConfig.from_dict(i['history'][0])
+        sc = ShatterConfig.from_dict(i['history'][0])
+        assert sc.finished
+

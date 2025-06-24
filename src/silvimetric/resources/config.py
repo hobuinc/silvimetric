@@ -254,9 +254,6 @@ class ShatterConfig(Config):
     processes., defaults to 0"""
 
     def __post_init__(self) -> None:
-        from .storage import Storage
-
-        s = Storage.from_db(self.tdb_dir)
         if isinstance(self.date, datetime):
             self.date = (self.date, self.date)
         if isinstance(self.date, list):
@@ -267,15 +264,16 @@ class ShatterConfig(Config):
             )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
-        self.timestamp = (int(self.date[0].timestamp()), int(self.date[0].timestamp()))
+        self.timestamp = (
+            int(self.date[0].timestamp()),
+            int(self.date[0].timestamp()),
+        )
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
             self.log.warning(
                 f'Truncating tile size to integer({self.tile_size})'
             )
-
-        del s
 
     def history_json(self):
         # removing a attrs and metrics, since they'll be in the storage log
