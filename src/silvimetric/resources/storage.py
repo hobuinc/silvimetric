@@ -249,7 +249,7 @@ class Storage:
 
         :param mode: Mode to open TileDB stream in. Valid options are
             'w', 'r', 'm', 'd'., defaults to 'r'.
-        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :raises Exception: Incorrect Mode, only valid modes are 'w' and 'r'.
         :raises Exception: Path exists and is not a TileDB array.
         :raises Exception: Path does not exist.
@@ -320,28 +320,9 @@ class Storage:
         :return: Returns list of array fragments that meet query parameters.
         """
 
-        # Get metadata configs from each timestamp that contains array fragments
-        # In future may want to collect all configs regardless, since they're
-        # still being stored there.
-        # configs = [
-        #     self.get_shatter_meta(time_slot)
-        #     for time_slot in range(self.config.next_time_slot)
-        # ]
-        # af = tiledb.array_fragments(self.config.tdb_dir, True)
         m = []
         for idx in range(1,self.config.next_time_slot):
             s = self.get_shatter_meta(idx)
-            # time_range = s.timestamp
-            # time_range = af[idx].timestamp_range
-            # all shatter processes should be input as a point in time, eg (1,1)
-            # if isinstance(time_range, tuple):
-            #     time_range = time_range[0]
-
-            # try:
-            #     s_str = self.get_metadata('shatter', time_range)
-            # except KeyError:
-            #     continue
-            # s = ShatterConfig.from_string(s_str)
             if s.bounds.disjoint(bounds):
                 continue
 
@@ -375,7 +356,7 @@ class Storage:
         granulated than if the fragments are still intact. Mbrs are represented
         as tuples in the form of ((minx, maxx), (miny, maxy))
 
-        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :return: Returns mbrs that match the given process number.
         """
         af_all = self.get_fragments_by_time(timestamp)
@@ -389,7 +370,7 @@ class Storage:
         """
         Get TileDB array fragments from the time slot specified.
 
-        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :return: Array fragments from time slot.
         """
 
@@ -400,7 +381,7 @@ class Storage:
         """
         Delete Shatter process and all associated data from database.
 
-        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :return: Config of deleted Shatter process
         """
 
@@ -425,7 +406,7 @@ class Storage:
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
         time traveling.
-        :param timestamp: TileDB timestamp, a tuple of start datetime and end datetime.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
         try:
             tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp)
