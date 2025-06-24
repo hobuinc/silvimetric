@@ -36,7 +36,7 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
     pc = pointcount * num_entries
 
     with storage.open('r') as a:
-        vals = a.df[:,:].set_index(['X','Y'])
+        vals = a.df[:, :].set_index(['X', 'Y'])
         assert vals.Z.shape[0] == shape
         xdom = int(a.schema.domain.dim('X').domain[1])
         ydom = int(a.schema.domain.dim('Y').domain[1])
@@ -52,13 +52,13 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
                 )
 
 
-class Test_Shatter(object):
+class Test_Shatter(object):  # noqa: D101
     def test_command(
         self,
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
+        threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -70,7 +70,7 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
+        threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -79,7 +79,7 @@ class Test_Shatter(object):
 
         og_timestamp = shatter_config.timestamp
 
-        d2 = (datetime.datetime(2009,1,1),datetime.datetime(2010,1,1))
+        d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
         dt_timestamp = tuple(int(d.timestamp()) for d in d2)
         # change attributes to make it a new run
         shatter_config.name = uuid.uuid4()
@@ -92,16 +92,24 @@ class Test_Shatter(object):
 
         # check that you can query results by datetime
         with storage.open('r', timestamp=dt_timestamp) as a:
-            assert np.all(a.df[:,:].shatter_process_num == 2)
-            assert len(a.df[:,:]) == base ** 2
+            assert np.all(a.df[:, :].shatter_process_num == 2)
+            assert len(a.df[:, :]) == base**2
 
         with storage.open('r', timestamp=og_timestamp) as a2:
-            assert np.all(a2.df[:,:].shatter_process_num == 1)
-            assert len(a2.df[:,:]) == base ** 2
+            assert np.all(a2.df[:, :].shatter_process_num == 1)
+            assert len(a2.df[:, :]) == base**2
 
-        with storage.open('r', timestamp=(dt_timestamp[0], og_timestamp[1])) as a3:
-            assert len(a3.query(cond='shatter_process_num == 1').df[:,:]) == base ** 2
-            assert len(a3.query(cond='shatter_process_num == 2').df[:,:]) == base ** 2
+        with storage.open(
+            'r', timestamp=(dt_timestamp[0], og_timestamp[1])
+        ) as a3:
+            assert (
+                len(a3.query(cond='shatter_process_num == 1').df[:, :])
+                == base**2
+            )
+            assert (
+                len(a3.query(cond='shatter_process_num == 2').df[:, :])
+                == base**2
+            )
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
@@ -160,7 +168,7 @@ class Test_Shatter(object):
         request: pytest.FixtureRequest,
         maxy: float,
         alignment: str,
-        threaded_dask
+        threaded_dask,
     ):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)
