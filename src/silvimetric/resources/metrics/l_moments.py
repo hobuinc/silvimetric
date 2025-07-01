@@ -13,7 +13,7 @@ def lmom4(data, *args):
     idx = np.arange(n)
 
     # sort in descending order
-    data = np.sort(data.reshape(n))[::-1]
+    # data = np.sort(data.reshape(n))[::-1]
 
     b0 = data.mean()
     l1: float = b0

@@ -2,15 +2,17 @@ import numpy as np
 import signal
 import datetime
 import copy
+
 from typing_extensions import Generator
 import pandas as pd
 import tiledb
+from itertools import product
 
+import dask.array as da
+import dask.bag as db
 from dask.distributed import as_completed, futures_of, CancelledError
 from distributed.client import _get_global_client as get_client
 from dask.delayed import Delayed
-import dask.array as da
-import dask.bag as db
 from dask.diagnostics import ProgressBar
 
 from .. import Extents, Storage, Data, ShatterConfig
@@ -42,18 +44,11 @@ def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
     :raises Exception: Missing attribute error.
     :return: None if no work is done, or a tuple of indices and rearranged data.
     """
-    if points is None:
-        return None
-    if points.size == 0:
-        return None
 
     points = points.loc[points.Y < leaf.bounds.maxy]
     points = points.loc[points.Y >= leaf.bounds.miny]
     points = points.loc[points.X >= leaf.bounds.minx]
     points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
-
-    if points.size == 0:
-        return None
 
     points.loc[:, 'xi'] = da.floor(points.xi)
     # ceil for y because origin is at top left
@@ -71,34 +66,33 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in, process_num):
+def agg_list(data_in, proc_num):
     """
     Make variable-length point data attributes into lists
     """
-    if data_in is None:
-        return None
 
     old_dtypes = data_in.dtypes
-    xyi_dtypes = {'xi': np.float64, 'yi': np.float64}
+    xyi_dtypes = {'xi': np.int32, 'yi': np.int32}
     o = np.dtype('O')
     first_col_name = data_in.columns[0]
-    col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
+    cols = [a for a in data_in.columns if a not in ['xi','yi']]
+    col_dtypes = {a: o for a in cols}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    listed = coerced.groupby(['xi', 'yi']).agg(
-        lambda x: np.array(x, old_dtypes[x.name])
-    )
-    return listed.assign(
-        count=lambda x: [len(z) for z in listed[first_col_name]],
-        shatter_process_num=lambda x: [process_num for z in listed[first_col_name]],
-    )
+    gb = coerced.groupby(['xi', 'yi'])
+    listed = gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
+
+    counts_df = gb[first_col_name].agg('count').rename('count')
+    listed = listed.join(counts_df)
+    listed = listed.assign(shatter_process_num=proc_num)
+    listed[cols] = listed[cols].astype(col_dtypes)
+
+    return listed
 
 def join(list_data: pd.DataFrame, metric_data):
     """
     Join the list data and metric DataFrames together.
     """
-    if list_data is None or metric_data is None:
-        return None
 
     if isinstance(metric_data, Delayed):
         metric_data = metric_data.compute()
@@ -118,7 +112,7 @@ def write(data_in, storage, timestamp):
     data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
 
     attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
-    xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
+    xy_dict = {'X': np.int32, 'Y': np.int32}
     metr_dict = {
         f'{m.entry_name(a.name)}': np.dtype(m.dtype)
         for m in storage.config.metrics
@@ -133,17 +127,46 @@ def write(data_in, storage, timestamp):
         for m in storage.config.metrics
         for a in storage.config.attrs
     }
+    # fillna_attr_dict = {a.name: '' for a in storage.config.attrs}
+    # fillna_dict = fillna_metr_dict | fillna_attr_dict
 
-    tiledb.from_pandas(
-        uri=storage.config.tdb_dir,
-        sparse=True,
-        dataframe=data_in,
-        mode='append',
-        timestamp=timestamp,
-        column_types=dtype_dict,
-        varlen_types=varlen_types,
-        fillna = fillna_dict,
-    )
+    try:
+        tiledb.from_pandas(
+            uri=storage.config.tdb_dir,
+            fit_to_df=True,
+            dataframe=data_in,
+            mode='append',
+            timestamp=timestamp,
+            column_types=dtype_dict,
+            varlen_types=varlen_types,
+            fillna=fillna_dict,
+        )
+    except Exception as e:
+        # try:
+            # xrange = np.arange(data_in.X.min(), data_in.X.max() + 1)
+            # yrange = np.arange(data_in.Y.min(), data_in.Y.max() + 1)
+            # prod = product(xrange, yrange)
+            # idx = np.array(
+            #     [t for t in prod], dtype=[('X', np.int32), ('Y', np.int32)]
+            # )
+            # data_in = (
+            #     data_in.set_index(['X', 'Y'])
+            #     .reindex(idx, method=None)
+            #     .reset_index()
+            # )
+            tiledb.from_pandas(
+                uri=storage.config.tdb_dir,
+                sparse=True,
+                fit_to_df=True,
+                dataframe=data_in,
+                mode='append',
+                timestamp=timestamp,
+                column_types=dtype_dict,
+                varlen_types=varlen_types,
+                fillna=fillna_dict,
+            )
+        # except Exception as e2:
+        #     raise e2 from e
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)

@@ -254,8 +254,8 @@ def scan_cmd(
 @click.option(
     '--attributes',
     '-a',
-    multiple=True,
     type=AttrParamType(),
+    default=[],
     help='List of attributes to include in Database',
 )
 @click.option(

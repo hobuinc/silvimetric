@@ -142,6 +142,7 @@ class Metric:
             name=entry_name,
             dtype=self.dtype,
             filters=FilterList([ZstdFilter()]),
+            nullable=True
         )
 
     def entry_name(self, attr: str) -> str:

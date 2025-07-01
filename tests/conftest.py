@@ -6,7 +6,7 @@ import copy
 from datetime import datetime
 from typing_extensions import Generator
 
-from silvimetric import Extents, Bounds, Attribute, Storage
+from silvimetric import Extents, Bounds, Attribute, Storage, Attributes
 from silvimetric import all_metrics
 from silvimetric import Log, Metric, ShatterConfig, StorageConfig
 from silvimetric import ApplicationConfig, ExtractConfig
@@ -144,7 +144,7 @@ def extents(
 @pytest.fixture(scope='function')
 def attrs(dims: dict) -> Generator[list[Attribute], None, None]:
     yield [
-        Attribute(a, dims[a])
+        copy.deepcopy(Attributes[a])
         for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
     ]
 

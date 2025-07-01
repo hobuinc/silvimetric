@@ -49,7 +49,7 @@ class Attribute:
         Create the tiledb schema for this attribute.
         :return: TileDB attribute schema
         """
-        return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
+        return Attr(name=self.name, dtype=self.dtype.subtype, var=True, nullable=True)
 
     def to_json(self) -> object:
         return {'name': self.name, 'dtype': np.dtype(self.dtype.subtype).str}

@@ -113,7 +113,7 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            allows_duplicates=True,
+            # allows_duplicates=True,
             sparse=True,
             # capacity=1000
         )
