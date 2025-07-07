@@ -295,7 +295,7 @@ class TestCli(object):
                 shatter_config.tdb_dir,
                 '--scheduler',
                 'single-threaded',
-                'restart',
+                'resume',
                 '--id',
                 pid,
             ],

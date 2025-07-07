@@ -71,7 +71,7 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in, process_num):
+def agg_list(data_in, proc_num):
     """
     Make variable-length point data attributes into lists
     """
@@ -85,13 +85,14 @@ def agg_list(data_in, process_num):
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    listed = coerced.groupby(['xi', 'yi']).agg(
-        lambda x: np.array(x, old_dtypes[x.name])
-    )
-    return listed.assign(
-        count=lambda x: [len(z) for z in listed[first_col_name]],
-        shatter_process_num=lambda x: [process_num for z in listed[first_col_name]],
-    )
+    gb = coerced.groupby(['xi', 'yi'])
+    listed = gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
+    counts_df = gb[first_col_name].agg('count').rename('count')
+    listed = listed.join(counts_df)
+    listed = listed.assign(shatter_process_num=proc_num)
+
+    return listed
+
 
 def join(list_data: pd.DataFrame, metric_data):
     """
@@ -115,35 +116,7 @@ def write(data_in, storage, timestamp):
     :return: Number of points written.
     """
 
-    data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
-
-    attr_dict = {f'{a.name}': a.dtype for a in storage.config.attrs}
-    xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
-    metr_dict = {
-        f'{m.entry_name(a.name)}': np.dtype(m.dtype)
-        for m in storage.config.metrics
-        for a in storage.config.attrs
-    }
-    dtype_dict = attr_dict | xy_dict | metr_dict
-
-    varlen_types = {a.dtype for a in storage.config.attrs}
-
-    fillna_dict = {
-        f'{m.entry_name(a.name)}': m.nan_value
-        for m in storage.config.metrics
-        for a in storage.config.attrs
-    }
-
-    tiledb.from_pandas(
-        uri=storage.config.tdb_dir,
-        sparse=True,
-        dataframe=data_in,
-        mode='append',
-        timestamp=timestamp,
-        column_types=dtype_dict,
-        varlen_types=varlen_types,
-        fillna = fillna_dict,
-    )
+    storage.write(data_in, timestamp)
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
@@ -274,20 +247,23 @@ def shatter(config: ShatterConfig) -> int:
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
-        leaves = extents.chunk(data, 100)
+        leaves = extents.chunk(
+            data, res_threshold=storage.config.resolution, depth_threshold=10
+        )
 
     # Begin main operations
     config.log.info('Fetching and arranging data...')
+    storage.save_shatter_meta(config)
     try:
         pc = run(leaves, config, storage)
     except Exception as e:
         config.mbr = storage.mbrs(config.timestamp)
         config.finished = False
         storage.save_shatter_meta(config)
+        storage.consolidate_shatter(config.timestamp)
         raise e
 
     # consolidate the fragments in this time slot down to just one
-    config.log.info('Consolidating db.')
     storage.consolidate_shatter(config.timestamp)
 
     # modify config to reflect result of shattter process

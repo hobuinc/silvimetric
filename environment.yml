@@ -19,3 +19,8 @@ dependencies:
   - dill
   - pandas
   - typing_extensions
+  - fast-histogram
+  # - pip:
+    # - dask-cloudprovider[aws] # for using the EC2Cluster
+    # - cryptography #needed for dask-cloudprovider
+    # - git+https://github.com/TileDB-Inc/TileDB-Py # if we have a special branch we need to install

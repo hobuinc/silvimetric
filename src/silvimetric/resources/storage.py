@@ -1,12 +1,17 @@
-import tiledb
-import numpy as np
-from datetime import datetime
 import pathlib
 import contextlib
 import json
-from typing_extensions import Generator, Optional
+from struct import Struct
+import struct
 
 from math import floor
+from datetime import datetime
+from typing_extensions import Generator, Optional
+
+import tiledb
+from tiledb.metadata import Metadata
+import numpy as np
+import pandas as pd
 
 from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
@@ -20,6 +25,7 @@ def ts_overlap(first, second):
         return False
     return True
 
+
 class Storage:
     """Handles storage of shattered data in a TileDB Database."""
 
@@ -30,6 +36,8 @@ class Storage:
             )
 
         self.config = config
+        self.reader: tiledb.SparseArray = None
+        self.writer: tiledb.SparseArray = None
 
     def __enter__(self):
         return self
@@ -75,12 +83,30 @@ class Storage:
             (config.root.maxy - config.root.miny) / float(config.resolution)
         )
 
-        dim_row = tiledb.Dim(name='X', domain=(0, xi), dtype=np.int32)
-        dim_col = tiledb.Dim(name='Y', domain=(0, yi), dtype=np.int32)
+        dim_row = tiledb.Dim(
+            name='X',
+            domain=(0, xi),
+            dtype=np.int32,
+            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+        )
+        dim_col = tiledb.Dim(
+            name='Y',
+            domain=(0, yi),
+            dtype=np.int32,
+            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+        )
         domain = tiledb.Domain(dim_row, dim_col)
 
-        count_att = tiledb.Attr(name='count', dtype=np.int32)
-        proc_att = tiledb.Attr(name='shatter_process_num', dtype=np.uint64)
+        count_att = tiledb.Attr(
+            name='count',
+            dtype=np.int32,
+            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+        )
+        proc_att = tiledb.Attr(
+            name='shatter_process_num',
+            dtype=np.uint64,
+            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+        )
         dim_atts = [attr.schema() for attr in config.attrs]
 
         metric_atts = [
@@ -115,16 +141,22 @@ class Storage:
             ],
             allows_duplicates=True,
             sparse=True,
-            # capacity=1000
+            offsets_filters=tiledb.FilterList(
+                [
+                    tiledb.PositiveDeltaFilter(),
+                    tiledb.BitWidthReductionFilter(),
+                    tiledb.ZstdFilter(),
+                ]
+            ),
         )
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
-        with tiledb.SparseArray(config.tdb_dir, 'w') as a:
-            meta = str(config)
-            a.meta['config'] = meta
+        writer = tiledb.SparseArray(config.tdb_dir, 'w')
+        writer.meta['config'] = str(config)
 
         s = Storage(config)
+        s.writer = writer
         s.save_config()
 
         return s
@@ -140,30 +172,41 @@ class Storage:
         if ctx is None:
             ctx = tiledb.default_ctx()
 
-        with tiledb.open(tdb_dir, 'r') as a:
-            s = a.meta['config']
-            config = StorageConfig.from_string(s)
+        reader = tiledb.open(tdb_dir, 'r')
+        metadata = reader.meta
+        s = metadata['config']
+        config = StorageConfig.from_string(s)
 
-        return Storage(config)
+        # in case a database has been copied somewhere else
+        config.tdb_dir = tdb_dir
+        storage = Storage(config)
+
+        # set the metadata for storage object so we don't have to query again
+        storage._meta = metadata
+        storage.reader = reader
+        storage.save_config()
+
+        return storage
 
     def save_config(self) -> None:
         """
         Save StorageConfig to the Database
         """
+        # build metadata, we'll only requery it if we can't find the desired
+        # key later
         with self.open('w') as w:
             w.meta['config'] = str(self.config)
+        with self.open('r') as r:
+            self._meta = r.meta
 
     def get_config(self) -> StorageConfig:
         """
-        Get the StorageConfig currently in use by the Storage.
+        Get the StorageConfig currently in use by Storage.
 
         :return: StorageConfig representing this object.
         """
-        with self.open('r') as a:
-            s = a.meta['config']
-            config = StorageConfig.from_string(s)
-
-        return config
+        meta_str = self.get_metadata('config')
+        return StorageConfig.from_string(meta_str)
 
     def save_shatter_meta(self, config: ShatterConfig):
         """
@@ -183,37 +226,53 @@ class Storage:
         m = self.get_metadata(key)
         return ShatterConfig.from_string(m)
 
-    def get_metadata(self, key: str, timestamp: Optional[int] = None) -> str:
+    def get_metadata(self, key: str) -> str:
         """
-        Return metadata at given key.
+        Return metadata at given key. Check first for this key in the
+        _meta member variable. If it's not there, we'll check the metadata
+        in the db.
 
         :param key: Key to look for in metadata.
-        :param timestamp: Time stamp for querying database.
         :return: Metadata value found in storage.
         """
-        if timestamp is None:
-            with self.open('r') as r:
-                val = r.meta[f'{key}']
-        with self.open('r', timestamp) as r:
-            val = r.meta[f'{key}']
+        # if meta hasn't been set up, do so
+        if self._meta is None:
+            with self.open('r') as tdb:
+                self._meta = tdb.meta
+                # this should be latest metadata, handle a keyerror higher up
+                return self._meta[key]
 
-        return val
+        # if it was already set up and the key doesn't exist,
+        # reload metadata and check there
+        if key not in self._meta.keys():
+            with self.open('r') as tdb:
+                self._meta = tdb.meta
 
-    def save_metadata(
-        self, key: str, data: str, timestamp: Optional[int] = None, retries=0
-    ) -> None:
+        return self._meta['key']
+
+
+    def save_metadata(self, key: str, data: str) -> None:
         """
         Save metadata to storage.
 
         :param key: Metadata key to save to.
         :param data: Data to save to metadata.
         """
-        if timestamp is None:
-            with self.open('w') as w:
-                w.meta[f'{key}'] = data
-        else:
-            with self.open('w', timestamp) as w:
-                w.meta[f'{key}'] = data
+        # if writer isn't set up, do it now
+        if self._writer is None:
+            self._writer = self.open('w')
+
+        # propogate the key-value to both tiledb and the local copy
+        self._meta[key] = data
+        self._writer.meta[key] = data
+
+    def get_tdb_context(self):
+        cfg = tiledb.Config()
+        cfg['vfs.s3.connect_scale_factor'] = '25'
+        cfg['vfs.s3.connect_max_retries'] = '10'
+        # cfg['vfs.s3.max_parallel_ops'] = '1'
+        ctx = tiledb.Ctx(cfg)
+        return ctx
 
     def get_attributes(self) -> list[Attribute]:
         """
@@ -221,7 +280,7 @@ class Storage:
 
         :return: List of attribute names.
         """
-        return self.get_config().attrs
+        return self.config.attrs
 
     def get_metrics(self) -> list[Metric]:
         """
@@ -229,7 +288,7 @@ class Storage:
 
         :return: List of metric names.
         """
-        return self.get_config().metrics
+        return self.config.metrics
 
     def get_derived_names(self) -> list[str]:
         # if no attributes are set in the metric, use all
@@ -240,7 +299,6 @@ class Storage:
             if not m.attributes or a.name in [ma.name for ma in m.attributes]
         ]
 
-    @contextlib.contextmanager
     def open(
         self, mode: str = 'r', timestamp=None
     ) -> Generator[tiledb.SparseArray, None, None]:
@@ -258,11 +316,12 @@ class Storage:
 
         # tiledb and dask have bad interaction with opening an array if
         # other threads present
+        ctx = self.get_tdb_context()
 
         if tiledb.object_type(self.config.tdb_dir) == 'array':
             if mode in ['w', 'r', 'd', 'm']:
                 tdb = tiledb.open(
-                    self.config.tdb_dir, mode, timestamp=timestamp
+                    self.config.tdb_dir, mode, timestamp=timestamp, ctx=ctx
                 )
             else:
                 raise Exception(f"Given open mode '{mode}' is not valid")
@@ -274,10 +333,41 @@ class Storage:
         else:
             raise Exception(f'Path {self.config.tdb_dir} does not exist')
 
-        try:
-            yield tdb
-        finally:
-            tdb.close()
+        return tdb
+
+    def write(self, data_in: pd.DataFrame, timestamp):
+        data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
+
+        attr_dict = {f'{a.name}': a.dtype for a in self.config.attrs}
+        xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
+        metr_dict = {
+            f'{m.entry_name(a.name)}': np.dtype(m.dtype)
+            for m in self.config.metrics
+            for a in self.config.attrs
+        }
+        dtype_dict = attr_dict | xy_dict | metr_dict
+
+        varlen_types = {a.dtype for a in self.config.attrs}
+
+        fillna_dict = {
+            f'{m.entry_name(a.name)}': m.nan_value
+            for m in self.config.metrics
+            for a in self.config.attrs
+        }
+
+        ctx = self.get_tdb_context()
+
+        return tiledb.from_pandas(
+            uri=self.config.tdb_dir,
+            ctx=ctx,
+            sparse=True,
+            dataframe=data_in,
+            mode='append',
+            timestamp=timestamp,
+            column_types=dtype_dict,
+            varlen_types=varlen_types,
+            fillna=fillna_dict,
+        )
 
     def reserve_time_slot(self) -> int:
         """
@@ -289,14 +379,11 @@ class Storage:
 
         :return: Time slot.
         """
-        with self.open('r') as r:
-            latest = json.loads(r.meta['config'])
+        latest = self.get_metadata('config')
 
         time = latest['next_time_slot']
         latest['next_time_slot'] = time + 1
-
-        with self.open('w') as w:
-            w.meta['config'] = json.dumps(latest)
+        self.save_metadata('config', json.dumps(latest))
 
         self.config.next_time_slot = latest['next_time_slot']
         return time
@@ -321,7 +408,7 @@ class Storage:
         """
 
         m = []
-        for idx in range(1,self.config.next_time_slot):
+        for idx in range(1, self.config.next_time_slot):
             s = self.get_shatter_meta(idx)
             if s.bounds.disjoint(bounds):
                 continue
@@ -357,7 +444,6 @@ class Storage:
         as tuples in the form of ((minx, maxx), (miny, maxy))
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
-        :return: Returns mbrs that match the given process number.
         """
         af_all = self.get_fragments_by_time(timestamp)
         mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
@@ -393,7 +479,7 @@ class Storage:
 
         self.config.log.debug('Deleting fragments...')
         with self.open('d') as d:
-            d.query(cond=f"shatter_process_num=={time_slot}").submit()
+            d.query(cond=f'shatter_process_num=={time_slot}').submit()
 
         self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
@@ -408,6 +494,7 @@ class Storage:
         time traveling.
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
+        self.config.log.info('Consolidating db.')
         try:
             tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp)
             c = tiledb.Config({'sm.vacuum.mode': 'fragments'})

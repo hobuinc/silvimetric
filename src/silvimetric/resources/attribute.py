@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import pdal
-from tiledb import Attr
+from tiledb import Attr, ZstdFilter, FilterList
 from .array_extensions import AttributeArray, AttributeDtype
 
 
@@ -49,7 +49,12 @@ class Attribute:
         Create the tiledb schema for this attribute.
         :return: TileDB attribute schema
         """
-        return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
+        return Attr(
+            name=self.name,
+            dtype=self.dtype.subtype,
+            var=True,
+            filters=FilterList([ZstdFilter()]),
+        )
 
     def to_json(self) -> object:
         return {'name': self.name, 'dtype': np.dtype(self.dtype.subtype).str}

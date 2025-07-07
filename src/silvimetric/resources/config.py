@@ -266,7 +266,7 @@ class ShatterConfig(Config):
             self.date = (self.date[0], self.date[0])
         self.timestamp = (
             int(self.date[0].timestamp()),
-            int(self.date[0].timestamp()),
+            int(self.date[1].timestamp()),
         )
 
         if isinstance(self.tile_size, float):
