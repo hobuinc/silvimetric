@@ -211,11 +211,9 @@ class TestCli(object):
     ):
         atts = []
         for a in extract_config.attrs:
-            atts.append('-a')
             atts.append(a.name)
         ms = []
         for m in extract_config.metrics:
-            ms.append('-m')
             ms.append(m.name)
         out_dir = extract_config.out_dir
         tdb_dir = extract_config.tdb_dir
@@ -228,8 +226,10 @@ class TestCli(object):
                 '--scheduler',
                 'single-threaded',
                 'extract',
-                *atts,
-                *ms,
+                '-a',
+                ','.join(atts),
+                '-m',
+                ','.join(ms),
                 '--outdir',
                 out_dir,
             ],

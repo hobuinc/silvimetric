@@ -256,7 +256,7 @@ def scan_cmd(
     '-a',
     type=AttrParamType(),
     default=[],
-    help='List of attributes to include in Database',
+    help='List of attributes to include in Database, eg. -a Z,Intensity',
 )
 @click.option(
     '--metrics',
@@ -385,10 +385,9 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 @click.option(
     '--attributes',
     '-a',
-    multiple=True,
     type=AttrParamType(),
     default=[],
-    help='List of attributes to include output',
+    help='List of attributes to include output, eg -a Z,Intensity',
 )
 @click.option(
     '--metrics',

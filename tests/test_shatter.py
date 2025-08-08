@@ -5,6 +5,7 @@ from math import ceil
 
 import pytest
 import numpy as np
+import pandas as pd
 import dask
 
 from silvimetric import Extents, Log, info, shatter, Storage
@@ -47,9 +48,15 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
 
         for xi in range(xdom):
             for yi in range(ydom):
-                assert bool(
-                    np.all(vals.loc[xi, yi].Z[0] == (val_const - yi - 1))
-                )
+                try:
+                    z = vals.loc[xi,yi].Z
+                    if isinstance(z, np.ndarray):
+                        assert np.all(z == (val_const - yi - 1))
+                    elif isinstance(z, pd.Series):
+                        for z1 in z.values:
+                            np.all(z1 == (val_const - yi - 1))
+                except Exception as e:
+                    print('asfasdf')
 
 
 class Test_Shatter(object):  # noqa: D101

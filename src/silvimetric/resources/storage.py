@@ -1,15 +1,11 @@
-import pathlib
-import contextlib
 import json
-from struct import Struct
-import struct
+import operator
 
 from math import floor
 from datetime import datetime
-from typing_extensions import Generator, Optional
+from typing_extensions import Optional
 
 import tiledb
-from tiledb.metadata import Metadata
 import numpy as np
 import pandas as pd
 
@@ -25,7 +21,6 @@ def ts_overlap(first, second):
         return False
     return True
 
-
 class Storage:
     """Handles storage of shattered data in a TileDB Database."""
 
@@ -35,14 +30,16 @@ class Storage:
                 f"Given database directory '{config.tdb_dir}' does not exist"
             )
 
-        self.config = config
-        self.reader: tiledb.SparseArray = None
-        self.writer: tiledb.SparseArray = None
+        self.config: StorageConfig = config
+        self._reader: tiledb.SparseArray = None
 
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc_value, exc_tb):
+        if self._reader is not None:
+            self._reader.close()
+        self._reader = None
         return
 
     @staticmethod
@@ -87,25 +84,25 @@ class Storage:
             name='X',
             domain=(0, xi),
             dtype=np.int32,
-            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.int32,
-            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(
             name='count',
             dtype=np.int32,
-            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
             dtype=np.uint64,
-            filters=tiledb.FilterList([ tiledb.ZstdFilter() ]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_atts = [attr.schema() for attr in config.attrs]
 
@@ -152,11 +149,10 @@ class Storage:
         schema.check()
 
         tiledb.SparseArray.create(config.tdb_dir, schema)
-        writer = tiledb.SparseArray(config.tdb_dir, 'w')
-        writer.meta['config'] = str(config)
+        with tiledb.SparseArray(config.tdb_dir, 'w') as writer:
+            writer.meta['config'] = str(config)
 
         s = Storage(config)
-        s.writer = writer
         s.save_config()
 
         return s
@@ -182,8 +178,7 @@ class Storage:
         storage = Storage(config)
 
         # set the metadata for storage object so we don't have to query again
-        storage._meta = metadata
-        storage.reader = reader
+        storage._reader = reader
         storage.save_config()
 
         return storage
@@ -196,8 +191,8 @@ class Storage:
         # key later
         with self.open('w') as w:
             w.meta['config'] = str(self.config)
-        with self.open('r') as r:
-            self._meta = r.meta
+        if self._reader is not None:
+            self._reader.reopen()
 
     def get_config(self) -> StorageConfig:
         """
@@ -236,20 +231,13 @@ class Storage:
         :return: Metadata value found in storage.
         """
         # if meta hasn't been set up, do so
-        if self._meta is None:
-            with self.open('r') as tdb:
-                self._meta = tdb.meta
-                # this should be latest metadata, handle a keyerror higher up
-                return self._meta[key]
-
-        # if it was already set up and the key doesn't exist,
-        # reload metadata and check there
-        if key not in self._meta.keys():
-            with self.open('r') as tdb:
-                self._meta = tdb.meta
-
-        return self._meta['key']
-
+        reader = self.open('r')
+        try:
+            return reader.meta[key]
+        except KeyError:
+            reader.reopen()
+            self._reader = reader
+            return reader.meta[key]
 
     def save_metadata(self, key: str, data: str) -> None:
         """
@@ -259,12 +247,11 @@ class Storage:
         :param data: Data to save to metadata.
         """
         # if writer isn't set up, do it now
-        if self._writer is None:
-            self._writer = self.open('w')
-
         # propogate the key-value to both tiledb and the local copy
-        self._meta[key] = data
-        self._writer.meta[key] = data
+        with self.open('w') as w:
+            w.meta[key] = data
+        if self._reader is not None:
+            self._reader.reopen()
 
     def get_tdb_context(self):
         cfg = tiledb.Config()
@@ -299,9 +286,7 @@ class Storage:
             if not m.attributes or a.name in [ma.name for ma in m.attributes]
         ]
 
-    def open(
-        self, mode: str = 'r', timestamp=None
-    ) -> Generator[tiledb.SparseArray, None, None]:
+    def open(self, mode: str = 'r', timestamp=None) -> tiledb.SparseArray:
         """
         Open stream for TileDB database in given mode and at given timestamp.
 
@@ -318,22 +303,18 @@ class Storage:
         # other threads present
         ctx = self.get_tdb_context()
 
-        if tiledb.object_type(self.config.tdb_dir) == 'array':
-            if mode in ['w', 'r', 'd', 'm']:
-                tdb = tiledb.open(
-                    self.config.tdb_dir, mode, timestamp=timestamp, ctx=ctx
-                )
-            else:
-                raise Exception(f"Given open mode '{mode}' is not valid")
-        elif pathlib.Path(self.config.tdb_dir).exists():
-            raise Exception(
-                f'Path {self.config.tdb_dir} already exists and is not'
-                ' initialized for TileDB access.'
+        # non-timestamped reader and writer are stored as member variables to
+        # avoid opening and closing too many io objects.
+        if timestamp is not None or mode != 'r':
+            return tiledb.open(
+                self.config.tdb_dir, mode, timestamp=timestamp, ctx=ctx
             )
-        else:
-            raise Exception(f'Path {self.config.tdb_dir} does not exist')
+        else:  # no timestamp and mode is 'r'
+            if self._reader is None or not self._reader.isopen:
+                self._reader = tiledb.open(self.config.tdb_dir, 'r')
 
-        return tdb
+            self._reader.reopen()
+            return self._reader
 
     def write(self, data_in: pd.DataFrame, timestamp):
         data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
@@ -375,17 +356,17 @@ class Storage:
         shatter process.
 
         :param config: Shatter config will be written as metadata to reserve
-            time slot.
+        time slot.
 
         :return: Time slot.
         """
-        latest = self.get_metadata('config')
+        # make sure we're dealing with the latest config
+        cfg = self.get_config()
+        self.config = cfg
+        time = self.config.next_time_slot
+        self.config.next_time_slot = time + 1
+        self.save_config()
 
-        time = latest['next_time_slot']
-        latest['next_time_slot'] = time + 1
-        self.save_metadata('config', json.dumps(latest))
-
-        self.config.next_time_slot = latest['next_time_slot']
         return time
 
     def get_history(
@@ -472,14 +453,16 @@ class Storage:
         """
 
         self.config.log.debug(f'Deleting time slot {time_slot}...')
-        with self.open('r') as r:
-            sh_cfg = ShatterConfig.from_string(r.meta[f'shatter_{time_slot}'])
-            sh_cfg.mbr = ()
-            sh_cfg.finished = False
+
+        r = self.open('r')
+        sh_cfg = ShatterConfig.from_string(r.meta[f'shatter_{time_slot}'])
+        sh_cfg.mbr = ()
+        sh_cfg.finished = False
 
         self.config.log.debug('Deleting fragments...')
-        with self.open('d') as d:
-            d.query(cond=f'shatter_process_num=={time_slot}').submit()
+        d = self.open('d')
+        d.query(cond=f'shatter_process_num=={time_slot}').submit()
+        d.close()
 
         self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
