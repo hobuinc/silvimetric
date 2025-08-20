@@ -194,14 +194,19 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     ## If dask is distributed, use the futures feature
     dc = get_client()
+    consolidate_count = 1000
+    count = 0
     if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
-            storage.consolidate_shatter(config.timestamp)
             for _, pack in batch:
                 if isinstance(pack, CancelledError):
                     continue
                 for pc in pack:
+                    count += 1
+                    if count >= consolidate_count:
+                        storage.consolidate_shatter(config.timestamp)
+                        count = 0
                     config.point_count = config.point_count + pc
                     del pc
 
