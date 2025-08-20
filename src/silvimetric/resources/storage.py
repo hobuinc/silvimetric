@@ -21,6 +21,7 @@ def ts_overlap(first, second):
         return False
     return True
 
+
 class Storage:
     """Handles storage of shattered data in a TileDB Database."""
 
@@ -479,10 +480,23 @@ class Storage:
         """
         self.config.log.info('Consolidating db.')
         try:
-            tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp)
+            commits = tiledb.Config({'sm.consolidation.mode': 'commits'})
+            tiledb.consolidate(
+                self.config.tdb_dir, timestamp=timestamp, config=commits
+            )
+            fragments = tiledb.Config({'sm.consolidation.mode': 'fragments'})
+            tiledb.consolidate(
+                self.config.tdb_dir, timestamp=timestamp, config=fragments
+            )
+            metadata = tiledb.Config({'sm.consolidation.mode': 'metadata'})
+            tiledb.consolidate(
+                self.config.tdb_dir, timestamp=timestamp, config=metadata
+            )
+
             c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
-            tiledb.vacuum(self.config.tdb_dir, c)
+            tiledb.vacuum(self.config.tdb_dir, timestamp=timestamp, config=c)
             self.config.log.info(f'Consolidated time slot {timestamp}.')
+
         except Exception as e:
             if retries >= 3:
                 self.config.log.warning(
