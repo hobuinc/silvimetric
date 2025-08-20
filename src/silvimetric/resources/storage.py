@@ -471,6 +471,14 @@ class Storage:
 
         return sh_cfg
 
+    def vacuum(self):
+        c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
+        tiledb.vacuum(self.config.tdb_dir, config=c)
+        c = tiledb.Config({'sm.vacuum.mode': 'commits'})
+        tiledb.vacuum(self.config.tdb_dir, config=c)
+        c = tiledb.Config({'sm.vacuum.mode': 'fragment_meta'})
+        tiledb.vacuum(self.config.tdb_dir, config=c)
+
     def consolidate_shatter(self, timestamp, retries=0) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
@@ -478,7 +486,7 @@ class Storage:
         time traveling.
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
-        self.config.log.info('Consolidating db.')
+        self.config.log.debug('Consolidating db.')
         try:
             commits = tiledb.Config({'sm.consolidation.mode': 'commits'})
             tiledb.consolidate(
@@ -488,14 +496,11 @@ class Storage:
             tiledb.consolidate(
                 self.config.tdb_dir, timestamp=timestamp, config=fragments
             )
-            metadata = tiledb.Config({'sm.consolidation.mode': 'metadata'})
+            metadata = tiledb.Config({'sm.consolidation.mode': 'fragment_meta'})
             tiledb.consolidate(
                 self.config.tdb_dir, timestamp=timestamp, config=metadata
             )
-
-            c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
-            tiledb.vacuum(self.config.tdb_dir, timestamp=timestamp, config=c)
-            self.config.log.info(f'Consolidated time slot {timestamp}.')
+            self.config.log.debug(f'Consolidated time slot {timestamp}.')
 
         except Exception as e:
             if retries >= 3:

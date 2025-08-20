@@ -197,6 +197,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     if dc is not None:
         pc_futures = futures_of(processes.persist())
         for batch in as_completed(pc_futures, with_results=True).batches():
+            storage.consolidate_shatter(config.timestamp)
             for _, pack in batch:
                 if isinstance(pack, CancelledError):
                     continue
@@ -265,6 +266,7 @@ def shatter(config: ShatterConfig) -> int:
 
     # consolidate the fragments in this time slot down to just one
     storage.consolidate_shatter(config.timestamp)
+    storage.vacuum()
 
     # modify config to reflect result of shattter process
     config.log.info('Saving shatter metadata')
