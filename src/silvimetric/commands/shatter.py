@@ -194,7 +194,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     ## If dask is distributed, use the futures feature
     dc = get_client()
-    consolidate_count = 1000
+    consolidate_count = 10
     count = 0
     if dc is not None:
         pc_futures = futures_of(processes.persist())
