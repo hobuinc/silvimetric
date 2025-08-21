@@ -158,30 +158,29 @@ class Metric:
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
         if isinstance(args, pd.DataFrame):
-            with mutex:
-                idx = locs.loc[d.index[0]]
-                xi = idx.xi
-                yi = idx.yi
-                pass_args = []
-                for a in attrs:
-                    try:
-                        arg = args.at[(yi, xi), a]
-                        if isinstance(arg, list) or isinstance(arg, tuple):
-                            pass_args.append(arg)
-                        elif np.isnan(arg):
-                            return self.nan_value
-                        else:
-                            pass_args.append(arg)
+            idx = locs.loc[d.index[0]]
+            xi = idx.xi
+            yi = idx.yi
+            pass_args = []
+            for a in attrs:
+                try:
+                    arg = args.at[(yi, xi), a]
+                    if isinstance(arg, (list, tuple)):
+                        pass_args.append(arg)
+                    elif np.isnan(arg):
+                        return self.nan_value
+                    else:
+                        pass_args.append(arg)
 
-                    except Exception as e:
-                        if self.nan_policy == 'propagate':
-                            return self.nan_value
-                        else:
-                            raise (e)
+                except Exception as e:
+                    if self.nan_policy == 'propagate':
+                        return self.nan_value
+                    else:
+                        raise (e)
         else:
             pass_args = args
-
-        return self._method(d, *pass_args)
+        a = self._method(d, *pass_args)
+        return a
 
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running

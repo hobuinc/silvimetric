@@ -213,6 +213,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
         config.finished = True
+        point_count = config.point_count
     else:
         # Handle non-distributed dask scenarios
         with ProgressBar():
