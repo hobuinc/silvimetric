@@ -103,7 +103,7 @@ def m_lkurtosis(data, *args):
 
 
 # intermediate metric, not intended for insertion into db
-l_mom_base = Metric('lmombase', object, lmom4, [])
+l_mom_base = Metric('lmombase', object, lmom4)
 
 
 l1 = Metric('l1', np.float32, m_l1, [l_mom_base])

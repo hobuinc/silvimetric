@@ -76,7 +76,7 @@ def m_95m05(data, *args):
 
 def m_profile_area(data, *args):
     # sanity check...must have valid heights/elevations
-    p = args[0]
+    p = np.percentile(data, range(100)).tolist()
     dmax = data.max()
     dmin = data.min()
     if dmax <= 0:
@@ -120,6 +120,4 @@ percentiles['p95'] = Metric('p95', np.float32, m_p95, [pct_base])
 percentiles['p99'] = Metric('p99', np.float32, m_p99, [pct_base])
 percentiles['90m10'] = Metric('90m10', np.float32, m_90m10, [pct_base])
 percentiles['95m05'] = Metric('95m05', np.float32, m_95m05, [pct_base])
-percentiles['profile_area'] = Metric(
-    'profile_area', np.float32, m_profile_area, [pct_base]
-)
+percentiles['profile_area'] = Metric('profile_area', np.float32, m_profile_area)

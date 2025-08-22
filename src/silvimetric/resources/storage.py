@@ -472,9 +472,9 @@ class Storage:
         return sh_cfg
 
     def vacuum(self):
-        c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
-        tiledb.vacuum(self.config.tdb_dir, config=c)
         c = tiledb.Config({'sm.vacuum.mode': 'commits'})
+        tiledb.vacuum(self.config.tdb_dir, config=c)
+        c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
         tiledb.vacuum(self.config.tdb_dir, config=c)
         c = tiledb.Config({'sm.vacuum.mode': 'fragment_meta'})
         tiledb.vacuum(self.config.tdb_dir, config=c)

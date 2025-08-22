@@ -4,7 +4,6 @@ import datetime
 import copy
 from typing_extensions import Generator
 import pandas as pd
-import tiledb
 
 from dask.distributed import as_completed, futures_of, CancelledError
 from distributed.client import _get_global_client as get_client
@@ -194,7 +193,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     ## If dask is distributed, use the futures feature
     dc = get_client()
-    consolidate_count = 10
+    consolidate_count = 30
     count = 0
     if dc is not None:
         pc_futures = futures_of(processes.persist())
@@ -250,16 +249,19 @@ def shatter(config: ShatterConfig) -> int:
     if config.bounds is None:
         config.bounds = extents.bounds
 
-    config.log.info('Grabbing leaf nodes...')
+    config.log.debug('Grabbing leaf nodes...')
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
         leaves = extents.chunk(
-            data, res_threshold=storage.config.resolution, depth_threshold=10
+            data, res_threshold=storage.config.resolution, depth_threshold=30
         )
+        leaf_count = len(leaves)
+        config.log.debug(f'{leaf_count} tiles to process.')
+
 
     # Begin main operations
-    config.log.info('Fetching and arranging data...')
+    config.log.debug('Fetching and arranging data...')
     storage.save_shatter_meta(config)
     try:
         pc = run(leaves, config, storage)
@@ -275,7 +277,7 @@ def shatter(config: ShatterConfig) -> int:
     storage.vacuum()
 
     # modify config to reflect result of shattter process
-    config.log.info('Saving shatter metadata')
+    config.log.debug('Saving shatter metadata')
     config.point_count = pc
     config.mbr = storage.mbrs(config.timestamp)
     config.end_time = datetime.datetime.now().timestamp() * 1000
