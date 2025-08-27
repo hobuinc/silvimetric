@@ -25,39 +25,21 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     :param storage: :class:`silvimetric.resources.storage.Storage` database.
     :return: Point data array from PDAL.
     """
+
+    attrs = [a.name for a in storage.get_attributes()]
     data = Data(filename, storage.config, bounds=extents.bounds)
     p = data.pipeline
     data.execute()
-    return p.get_dataframe(0)
 
-
-def arrange(points: pd.DataFrame, leaf, attrs: list[str]):
-    """
-    Arrange data to fit key-value TileDB input format.
-
-    :param data: Tuple of indices and point data array (xis, yis, data).
-    :param leaf: :class:`silvimetric.resources.extents.Extent` being used.
-    :param attrs: List of attribute names.
-    :raises Exception: Missing attribute error.
-    :return: None if no work is done, or a tuple of indices and rearranged data.
-    """
-    if points is None:
-        return None
-    if points.size == 0:
-        return None
-
-    points = points.loc[points.Y < leaf.bounds.maxy]
-    points = points.loc[points.Y >= leaf.bounds.miny]
-    points = points.loc[points.X >= leaf.bounds.minx]
-    points = points.loc[points.X < leaf.bounds.maxx, [*attrs, 'xi', 'yi']]
-
-    if points.size == 0:
-        return None
+    points = p.get_dataframe(0)
+    points = points.loc[points.Y < extents.bounds.maxy]
+    points = points.loc[points.Y >= extents.bounds.miny]
+    points = points.loc[points.X >= extents.bounds.minx]
+    points = points.loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']]
 
     points.loc[:, 'xi'] = da.floor(points.xi)
     # ceil for y because origin is at top left
     points.loc[:, 'yi'] = da.ceil(points.yi)
-
     return points
 
 
@@ -84,7 +66,7 @@ def agg_list(data_in, proc_num):
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    gb = coerced.groupby(['xi', 'yi'])
+    gb = coerced.groupby(['xi', 'yi'], sort=False)
     listed = gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
     counts_df = gb[first_col_name].agg('count').rename('count')
     listed = listed.join(counts_df)
@@ -97,12 +79,6 @@ def join(list_data: pd.DataFrame, metric_data):
     """
     Join the list data and metric DataFrames together.
     """
-    if list_data is None or metric_data is None:
-        return None
-
-    if isinstance(metric_data, Delayed):
-        metric_data = metric_data.compute()
-
     return list_data.join(metric_data).reset_index()
 
 
@@ -127,38 +103,27 @@ def write(data_in, storage, timestamp):
 Leaves = Generator[Extents, None, None]
 
 
-def get_processes(
-    leaves: Leaves, config: ShatterConfig, storage: Storage
+def do_one(
+    leaf: Extents, config: ShatterConfig, storage: Storage
 ) -> db.Bag:
     """Create dask bags and the order of operations."""
 
-    ## Handle dask bag transitions through work states
-    attrs = [a.name for a in storage.config.attrs]
     timestamp = config.timestamp
 
     # remove any extents that have already been done, only skip if full overlap
-    leaf_bag: db.Bag = db.from_sequence(leaves)
     if config.mbr:
+        if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
+            return 0
 
-        def mbr_filter(one: Extents):
-            return all(one.disjoint_by_mbr(m) for m in config.mbr)
+    points = get_data(leaf, config.filename, storage)
+    if points.empty:
+        return 0
+    metric_data = run_graph(points, storage.get_metrics())
+    listed_data = agg_list(points, config.time_slot)
+    joined_data = join(listed_data, metric_data)
+    point_count = write(joined_data, storage, timestamp)
 
-        leaf_bag = leaf_bag.filter(mbr_filter)
-
-    def pc_filter(d: pd.DataFrame):
-        if d is None:
-            return False
-        return not d.empty
-
-    points: db.Bag = leaf_bag.map(get_data, config.filename, storage)
-    arranged: db.Bag = points.map(arrange, leaf_bag, attrs)
-    filtered: db.Bag = arranged.filter(pc_filter)
-    metrics: db.Bag = filtered.map(run_graph, storage.config.metrics)
-    lists: db.Bag = filtered.map(agg_list, config.time_slot)
-    joined: db.Bag = lists.map(join, metrics)
-    writes: db.Bag = joined.map(write, storage, timestamp)
-
-    return writes
+    return point_count
 
 
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
@@ -189,7 +154,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
-    processes = get_processes(leaves, config, storage)
+    leaf_bag: db.Bag = db.from_sequence(leaves)
+    processes = leaf_bag.map(do_one, config, storage)
 
     ## If dask is distributed, use the futures feature
     dc = get_client()

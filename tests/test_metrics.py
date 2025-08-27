@@ -18,7 +18,7 @@ class TestMetrics:
         g = Graph(metrics).init()
         assert g.initialized
         assert all(n.initialized for n in g.nodes.values())
-        assert list(g.nodes.keys()) == [
+        assert not set(g.nodes.keys()) ^ set([
             'l1',
             'l2',
             'l3',
@@ -27,7 +27,8 @@ class TestMetrics:
             'lskewness',
             'lkurtosis',
             'lmombase',
-        ]
+        ])
+
         g.run(metric_data)
         for node in g.nodes.values():
             assert isinstance(node.results, pd.DataFrame)
@@ -40,6 +41,8 @@ class TestMetrics:
         metric_data: pd.DataFrame,
         metric_data_results: pd.DataFrame,
     ):
+        # TODO fix this, changed to hilbert ordering and changed
+        # to not using sort in groupbys
         metrics = list(s.values())
         graph = Graph(metrics)
         metrics = graph.run(metric_data)

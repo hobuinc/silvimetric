@@ -131,6 +131,7 @@ class Storage:
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(
             domain=domain,
+            cell_order='hilbert',
             attrs=[
                 count_att,
                 proc_att,

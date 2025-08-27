@@ -204,7 +204,7 @@ class Metric:
             data = data[attrs]
 
         idxer = data[idx]
-        gb = data.groupby(idx)
+        gb = data.groupby(idx, sort=False)
 
         # Arguments come in as separate dataframes returned from previous
         # metrics deemed dependencies. If there are dependencies for this
@@ -221,8 +221,11 @@ class Metric:
             merged_args = args
 
         # lambda method for use in dataframe aggregator
-        def runner(d):
-            return self.sanitize_and_run(d, idxer, merged_args)
+        def runner(d, idx=idxer, m_args=merged_args):
+            return self.sanitize_and_run(d, idx, m_args)
+
+        # def runner(values, index, m=merged_args):
+        #     return self._method(values, index, merged_args)
 
         # create map of current column name to tuple of new column name and
         # metric method
