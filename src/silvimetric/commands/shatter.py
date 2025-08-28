@@ -168,12 +168,15 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                 if isinstance(pack, CancelledError):
                     continue
                 for pc in pack:
-                    count += 1
-                    if count >= consolidate_count:
-                        storage.consolidate_shatter(config.timestamp)
-                        count = 0
-                    config.point_count = config.point_count + pc
-                    del pc
+                    if isinstance(pc, BaseException):
+                        print('Error found: ', pc)
+                    else:
+                        count += 1
+                        if count >= consolidate_count:
+                            dc.submit(storage.consolidate_shatter(config.timestamp))
+                            count = 0
+                        config.point_count = config.point_count + pc
+                        del pc
 
         end_time = datetime.datetime.now().timestamp() * 1000
         config.end_time = end_time
