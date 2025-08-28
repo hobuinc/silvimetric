@@ -5,9 +5,15 @@ import copy
 from typing_extensions import Generator
 import pandas as pd
 
-from dask.distributed import as_completed, futures_of, CancelledError
+from dask.distributed import (
+    as_completed,
+    futures_of,
+    CancelledError,
+    fire_and_forget,
+)
 from distributed.client import _get_global_client as get_client
-from dask.delayed import Delayed
+
+from dask.delayed import Delayed, delayed
 import dask.array as da
 import dask.bag as db
 from dask.diagnostics import ProgressBar
@@ -103,9 +109,7 @@ def write(data_in, storage, timestamp):
 Leaves = Generator[Extents, None, None]
 
 
-def do_one(
-    leaf: Extents, config: ShatterConfig, storage: Storage
-) -> db.Bag:
+def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     """Create dask bags and the order of operations."""
 
     timestamp = config.timestamp
@@ -154,8 +158,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
-    leaf_bag: db.Bag = db.from_sequence(leaves)
-    processes = leaf_bag.map(do_one, config, storage)
+    # leaf_bag: db.Bag = db.from_sequence(leaves)
+    processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
 
     ## If dask is distributed, use the futures feature
     dc = get_client()
@@ -173,7 +177,10 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                     else:
                         count += 1
                         if count >= consolidate_count:
-                            dc.submit(storage.consolidate_shatter(config.timestamp))
+                            faf = dc.submit(
+                                storage.consolidate_shatter(config.timestamp)
+                            )
+                            fire_and_forget(faf)
                             count = 0
                         config.point_count = config.point_count + pc
                         del pc
@@ -227,7 +234,6 @@ def shatter(config: ShatterConfig) -> int:
         )
         leaf_count = len(leaves)
         config.log.debug(f'{leaf_count} tiles to process.')
-
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
