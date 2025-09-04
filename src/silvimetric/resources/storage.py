@@ -493,6 +493,12 @@ class Storage:
             tiledb.consolidate(
                 self.config.tdb_dir, timestamp=timestamp, config=commits
             )
+        except Exception:
+            # this one sometimes fails unexpectedly if too many consolidations
+            # been made recently, not a big deal if we just skip it
+            pass
+
+        try:
             fragments = tiledb.Config({'sm.consolidation.mode': 'fragments'})
             tiledb.consolidate(
                 self.config.tdb_dir, timestamp=timestamp, config=fragments
@@ -503,15 +509,8 @@ class Storage:
             )
             self.config.log.debug(f'Consolidated time slot {timestamp}.')
 
-        except Exception as e:
-            if retries >= 3:
-                self.config.log.warning(
-                    'Failed to consolidate time slot '
-                    f'{timestamp} {retries} time(s). Stopping.'
-                )
-                raise e
+        except Exception:
             self.config.log.warning(
                 'Failed to consolidate time slot '
-                f'{timestamp} {retries + 1} time. Retrying...'
+                f'{timestamp} {retries + 1} time.'
             )
-            self.consolidate_shatter(timestamp, retries + 1)

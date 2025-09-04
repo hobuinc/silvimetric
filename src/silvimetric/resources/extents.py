@@ -94,9 +94,7 @@ class Extents(object):
     def chunk(
         self,
         data: Data,
-        res_threshold=100,
         pc_threshold=600000,
-        depth_threshold=6,
     ):
         """
         Split up a dataset into tiles based on the given thresholds. Unlike Scan
@@ -131,34 +129,57 @@ class Extents(object):
 
         if self.bounds == self.root:
             self.root = chunk.bounds
+        yield from chunk.filter(data, pc_threshold)
 
-        filtered = []
-        curr = db.from_delayed(
-            [
-                dask.delayed(ch.filter)(
-                    data, res_threshold, pc_threshold, depth_threshold, 1
-                )
-                for ch in chunk.split()
-            ]
-        )
-        curr_depth = 1
+    def filter(
+        self,
+        data: Data,
+        pc_threshold=600000,
+        prev_estimate=0,
+    ):
+        """
+        Creates quad tree of chunks for this bounds, runs pdal quickinfo over
+        this to determine if there are any points available. Uses a bottom
+        resolution of 1km.
 
-        logger = data.storageconfig.log
-        while curr.npartitions > 0:
-            logger.debug(
-                f'Filtering {curr.npartitions} tiles at depth {curr_depth}'
-            )
-            n = curr.compute()
-            to_add = [ne for ne in n if isinstance(ne, Extents)]
-            if to_add:
-                filtered = filtered + to_add
+        :param data: Data object containing point cloud details.
+        :param res_threshold: Resolution threshold., defaults to 100
+        :param pc_threshold: Point count threshold., defaults to 600000
+        :param depth_threshold: Tree depth threshold., defaults to 6
+        :param depth: Current tree depth., defaults to 0
+        :return: Returns a list of Extents.
+        """
 
-            curr = db.from_delayed(
-                [ne for ne in n if not isinstance(ne, Extents)]
-            )
-            curr_depth += 1
+        pc = data.estimate_count(self.bounds)
 
-        return filtered
+        target_pc = pc_threshold
+        minx, miny, maxx, maxy = self.bounds.get()
+
+        # is it empty?
+        if not pc:
+            yield self
+        else:
+            # has it hit the threshold yet?
+            area = (maxx - minx) * (maxy - miny)
+            next_split_x = (maxx - minx) / 2
+            next_split_y = (maxy - miny) / 2
+
+            # if the next split would put our area below the resolution, or if
+            # the point count is less than the point threshold then use this
+            # tile as the work unit.
+            if next_split_x < self.resolution or next_split_y < self.resolution:
+                yield self
+            elif pc <= target_pc:
+                yield self
+            elif pc == prev_estimate:
+                yield self
+            else:
+                for ch in self.split():
+                    yield from ch.filter(
+                            data,
+                            pc_threshold,
+                            prev_estimate=pc
+                        )
 
     def split(self):
         """
@@ -202,63 +223,6 @@ class Extents(object):
         ]
         return exts
 
-    def filter(
-        self,
-        data: Data,
-        res_threshold=100,
-        pc_threshold=600000,
-        depth_threshold=6,
-        depth=0,
-    ):
-        """
-        Creates quad tree of chunks for this bounds, runs pdal quickinfo over
-        this to determine if there are any points available. Uses a bottom
-        resolution of 1km.
-
-        :param data: Data object containing point cloud details.
-        :param res_threshold: Resolution threshold., defaults to 100
-        :param pc_threshold: Point count threshold., defaults to 600000
-        :param depth_threshold: Tree depth threshold., defaults to 6
-        :param depth: Current tree depth., defaults to 0
-        :return: Returns a list of Extents.
-        """
-
-        pc = data.estimate_count(self.bounds)
-        target_pc = pc_threshold
-        minx, miny, maxx, maxy = self.bounds.get()
-
-        # is it empty?
-        if not pc:
-            return []
-        else:
-            # has it hit the threshold yet?
-            area = (maxx - minx) * (maxy - miny)
-            next_split_x = (maxx - minx) / 2
-            next_split_y = (maxy - miny) / 2
-
-            # if the next split would put our area below the resolution, or if
-            # the point count is less than the threshold (600k) then use this
-            # tile as the work unit.
-            if next_split_x < self.resolution or next_split_y < self.resolution:
-                return [self]
-            elif pc < target_pc:
-                return [self]
-            elif area < res_threshold**2 or depth >= depth_threshold:
-                pc_per_cell = pc / (area / self.resolution**2)
-                cell_estimate = ceil(target_pc / pc_per_cell)
-
-                return self.get_leaf_children(cell_estimate)
-            else:
-                return [
-                    dask.delayed(ch.filter)(
-                        data,
-                        res_threshold,
-                        pc_threshold,
-                        depth_threshold,
-                        depth=depth + 1,
-                    )
-                    for ch in self.split()
-                ]
 
     def _find_dims(self, tile_size):
         """
@@ -308,15 +272,13 @@ class Extents(object):
         coords_list = np.array(
             [[*x, *y] for x in dx for y in dy], dtype=np.float64
         )
-        yield from [
-            Extents(
-                Bounds(minx, miny, maxx, maxy),
-                self.resolution,
-                self.alignment,
-                self.root,
-            )
-            for minx, maxx, miny, maxy in coords_list
-        ]
+        for minx, maxx, miny, maxy in coords_list:
+            yield Extents(
+                    Bounds(minx, miny, maxx, maxy),
+                    self.resolution,
+                    self.alignment,
+                    self.root,
+                )
 
     @staticmethod
     def from_storage(tdb_dir: str):

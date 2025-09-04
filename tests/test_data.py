@@ -1,5 +1,9 @@
-from silvimetric import Data, Bounds
+import pytest
+
+from silvimetric import Data, Bounds, Extents
 from silvimetric.resources.config import StorageConfig
+import dask.bag as db
+from dask.diagnostics import ProgressBar
 
 
 class Test_Data(object):
@@ -73,3 +77,19 @@ class Test_Autzen(object):
         data.execute()
         assert len(data.array) == 577637
         assert data.estimate_count(data.bounds) == 577637
+
+    @pytest.mark.skip()
+    def test_chunking(
+        self, autzen_data: Data, autzen_storage: StorageConfig, threaded_dask
+    ):
+        ex = Extents(
+            autzen_data.bounds,
+            autzen_storage.resolution,
+            autzen_storage.alignment,
+            autzen_storage.root,
+        )
+        chs = ex.chunk(autzen_data, pc_threshold=600000)
+        with ProgressBar():
+            leaves = db.from_sequence(chs)
+
+        assert leaves.npartitions == 62

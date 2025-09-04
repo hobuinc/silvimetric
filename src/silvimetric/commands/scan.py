@@ -55,7 +55,7 @@ def scan(
             count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
             if filter_empty:
-                chunks = extents.chunk(data, resolution, point_count, depth)
+                chunks = extents.chunk(data, point_count)
                 cell_counts = [ch.cell_count for ch in chunks]
 
             else:

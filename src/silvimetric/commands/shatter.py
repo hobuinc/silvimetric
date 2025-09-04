@@ -17,6 +17,7 @@ from dask.delayed import Delayed, delayed
 import dask.array as da
 import dask.bag as db
 from dask.diagnostics import ProgressBar
+from dask import persist, compute
 
 from .. import Extents, Storage, Data, ShatterConfig
 from ..resources.taskgraph import Graph
@@ -159,6 +160,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     signal.signal(signal.SIGINT, kill_gracefully)
 
     # leaf_bag: db.Bag = db.from_sequence(leaves)
+    # processes = leaf_bag.map(do_one, config, storage)
     processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
 
     ## If dask is distributed, use the futures feature
@@ -166,19 +168,22 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     consolidate_count = 30
     count = 0
     if dc is not None:
-        pc_futures = futures_of(processes.persist())
+        pc_futures = futures_of(persist(processes))
         for batch in as_completed(pc_futures, with_results=True).batches():
             for _, pack in batch:
                 if isinstance(pack, CancelledError):
                     continue
+                if isinstance(pack, int):
+                    pack = [pack]
                 for pc in pack:
                     if isinstance(pc, BaseException):
-                        print('Error found: ', pc)
-                    else:
+                        config.log.warning('Worker returned exception: ', pc)
+                    if isinstance(pc, int):
                         count += 1
                         if count >= consolidate_count:
                             faf = dc.submit(
-                                storage.consolidate_shatter(config.timestamp)
+                                storage.consolidate_shatter,
+                                timestamp=config.timestamp,
                             )
                             fire_and_forget(faf)
                             count = 0
@@ -192,7 +197,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     else:
         # Handle non-distributed dask scenarios
         with ProgressBar():
-            point_count = sum(processes)
+            point_count = sum(*compute(processes))
 
     return point_count
 
@@ -229,11 +234,8 @@ def shatter(config: ShatterConfig) -> int:
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
-        leaves = extents.chunk(
-            data, res_threshold=storage.config.resolution, depth_threshold=30
-        )
-        leaf_count = len(leaves)
-        config.log.debug(f'{leaf_count} tiles to process.')
+        chunks = extents.chunk(data, pc_threshold=600000)
+        leaves = db.from_sequence(chunks).compute()
 
     # Begin main operations
     config.log.debug('Fetching and arranging data...')

@@ -47,7 +47,10 @@ class TestMetrics:
         graph = Graph(metrics)
         metrics = graph.run(metric_data)
         assert isinstance(metrics, pd.DataFrame)
-        assert all(metrics == metric_data_results)
+        # cannot use pandas compare because dataframes may not have identical
+        # column ordering, so compare values of each column
+        for m in metrics.columns:
+            assert all(metrics[m] == metric_data_results[m])
 
     def test_dependencies(self, metric_data: pd.DataFrame):
         # should be able to create a dependency graph

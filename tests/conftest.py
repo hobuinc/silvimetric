@@ -72,7 +72,8 @@ def storage_config(
 
 @pytest.fixture(scope='function')
 def storage(storage_config: StorageConfig):
-    yield Storage(storage_config)
+    st = Storage(storage_config)
+    yield st
 
 
 @pytest.fixture(scope='function')
