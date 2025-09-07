@@ -148,7 +148,7 @@ class Metric:
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, locs, args):
+    def sanitize_and_run(self, d, locs, deps):
         """Sanitize arguments, find the indices"""
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
@@ -157,14 +157,14 @@ class Metric:
         attr = d.name
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
-        if isinstance(args, pd.DataFrame):
+        if isinstance(deps, pd.DataFrame):
             idx = locs.loc[d.index[0]]
             xi = idx.xi
             yi = idx.yi
             pass_args = []
             for a in attrs:
                 try:
-                    arg = args.at[(yi, xi), a]
+                    arg = deps.at[(yi, xi), a]
                     if isinstance(arg, (list, tuple)):
                         pass_args.append(arg)
                     elif np.isnan(arg):
@@ -178,7 +178,7 @@ class Metric:
                     else:
                         raise (e)
         else:
-            pass_args = args
+            pass_args = deps
         a = self._method(d, *pass_args)
         return a
 
@@ -224,16 +224,13 @@ class Metric:
         def runner(d, idx=idxer, m_args=merged_args):
             return self.sanitize_and_run(d, idx, m_args)
 
-        # def runner(values, index, m=merged_args):
-        #     return self._method(values, index, merged_args)
-
         # create map of current column name to tuple of new column name and
         # metric method
         cols = data.columns
         prev_cols = [col for col in cols if col not in idx]
         new_cols = {c: [(self.entry_name(c), runner)] for c in prev_cols}
 
-        val = gb.aggregate(new_cols)
+        val = gb.aggregate(new_cols, raw=True)
 
         # remove hierarchical columns
         val.columns = val.columns.droplevel(0)

@@ -1,4 +1,5 @@
 import pytest
+import itertools
 
 from silvimetric import Data, Bounds, Extents
 from silvimetric.resources.config import StorageConfig
@@ -78,7 +79,7 @@ class Test_Autzen(object):
         assert len(data.array) == 577637
         assert data.estimate_count(data.bounds) == 577637
 
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_chunking(
         self, autzen_data: Data, autzen_storage: StorageConfig, threaded_dask
     ):
@@ -88,8 +89,11 @@ class Test_Autzen(object):
             autzen_storage.alignment,
             autzen_storage.root,
         )
-        chs = ex.chunk(autzen_data, pc_threshold=600000)
-        with ProgressBar():
-            leaves = db.from_sequence(chs)
+        chs1 = ex.chunk(autzen_data, pc_threshold=600000)
+        chs2 = ex.get_leaf_children(50)
+        for c in chs1:
+            assert isinstance(c, Extents)
 
-        assert leaves.npartitions == 62
+        for c in chs2:
+            assert isinstance(c, Extents)
+

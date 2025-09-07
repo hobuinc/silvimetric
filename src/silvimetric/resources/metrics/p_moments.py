@@ -1,12 +1,11 @@
 import numpy as np
 
 from ..metric import Metric
-import pdb
 
 def m_mean(data, *args):
-    m = data.mean()
-    if m.size == 0:
+    if not data.any():
         return np.nan
+    m = data.mean()
     return m
 
 

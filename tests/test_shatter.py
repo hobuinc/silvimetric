@@ -67,7 +67,6 @@ class Test_Shatter(object):  # noqa: D101
         test_point_count: int,
         # threaded_dask,
     ):
-        os.environ['NUMBA_GDB_BINARY'] = '/usr/local/bin/gdb'
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
         maxy = storage.config.root.maxy

@@ -200,13 +200,6 @@ def info_cmd(
     '--resolution', type=float, default=100, help='Summary pixel resolution'
 )
 @click.option(
-    '--filter_empty',
-    is_flag=True,
-    type=bool,
-    default=False,
-    help='Remove empty space in computation. Will take extra time.',
-)
-@click.option(
     '--point_count', type=int, default=600000, help='Point count threshold.'
 )
 @click.option('--depth', type=int, default=6, help='Quadtree depth threshold.')
@@ -215,7 +208,7 @@ def info_cmd(
 )
 @click.pass_obj
 def scan_cmd(
-    app, resolution, point_count, pointcloud, bounds, depth, filter_empty
+    app, resolution, point_count, pointcloud, bounds, depth
 ):
     """Scan point cloud, output information on it, and determine the optimal
     tile size."""
@@ -233,7 +226,6 @@ def scan_cmd(
         point_count,
         resolution,
         depth,
-        filter_empty,
         log=app.log,
     )
 

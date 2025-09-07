@@ -149,7 +149,6 @@ class Extents(object):
         :param depth: Current tree depth., defaults to 0
         :return: Returns a list of Extents.
         """
-
         pc = data.estimate_count(self.bounds)
 
         target_pc = pc_threshold
@@ -160,7 +159,6 @@ class Extents(object):
             yield self
         else:
             # has it hit the threshold yet?
-            area = (maxx - minx) * (maxy - miny)
             next_split_x = (maxx - minx) / 2
             next_split_y = (maxy - miny) / 2
 
@@ -221,25 +219,8 @@ class Extents(object):
                 self.root,
             ),  # top right
         ]
-        return exts
+        yield from exts
 
-
-    def _find_dims(self, tile_size):
-        """
-        Find most square-like Extents given the number of cells per tile.
-
-        :param tile_size: Number of cells per tile.
-        :return: Returns x and y coordinates in a list.
-        """
-        s = math.sqrt(tile_size)
-        if int(s) == s:
-            return [s, s]
-        rng = np.arange(1, tile_size + 1, dtype=np.int32)
-        factors = rng[np.where(tile_size % rng == 0)]
-        idx = int((factors.size / 2) - 1)
-        x = factors[idx]
-        y = int(tile_size / x)
-        return [x, y]
 
     def get_leaf_children(self, tile_size):
         """
@@ -249,7 +230,8 @@ class Extents(object):
         :yield: Yield from list of child extents.
         """
         res = self.resolution
-        xnum, ynum = self._find_dims(tile_size)
+        xnum = math.floor(math.sqrt(tile_size))
+        ynum = xnum
 
         local_xs = np.array(
             [

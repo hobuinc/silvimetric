@@ -4,6 +4,7 @@ import dask.bag as db
 import dask
 import math
 import json
+import itertools
 
 from dask.diagnostics import ProgressBar
 
@@ -17,7 +18,6 @@ def scan(
     point_count: int = 600000,
     resolution: float = 100,
     depth: int = 6,
-    filter_empty: bool = False,
     log: Log = None,
 ):
     """
@@ -29,7 +29,6 @@ def scan(
     :param point_count: Point count threshold., defaults to 600000
     :param resolution: Resolution threshold., defaults to 100
     :param depth: Tree depth threshold., defaults to 6
-    :param filter_empty: Remove empty Extents. This takes longer, but is more
     accurate., defaults to False
 
     :return: Returns list of point counts.
@@ -54,14 +53,9 @@ def scan(
             logger.info('Gathering initial chunks...')
             count = dask.delayed(data.estimate_count)(extents.bounds).persist()
 
-            if filter_empty:
-                chunks = extents.chunk(data, point_count)
-                cell_counts = [ch.cell_count for ch in chunks]
-
-            else:
-                cell_counts = extent_handle(
-                    extents, data, resolution, point_count, depth, log
-                )
+            cell_counts = extent_handle(
+                extents, data, resolution, point_count, depth, log
+            )
 
             num_cells = np.sum(cell_counts).item()
             std = np.std(cell_counts)

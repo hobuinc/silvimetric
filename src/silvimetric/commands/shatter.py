@@ -4,20 +4,15 @@ import datetime
 import copy
 from typing_extensions import Generator
 import pandas as pd
+import itertools
 
-from dask.distributed import (
-    as_completed,
-    futures_of,
-    CancelledError,
-    fire_and_forget,
-)
+from dask.distributed import CancelledError
 from distributed.client import _get_global_client as get_client
 
-from dask.delayed import Delayed, delayed
-import dask.array as da
+from dask.delayed import delayed
 import dask.bag as db
 from dask.diagnostics import ProgressBar
-from dask import persist, compute
+from dask import compute
 
 from .. import Extents, Storage, Data, ShatterConfig
 from ..resources.taskgraph import Graph
@@ -39,14 +34,15 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     data.execute()
 
     points = p.get_dataframe(0)
-    points = points.loc[points.Y < extents.bounds.maxy]
-    points = points.loc[points.Y >= extents.bounds.miny]
-    points = points.loc[points.X >= extents.bounds.minx]
-    points = points.loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']]
+    points = (points
+        .loc[points.Y < extents.bounds.maxy]
+        .loc[points.Y >= extents.bounds.miny]
+        .loc[points.X >= extents.bounds.minx]
+        .loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']])
 
-    points.loc[:, 'xi'] = da.floor(points.xi)
+    points.loc[:, 'xi'] = np.floor(points.xi)
     # ceil for y because origin is at top left
-    points.loc[:, 'yi'] = da.ceil(points.yi)
+    points.loc[:, 'yi'] = np.ceil(points.yi)
     return points
 
 
@@ -74,10 +70,10 @@ def agg_list(data_in, proc_num):
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
     gb = coerced.groupby(['xi', 'yi'], sort=False)
-    listed = gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
     counts_df = gb[first_col_name].agg('count').rename('count')
-    listed = listed.join(counts_df)
-    listed = listed.assign(shatter_process_num=proc_num)
+    listed = (gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
+              .join(counts_df)
+              .assign(shatter_process_num=proc_num))
 
     return listed
 
@@ -159,45 +155,49 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     signal.signal(signal.SIGINT, kill_gracefully)
 
-    # leaf_bag: db.Bag = db.from_sequence(leaves)
-    # processes = leaf_bag.map(do_one, config, storage)
-    processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
-
     ## If dask is distributed, use the futures feature
     dc = get_client()
     consolidate_count = 30
-    count = 0
     if dc is not None:
-        pc_futures = futures_of(persist(processes))
-        for batch in as_completed(pc_futures, with_results=True).batches():
-            for _, pack in batch:
-                if isinstance(pack, CancelledError):
-                    continue
-                if isinstance(pack, int):
-                    pack = [pack]
-                for pc in pack:
-                    if isinstance(pc, BaseException):
-                        config.log.warning('Worker returned exception: ', pc)
-                    if isinstance(pc, int):
-                        count += 1
-                        if count >= consolidate_count:
-                            faf = dc.submit(
-                                storage.consolidate_shatter,
-                                timestamp=config.timestamp,
-                            )
-                            fire_and_forget(faf)
-                            count = 0
-                        config.point_count = config.point_count + pc
-                        del pc
+        processes = []
+        count = 0
+        for leaf_bunch in itertools.batched(leaves, consolidate_count):
+            count = count + 1
+            processes.append(dc.map(do_one, leaf_bunch, config=config, storage=storage))
 
-        end_time = datetime.datetime.now().timestamp() * 1000
-        config.end_time = end_time
-        config.finished = True
-        point_count = config.point_count
+            processes.append(dc.submit(storage.consolidate_shatter, config.timestamp))
+        gathered = dc.gather(processes)
+        point_count = 0
+        for pc in gathered:
+            if pc is None:
+                continue
+            if isinstance(pc, int):
+                point_count = point_count + pc
+            elif isinstance(pc, BaseException):
+                config.log.warning(pc)
+            elif isinstance(pc, CancelledError):
+                config.log.warning(pc)
+            del pc
+
     else:
         # Handle non-distributed dask scenarios
         with ProgressBar():
-            point_count = sum(*compute(processes))
+            count = 0
+            futures = []
+            for leaf in leaves:
+                count = count + 1
+                futures.append(delayed(do_one)(leaf, config, storage))
+                if count % consolidate_count == 0:
+                    futures.append(delayed(storage.consolidate_shatter)(timestamp=config.timestamp))
+
+            results = compute(*futures)
+            pcs = [possible_pc for possible_pc in results if possible_pc is not None]
+            point_count = sum(pcs)
+
+    end_time = datetime.datetime.now().timestamp() * 1000
+    config.end_time = end_time
+    config.finished = True
+    config.point_count = point_count
 
     return point_count
 
@@ -234,9 +234,9 @@ def shatter(config: ShatterConfig) -> int:
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
-        chunks = extents.chunk(data, pc_threshold=600000)
-        leaves = db.from_sequence(chunks).compute()
+        leaves = extents.chunk(data)
 
+    leaves = itertools.chain(leaves)
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
     storage.save_shatter_meta(config)

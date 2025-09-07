@@ -1,5 +1,6 @@
 from ..metric import Metric
 import numpy as np
+from numba import jit
 
 
 def lmom4(data, *args):
@@ -8,12 +9,11 @@ def lmom4(data, *args):
     Adapted from https://xiaoganghe.github.io/python-climate-visuals/chapters/data-analytics/scipy-basic.html
     """
 
-    data = data.values
-    n = len(data)
+    n = data.count()
     idx = np.arange(n)
 
     # sort in descending order
-    data = np.sort(data, kind='quickstort')[::-1]
+    data = np.sort(data)[::-1]
 
     b0 = data.mean()
     l1: float = b0
