@@ -4,7 +4,6 @@ import dask.bag as db
 import dask
 import math
 import json
-import itertools
 
 from dask.diagnostics import ProgressBar
 
@@ -52,15 +51,24 @@ def scan(
             extents = Extents.from_sub(tdb_dir, data.bounds)
             logger.info('Gathering initial chunks...')
             count = dask.delayed(data.estimate_count)(extents.bounds).persist()
-
             cell_counts = extent_handle(
                 extents, data, resolution, point_count, depth, log
             )
 
-            num_cells = np.sum(cell_counts).item()
-            std = np.std(cell_counts)
-            mean = np.mean(cell_counts)
-            rec = int(mean)
+            np_cell_counts = np.array(cell_counts)
+            num_cells = np.sum(np_cell_counts).item()
+            q1, q3 = np.percentile(np_cell_counts, [25,75])
+            iqr = q3 - q1
+            low_bounds = q1 - (1.5 * iqr)
+            up_bounds = q3 + (1.5 * iqr)
+
+            adjusted = np_cell_counts[np_cell_counts > low_bounds]
+            adjusted = adjusted[adjusted < up_bounds]
+
+            std = np.std(adjusted)
+            mean = np.mean(adjusted)
+            median = np.median(adjusted)
+            rec = median
 
             pc_info = dict(
                 pc_info=dict(
@@ -75,6 +83,7 @@ def scan(
                     num_tiles=len(cell_counts),
                     mean=mean,
                     std_dev=std,
+                    median=median,
                     recommended=rec,
                 )
             )

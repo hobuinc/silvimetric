@@ -89,7 +89,7 @@ class Test_Autzen(object):
             autzen_storage.alignment,
             autzen_storage.root,
         )
-        chs1 = ex.chunk(autzen_data, pc_threshold=600000)
+        chs1 = ex.chunk(autzen_data, pc_threshold=100000)
         chs2 = ex.get_leaf_children(50)
         for c in chs1:
             assert isinstance(c, Extents)

@@ -52,6 +52,7 @@ def _get_grid_metrics(elev_key='Z'):
 
     # give profile_area separate pct_base so we can apply separate filters
     percentiles['profile_area'].attributes = [A[elev_key]]
+    percentiles['iq'].attributes = [A[elev_key], A['Intensity']]
     # pct_base_copy = copy.deepcopy(pct_base)
     # pct_base_copy.name = 'pct_base_profile_area'
     # percentiles['profile_area'].dependencies = [pct_base_copy]
@@ -59,7 +60,6 @@ def _get_grid_metrics(elev_key='Z'):
     statistics['cumean'].attributes = [A[elev_key]]
     statistics['sqmean'].attributes = [A[elev_key]]
 
-    statistics['iq'].attributes = [A[elev_key], A['Intensity']]
     statistics['min'].attributes = [A[elev_key], A['Intensity']]
     statistics['max'].attributes = [A[elev_key], A['Intensity']]
     statistics['mode'].attributes = [A[elev_key], A['Intensity']]

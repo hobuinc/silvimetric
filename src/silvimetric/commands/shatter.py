@@ -161,11 +161,12 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     if dc is not None:
         processes = []
         count = 0
-        for leaf_bunch in itertools.batched(leaves, consolidate_count):
+        for leaf in leaves:
             count = count + 1
-            processes.append(dc.map(do_one, leaf_bunch, config=config, storage=storage))
+            processes.append(dc.submit(do_one, leaf, config=config, storage=storage))
+            if count % consolidate_count == 0:
+                processes.append(dc.submit(storage.consolidate_shatter, timestamp=config.timestamp, key=f'consolidate_{count}'))
 
-            processes.append(dc.submit(storage.consolidate_shatter, config.timestamp))
         gathered = dc.gather(processes)
         point_count = 0
         for pc in gathered:
@@ -234,9 +235,8 @@ def shatter(config: ShatterConfig) -> int:
     if config.tile_size is not None:
         leaves = extents.get_leaf_children(config.tile_size)
     else:
-        leaves = extents.chunk(data)
+        leaves = itertools.chain(extents.chunk(data))
 
-    leaves = itertools.chain(leaves)
     # Begin main operations
     config.log.debug('Fetching and arranging data...')
     storage.save_shatter_meta(config)
