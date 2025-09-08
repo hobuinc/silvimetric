@@ -1,6 +1,5 @@
 from ..metric import Metric
 import numpy as np
-from numba import jit
 
 
 def lmom4(data, *args):
