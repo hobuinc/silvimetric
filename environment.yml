@@ -24,3 +24,4 @@ dependencies:
     # - dask-cloudprovider[aws] # for using the EC2Cluster
     # - cryptography #needed for dask-cloudprovider
     # - git+https://github.com/TileDB-Inc/TileDB-Py # if we have a special branch we need to install
+    # - git+https://github.com/dask/dask-cloudprovider

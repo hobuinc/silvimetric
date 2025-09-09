@@ -13,9 +13,29 @@ from dask.delayed import delayed
 import dask.bag as db
 from dask.diagnostics import ProgressBar
 from dask import compute
+from dask.distributed import futures_of, as_completed
 
 from .. import Extents, Storage, Data, ShatterConfig
 from ..resources.taskgraph import Graph
+
+
+def final(
+    config: ShatterConfig,
+    storage: Storage,
+    point_count: int = 0,
+    finished: bool = False,
+):
+    # modify config to reflect result of shattter process
+    config.log.debug('Saving shatter metadata')
+    if point_count:
+        config.point_count = point_count
+    config.mbr = storage.mbrs(config.timestamp)
+    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.finished = finished
+    storage.save_shatter_meta(config)
+
+    storage.full_consolidate(config.timestamp)
+    storage.vacuum()
 
 
 def get_data(extents: Extents, filename: str, storage: Storage):
@@ -34,11 +54,12 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     data.execute()
 
     points = p.get_dataframe(0)
-    points = (points
-        .loc[points.Y < extents.bounds.maxy]
+    points = (
+        points.loc[points.Y < extents.bounds.maxy]
         .loc[points.Y >= extents.bounds.miny]
         .loc[points.X >= extents.bounds.minx]
-        .loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']])
+        .loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']]
+    )
 
     points.loc[:, 'xi'] = np.floor(points.xi)
     # ceil for y because origin is at top left
@@ -71,9 +92,11 @@ def agg_list(data_in, proc_num):
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
     gb = coerced.groupby(['xi', 'yi'], sort=False)
     counts_df = gb[first_col_name].agg('count').rename('count')
-    listed = (gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
-              .join(counts_df)
-              .assign(shatter_process_num=proc_num))
+    listed = (
+        gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
+        .join(counts_df)
+        .assign(shatter_process_num=proc_num)
+    )
 
     return listed
 
@@ -103,9 +126,6 @@ def write(data_in, storage, timestamp):
     return p
 
 
-Leaves = Generator[Extents, None, None]
-
-
 def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     """Create dask bags and the order of operations."""
 
@@ -119,14 +139,15 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     points = get_data(leaf, config.filename, storage)
     if points.empty:
         return 0
-    metric_data = run_graph(points, storage.get_metrics())
     listed_data = agg_list(points, config.time_slot)
+    metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
     point_count = write(joined_data, storage, timestamp)
 
     return point_count
 
 
+Leaves = Generator[Extents, None, None]
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
@@ -137,43 +158,21 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     :return: Number of points processed.
     """
 
-    # Process kill handler. Make sure we write out a config even if we fail.
-    def kill_gracefully(signum, frame):
-        client = get_client()
-        if client is not None:
-            client.close()
-        end_time = datetime.datetime.now().timestamp() * 1000
-
-        storage.consolidate_shatter(config.timestamp)
-        config.end_time = end_time
-        config.mbrs = storage.mbrs(config.timestamp)
-        config.finished = False
-        config.log.info('Saving config before quitting...')
-
-        storage.save_shatter_meta(config)
-        config.log.info('Quitting.')
-
-    signal.signal(signal.SIGINT, kill_gracefully)
-
     ## If dask is distributed, use the futures feature
+    processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
     dc = get_client()
-    consolidate_count = 30
     if dc is not None:
-        processes = []
-        count = 0
-        for leaf in leaves:
-            count = count + 1
-            processes.append(dc.submit(do_one, leaf, config=config, storage=storage))
-            if count % consolidate_count == 0:
-                processes.append(dc.submit(storage.consolidate_shatter, timestamp=config.timestamp, key=f'consolidate_{count}'))
+        futures = dc.map(do_one, leaves, config=config, storage=storage)
 
-        gathered = dc.gather(processes)
         point_count = 0
-        for pc in gathered:
+        count = 1
+        futures = futures_of(processes.persist())
+        for _, pc in as_completed(futures, with_results=True):
             if pc is None:
                 continue
             if isinstance(pc, int):
-                point_count = point_count + pc
+                config.point_count = config.point_count + pc
+                count = count + 1
             elif isinstance(pc, BaseException):
                 config.log.warning(pc)
             elif isinstance(pc, CancelledError):
@@ -183,16 +182,12 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     else:
         # Handle non-distributed dask scenarios
         with ProgressBar():
-            count = 0
-            futures = []
-            for leaf in leaves:
-                count = count + 1
-                futures.append(delayed(do_one)(leaf, config, storage))
-                if count % consolidate_count == 0:
-                    futures.append(delayed(storage.consolidate_shatter)(timestamp=config.timestamp))
-
-            results = compute(*futures)
-            pcs = [possible_pc for possible_pc in results if possible_pc is not None]
+            results = compute(*processes)
+            pcs = [
+                possible_pc
+                for possible_pc in results
+                if possible_pc is not None
+            ]
             point_count = sum(pcs)
 
     end_time = datetime.datetime.now().timestamp() * 1000
@@ -215,12 +210,17 @@ def shatter(config: ShatterConfig) -> int:
 
     # get start time in milliseconds
     config.start_time = datetime.datetime.now().timestamp() * 1000
+
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
 
-    config.log.info('Beginning shatter process...')
+    # try to catch sigints and save info about work that has been done so far
+    signal.signal(
+        signal.SIGINT, lambda signum, frame, c=config, s=storage: final(c, s)
+    )
+
     config.log.debug(f'Shatter Config: {config}')
     config.log.debug(f'Data: {data}')
     config.log.debug(f'Extents: {extents}')
@@ -230,35 +230,23 @@ def shatter(config: ShatterConfig) -> int:
 
     if config.bounds is None:
         config.bounds = extents.bounds
-
-    config.log.debug('Grabbing leaf nodes...')
-    if config.tile_size is not None:
-        leaves = extents.get_leaf_children(config.tile_size)
-    else:
-        leaves = itertools.chain(extents.chunk(data))
-
-    # Begin main operations
-    config.log.debug('Fetching and arranging data...')
     storage.save_shatter_meta(config)
-    try:
-        pc = run(leaves, config, storage)
-    except Exception as e:
-        config.mbr = storage.mbrs(config.timestamp)
-        config.finished = False
-        storage.save_shatter_meta(config)
-        storage.consolidate_shatter(config.timestamp)
-        raise e
 
-    # consolidate the fragments in this time slot down to just one
-    storage.consolidate_shatter(config.timestamp)
-    storage.vacuum()
+    config.log.debug('Grabbing leaf nodes.')
+    es = list(extents.chunk(data, pc_threshold=15*10**6))
 
-    # modify config to reflect result of shattter process
-    config.log.debug('Saving shatter metadata')
-    config.point_count = pc
-    config.mbr = storage.mbrs(config.timestamp)
-    config.end_time = datetime.datetime.now().timestamp() * 1000
-    config.finished = True
+    for e in es:
+        if config.tile_size is not None:
+            leaves = e.get_leaf_children(config.tile_size)
+        else:
+            leaves = list(itertools.chain(e.chunk(data)))
 
-    storage.save_shatter_meta(config)
-    return pc
+        # Begin main operations
+        config.log.debug('Shattering.')
+        try:
+            pc = run(leaves, config, storage)
+        except Exception as e:
+            final(config, storage)
+            raise e
+
+        return pc

@@ -182,7 +182,6 @@ def tile_info(
 
     :return: Returns list of Extents that fit thresholds.
     """
-
     pc = data.estimate_count(extent.bounds)
     target_pc = pc_threshold
     minx, miny, maxx, maxy = extent.bounds.get()
@@ -196,6 +195,14 @@ def tile_info(
         next_split_x = (maxx - minx) / 2
         next_split_y = (maxy - miny) / 2
 
+        def end_early():
+            pc_per_cell = pc / (area / extent.resolution**2)
+            cell_estimate = math.ceil(target_pc / pc_per_cell)
+            tile_count = math.floor(extent.cell_count / cell_estimate)
+            remainder = extent.cell_count % cell_estimate
+
+            return [cell_estimate for x in range(tile_count)] + [remainder]
+
         # if the next split would put our area below the resolution, or if
         # the point count is less than the threshold (600k) then use this
         # tile as the work unit.
@@ -203,13 +210,10 @@ def tile_info(
             return [extent.cell_count]
         elif pc < target_pc:
             return [extent.cell_count]
-        elif area < res_threshold**2 or depth >= depth_threshold:
-            pc_per_cell = pc / (area / extent.resolution**2)
-            cell_estimate = math.ceil(target_pc / pc_per_cell)
-            tile_count = math.floor(extent.cell_count / cell_estimate)
-            remainder = extent.cell_count % cell_estimate
-
-            return [cell_estimate for x in range(tile_count)] + [remainder]
+        elif area < res_threshold**2:
+            return end_early()
+        elif depth >= depth_threshold:
+            return end_early()
 
         else:
             return [

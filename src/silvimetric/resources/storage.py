@@ -340,7 +340,7 @@ class Storage:
 
         ctx = self.get_tdb_context()
 
-        return tiledb.from_pandas(
+        tiledb.from_pandas(
             uri=self.config.tdb_dir,
             ctx=ctx,
             sparse=True,
@@ -351,6 +351,12 @@ class Storage:
             varlen_types=varlen_types,
             fillna=fillna_dict,
         )
+
+        cfg = tiledb.Config()
+        cfg['sm.consolidation.step_min_frags'] = 2
+        cfg['sm.consolidation.step_max_frags'] = 20
+        cfg['sm.consolidation.steps'] = 100
+        tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp, config=cfg)
 
     def reserve_time_slot(self) -> int:
         """
@@ -480,7 +486,7 @@ class Storage:
         c = tiledb.Config({'sm.vacuum.mode': 'fragment_meta'})
         tiledb.vacuum(self.config.tdb_dir, config=c)
 
-    def consolidate_shatter(self, timestamp, retries=0) -> None:
+    def full_consolidate(self, timestamp, retries=0) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of

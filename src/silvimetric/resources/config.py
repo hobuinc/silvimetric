@@ -271,9 +271,6 @@ class ShatterConfig(Config):
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
-            self.log.warning(
-                f'Truncating tile size to integer({self.tile_size})'
-            )
 
     def history_json(self):
         # removing a attrs and metrics, since they'll be in the storage log

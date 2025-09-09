@@ -61,7 +61,7 @@ class Extents(object):
         """
         xis = np.arange(self.x1, self.x2, dtype=np.int32)
         yis = np.arange(self.y1, self.y2, dtype=np.int32)
-        xys = np.array(np.meshgrid(xis,yis)).T.reshape(-1,2)
+        xys = np.array(np.meshgrid(xis, yis)).T.reshape(-1, 2)
         return xys
 
     def disjoint_by_mbr(self, mbr):
@@ -173,11 +173,7 @@ class Extents(object):
                 yield self
             else:
                 for ch in self.split():
-                    yield from ch.filter(
-                            data,
-                            pc_threshold,
-                            prev_estimate=pc
-                        )
+                    yield from ch.filter(data, pc_threshold, prev_estimate=pc)
 
     def split(self):
         """
@@ -221,7 +217,6 @@ class Extents(object):
         ]
         yield from exts
 
-
     def get_leaf_children(self, tile_size):
         """
         Get children Extents with given number of cells per tile.
@@ -254,13 +249,15 @@ class Extents(object):
         coords_list = np.array(
             [[*x, *y] for x in dx for y in dy], dtype=np.float64
         )
-        for minx, maxx, miny, maxy in coords_list:
-            yield Extents(
-                    Bounds(minx, miny, maxx, maxy),
-                    self.resolution,
-                    self.alignment,
-                    self.root,
-                )
+        return [
+            Extents(
+                Bounds(minx, miny, maxx, maxy),
+                self.resolution,
+                self.alignment,
+                self.root,
+            )
+            for minx, maxx, miny, maxy in coords_list
+        ]
 
     @staticmethod
     def from_storage(tdb_dir: str):
