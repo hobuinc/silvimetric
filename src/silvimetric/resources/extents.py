@@ -1,6 +1,8 @@
 import math
 import numpy as np
+import itertools
 
+from dask.distributed import get_client
 from dask.delayed import delayed, Delayed
 from dask import compute
 
@@ -97,48 +99,31 @@ class Extents(object):
         pc_threshold=600000,
     ):
         """
-        Split up a dataset into tiles based on the given thresholds. Unlike Scan
-        this will filter out any tiles that contain no points.
+        Split up a dataset into tiles based on the point threshold. Unlike Scan
+        this will not stop at a specific depth, but keep going until finding
+        nodes that fit the point count threshold.
 
         :param data: Incoming Data object to oeprate on.
-        :param res_threshold: Resolution threshold., defaults to 100
         :param pc_threshold: Point count threshold., defaults to 600000
-        :param depth_threshold: Tree depth threshold., defaults to 6
         :return: Return list of Extents that fit the criteria
         """
-        if self.root is not None:
-            base_bbox = self.root.get()
-            r = self.root
-        else:
-            base_bbox = self.bounds.get()
-            r = self.bounds
+        def add_lists(l1, l2):
+            return list(itertools.chain(l1,l2))
 
-        bminx = base_bbox[0]
-        bmaxy = base_bbox[3]
+        data = delayed(data)
+        pc_threshold = delayed(pc_threshold)
+        tasks = [self.filter(data, pc_threshold)]
 
-        # make bounds in scale with the desired resolution
-        minx = bminx + (self.x1 * self.resolution)
-        maxx = bminx + (self.x2 * self.resolution)
-
-        miny = bmaxy - (self.y2 * self.resolution)
-        maxy = bmaxy - (self.y1 * self.resolution)
-
-        chunk = Extents(
-            Bounds(minx, miny, maxx, maxy), self.resolution, self.alignment, r
-        )
-
-        if self.bounds == self.root:
-            self.root = chunk.bounds
-        tasks = [chunk.filter(data, pc_threshold)]
         while tasks:
-            tasks = compute(*tasks)
-            nt = []
-            for t in tasks:
-                if isinstance(t, Extents):
-                    yield t
-                else:
-                    nt = nt + t
-            tasks = nt
+            batches = list(itertools.batched(tasks, 1000))
+            for batch in batches:
+                results = compute(batch)[0]
+                tasks = []
+                for r in results:
+                    if isinstance(r, Extents):
+                        yield r
+                    else:
+                        tasks = tasks + r
 
     @delayed
     def filter(

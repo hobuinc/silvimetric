@@ -11,7 +11,6 @@ from distributed.client import _get_global_client as get_client
 
 from dask.delayed import delayed
 import dask.bag as db
-from dask.diagnostics import ProgressBar
 from dask import compute, persist
 from dask.distributed import futures_of, as_completed
 
