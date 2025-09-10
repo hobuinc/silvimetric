@@ -75,9 +75,7 @@ def agg_list(data_in: pd.DataFrame, proc_num: int) -> pd.DataFrame:
     """
     Make variable-length point data attributes into lists
     """
-    if data_in is None:
-        return None
-
+    # groupby won't set index on an empty array
     if data_in.empty:
         return data_in.set_index(['xi', 'yi'])
 
@@ -116,6 +114,8 @@ def write(
     :param tdb: TileDB write stream.
     :return: Number of points written.
     """
+    if data_in.empty:
+        return 0
 
     storage.write(data_in, timestamp)
 
