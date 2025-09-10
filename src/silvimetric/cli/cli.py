@@ -30,9 +30,6 @@ from .common import dask_handle, close_dask
 @click.option(
     '--log-dir', default=None, help='Directory for log output', type=str
 )
-@click.option(
-    '--progress', is_flag=True, default=True, type=bool, help='Report progress'
-)
 @click.option('--workers', type=int, help='Number of workers for Dask')
 @click.option(
     '--threads', type=int, help='Number of threads per worker for Dask'
@@ -66,7 +63,6 @@ def cli(
     database,
     debug,
     log_dir,
-    progress,
     dasktype,
     scheduler,
     workers,
@@ -88,7 +84,6 @@ def cli(
         tdb_dir=database,
         log=log,
         debug=debug,
-        progress=progress,
         scheduler=scheduler,
         dasktype=dasktype,
         workers=workers,

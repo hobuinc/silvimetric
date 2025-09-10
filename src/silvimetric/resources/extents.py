@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
-import dask
-import dask.bag as db
+from dask.delayed import delayed, Delayed
+from dask import compute
 
 from math import ceil
 
@@ -129,7 +129,16 @@ class Extents(object):
 
         if self.bounds == self.root:
             self.root = chunk.bounds
-        yield from chunk.filter(data, pc_threshold)
+        tasks = [delayed(chunk.filter)(data, pc_threshold)]
+        while tasks:
+            tasks = compute(*tasks)
+            nt = []
+            for t in tasks:
+                if isinstance(t, Extents):
+                    yield t
+                else:
+                    nt = nt + t
+            tasks = nt
 
     def filter(
         self,
@@ -156,7 +165,7 @@ class Extents(object):
 
         # is it empty?
         if not pc:
-            yield self
+            return self
         else:
             # has it hit the threshold yet?
             next_split_x = (maxx - minx) / 2
@@ -166,14 +175,16 @@ class Extents(object):
             # the point count is less than the point threshold then use this
             # tile as the work unit.
             if next_split_x < self.resolution or next_split_y < self.resolution:
-                yield self
+                return self
             elif pc <= target_pc:
-                yield self
+                return self
             elif pc == prev_estimate:
-                yield self
+                return self
             else:
-                for ch in self.split():
-                    yield from ch.filter(data, pc_threshold, prev_estimate=pc)
+                return [
+                    ch.filter(data, pc_threshold, prev_estimate=pc)
+                    for ch in self.split()
+                ]
 
     def split(self):
         """

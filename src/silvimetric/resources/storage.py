@@ -352,12 +352,6 @@ class Storage:
             fillna=fillna_dict,
         )
 
-        cfg = tiledb.Config()
-        cfg['sm.consolidation.step_min_frags'] = 2
-        cfg['sm.consolidation.step_max_frags'] = 20
-        cfg['sm.consolidation.steps'] = 100
-        tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp, config=cfg)
-
     def reserve_time_slot(self) -> int:
         """
         Increment time slot in database and reserve that spot for a new
@@ -479,14 +473,11 @@ class Storage:
         return sh_cfg
 
     def vacuum(self):
-        c = tiledb.Config({'sm.vacuum.mode': 'commits'})
-        tiledb.vacuum(self.config.tdb_dir, config=c)
-        c = tiledb.Config({'sm.vacuum.mode': 'fragments'})
-        tiledb.vacuum(self.config.tdb_dir, config=c)
-        c = tiledb.Config({'sm.vacuum.mode': 'fragment_meta'})
-        tiledb.vacuum(self.config.tdb_dir, config=c)
+        for vac_type in ['commits', 'fragments', 'fragment_meta']:
+            c = tiledb.Config({'sm.vacuum.mode': vac_type})
+            tiledb.vacuum(self.config.tdb_dir, config=c)
 
-    def full_consolidate(self, timestamp, retries=0) -> None:
+    def consolidate(self, timestamp) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
@@ -494,29 +485,9 @@ class Storage:
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
         self.config.log.debug('Consolidating db.')
-        try:
-            commits = tiledb.Config({'sm.consolidation.mode': 'commits'})
+        for con_type in ['commits', 'fragments', 'fragment_meta']:
+            c = tiledb.Config({'sm.consolidation.mode': con_type})
             tiledb.consolidate(
-                self.config.tdb_dir, timestamp=timestamp, config=commits
+                self.config.tdb_dir, timestamp=timestamp, config=c
             )
-        except Exception:
-            # this one sometimes fails unexpectedly if too many consolidations
-            # been made recently, not a big deal if we just skip it
-            pass
-
-        try:
-            fragments = tiledb.Config({'sm.consolidation.mode': 'fragments'})
-            tiledb.consolidate(
-                self.config.tdb_dir, timestamp=timestamp, config=fragments
-            )
-            metadata = tiledb.Config({'sm.consolidation.mode': 'fragment_meta'})
-            tiledb.consolidate(
-                self.config.tdb_dir, timestamp=timestamp, config=metadata
-            )
-            self.config.log.debug(f'Consolidated time slot {timestamp}.')
-
-        except Exception:
-            self.config.log.warning(
-                'Failed to consolidate time slot '
-                f'{timestamp} {retries + 1} time.'
-            )
+        self.config.log.debug(f'Consolidated time slot {timestamp}.')

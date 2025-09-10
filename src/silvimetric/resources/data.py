@@ -254,9 +254,6 @@ class Data:
         :return: estimated point count
         """
 
-        # TODO: if bounds is different from root bounds, find way to estimate
-        # point count. PDAL quickinfo grabs info from header or ept.json
-        # and this reflects point count of entire file
         reader = self.get_reader()
         if bounds:
             reader._options['bounds'] = str(bounds)

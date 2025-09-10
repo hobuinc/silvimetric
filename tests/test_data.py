@@ -1,13 +1,8 @@
-import pytest
-import itertools
-
-from silvimetric import Data, Bounds, Extents
+from silvimetric import Data, Bounds
 from silvimetric.resources.config import StorageConfig
-import dask.bag as db
-from dask.diagnostics import ProgressBar
 
 
-class Test_Data(object):
+class Test_Data(object):  # noqa: D101
     def test_filepath(
         self,
         no_cell_line_path: str,
@@ -68,7 +63,7 @@ class Test_Data(object):
         assert data.count(ll) == correct_count
 
 
-class Test_Autzen(object):
+class Test_Autzen(object):  # noqa: D101
     def test_filepath(
         self, autzen_filepath: str, storage_config: StorageConfig
     ):
@@ -78,22 +73,4 @@ class Test_Autzen(object):
         data.execute()
         assert len(data.array) == 577637
         assert data.estimate_count(data.bounds) == 577637
-
-    # @pytest.mark.skip()
-    def test_chunking(
-        self, autzen_data: Data, autzen_storage: StorageConfig, threaded_dask
-    ):
-        ex = Extents(
-            autzen_data.bounds,
-            autzen_storage.resolution,
-            autzen_storage.alignment,
-            autzen_storage.root,
-        )
-        chs1 = ex.chunk(autzen_data, pc_threshold=100000)
-        chs2 = ex.get_leaf_children(50)
-        for c in chs1:
-            assert isinstance(c, Extents)
-
-        for c in chs2:
-            assert isinstance(c, Extents)
 

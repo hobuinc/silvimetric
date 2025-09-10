@@ -179,8 +179,6 @@ class ApplicationConfig(Config):
 
     debug: bool = (False,)
     """Debug mode, defaults to False"""
-    progress: bool = (False,)
-    """Should processes display progress bars, defaults to False"""
 
     # Dask configuration
     dasktype: str = 'processes'
@@ -205,7 +203,6 @@ class ApplicationConfig(Config):
         n = cls(
             tdb_dir=x['tdb_dir'],
             debug=x['debug'],
-            progress=x['progress'],
             dasktype=x['dasktype'],
             scheduler=x['scheduler'],
             workers=x['workers'],
