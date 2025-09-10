@@ -129,7 +129,7 @@ class Extents(object):
 
         if self.bounds == self.root:
             self.root = chunk.bounds
-        tasks = [delayed(chunk.filter)(data, pc_threshold)]
+        tasks = [chunk.filter(data, pc_threshold)]
         while tasks:
             tasks = compute(*tasks)
             nt = []
@@ -140,6 +140,7 @@ class Extents(object):
                     nt = nt + t
             tasks = nt
 
+    @delayed
     def filter(
         self,
         data: Data,
@@ -200,7 +201,7 @@ class Extents(object):
         midx = minx + (x_adjusted * self.resolution)
         midy = maxy - (y_adjusted * self.resolution)
 
-        exts = [
+        return [
             Extents(
                 Bounds(minx, miny, midx, midy),
                 self.resolution,
@@ -226,7 +227,6 @@ class Extents(object):
                 self.root,
             ),  # top right
         ]
-        yield from exts
 
     def get_leaf_children(self, tile_size):
         """

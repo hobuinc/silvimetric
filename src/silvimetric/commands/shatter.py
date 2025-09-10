@@ -15,7 +15,7 @@ from dask.diagnostics import ProgressBar
 from dask import compute, persist
 from dask.distributed import futures_of, as_completed
 
-from .. import Extents, Storage, Data, ShatterConfig
+from .. import Extents, Storage, Data, ShatterConfig, Metric
 from ..resources.taskgraph import Graph
 
 
@@ -35,7 +35,7 @@ def final(
     storage.vacuum()
 
 
-def get_data(extents: Extents, filename: str, storage: Storage):
+def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
     """
     Execute pipeline and retrieve point cloud data for this extent
 
@@ -62,7 +62,7 @@ def get_data(extents: Extents, filename: str, storage: Storage):
     return points
 
 
-def run_graph(data_in, metrics):
+def run_graph(data_in: pd.DataFrame, metrics: list[Metric]) -> pd.DataFrame:
     """
     Run DataFrames through metric processes
     """
@@ -71,12 +71,15 @@ def run_graph(data_in, metrics):
     return graph.run(data_in)
 
 
-def agg_list(data_in, proc_num):
+def agg_list(data_in: pd.DataFrame, proc_num: int) -> pd.DataFrame:
     """
     Make variable-length point data attributes into lists
     """
     if data_in is None:
         return None
+
+    if data_in.empty:
+        return data_in.set_index(['xi', 'yi'])
 
     old_dtypes = data_in.dtypes
     xyi_dtypes = {'xi': np.float64, 'yi': np.float64}
@@ -96,14 +99,16 @@ def agg_list(data_in, proc_num):
     return listed
 
 
-def join(list_data: pd.DataFrame, metric_data):
+def join(list_data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
     """
     Join the list data and metric DataFrames together.
     """
     return list_data.join(metric_data).reset_index()
 
 
-def write(data_in, storage, timestamp):
+def write(
+    data_in: pd.DataFrame, storage: Storage, timestamp: tuple[int, int]
+) -> int:
     """
     Write cell data to database
 
@@ -141,6 +146,8 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
 
 
 Leaves = Generator[Extents, None, None]
+
+
 def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
@@ -172,9 +179,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         # Handle non-distributed dask scenarios
         results = compute(*processes)
         pcs = [
-            possible_pc
-            for possible_pc in results
-            if possible_pc is not None
+            possible_pc for possible_pc in results if possible_pc is not None
         ]
         pc = sum(pcs)
         config.point_count = config.point_count + pc
@@ -217,7 +222,7 @@ def shatter(config: ShatterConfig) -> int:
     storage.save_shatter_meta(config)
 
     config.log.debug('Grabbing leaf nodes.')
-    es = extents.chunk(data, pc_threshold=(15*10**6))
+    es = extents.chunk(data, pc_threshold=(15 * 10**6))
 
     for e in es:
         if config.tile_size is not None:
