@@ -30,8 +30,8 @@ def final(
     config.finished = finished
     storage.save_shatter_meta(config)
 
-    storage.consolidate(config.timestamp)
-    storage.vacuum()
+    persist(delayed(storage.consolidate)(config.timestamp))
+    compute(delayed(storage.vacuum)())
 
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
@@ -233,7 +233,7 @@ def shatter(config: ShatterConfig) -> int:
         config.log.debug('Shattering.')
         try:
             run(leaves, config, storage)
-            storage.consolidate(config.timestamp)
+            persist(delayed(storage.consolidate)(config.timestamp))
         except Exception as e:
             final(config, storage)
             raise e

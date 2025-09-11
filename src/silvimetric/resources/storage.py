@@ -476,6 +476,7 @@ class Storage:
         for vac_type in ['commits', 'fragments', 'fragment_meta']:
             c = tiledb.Config({'sm.vacuum.mode': vac_type})
             tiledb.vacuum(self.config.tdb_dir, config=c)
+        self.config.log.debug('Vacuuming complete.')
 
     def consolidate(self, timestamp) -> None:
         """
@@ -484,9 +485,11 @@ class Storage:
         time traveling.
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
-        self.config.log.debug('Consolidating db.')
         for con_type in ['commits', 'fragments', 'fragment_meta']:
-            c = tiledb.Config({'sm.consolidation.mode': con_type})
+            c = tiledb.Config({
+                'sm.consolidation.mode': con_type,
+                'sm.consolidation.max_fragment_size': (300*2**20) #300MB
+            })
             tiledb.consolidate(
                 self.config.tdb_dir, timestamp=timestamp, config=c
             )
