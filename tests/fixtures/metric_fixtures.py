@@ -59,7 +59,8 @@ def autzen_data(
 @pytest.fixture(scope='function')
 def metric_data(autzen_data: Data) -> Generator[pd.DataFrame, None, None]:
     p = autzen_data.pipeline
-    autzen_data.execute()
+    dims = ['Z', 'Intensity', 'xi', 'yi', 'X', 'Y']
+    autzen_data.execute(allowed_dims=dims)
     points = p.get_dataframe(0)
     points.loc[:, 'xi'] = np.floor(points.xi)
     points.loc[:, 'yi'] = np.ceil(points.yi)
@@ -115,7 +116,7 @@ def metric_shatter_config(
         assert isinstance(ndf, pd.DataFrame)
         return ndf
 
-    metrics[0].add_filter(dummy_fn)
+    metrics[0].filters = [dummy_fn]
     metrics[0].attributes = attrs
 
     """Make output"""

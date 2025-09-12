@@ -120,11 +120,7 @@ class Test_Storage(object):
         sh_c_2 = storage.get_shatter_meta(shc_copy.time_slot)
         assert sh_c_2 == shc_copy
 
-        history = storage.get_history(
-            start_time=datetime.datetime(1970, 1, 1),
-            end_time=datetime.datetime.now(),
-            bounds=storage.config.root,
-        )
+        history = storage.get_history()
         assert len(history) == 2
 
         assert ShatterConfig.from_json(history[0])== shatter_config

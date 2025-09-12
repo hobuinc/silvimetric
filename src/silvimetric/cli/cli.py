@@ -150,12 +150,15 @@ def info_cmd(
 
     start_date = dates[0] if dates else date
     end_date = dates[1] if dates else date
+    if start_date is None and end_date is None:
+        timestamp=None
+    else:
+        timestamp = tuple(start_date.timestamp(), end_date.timestamp())
 
     i = info.info(
         app.tdb_dir,
         bounds=bounds,
-        start_time=start_date,
-        end_time=end_date,
+        timestamp=timestamp,
         name=name,
         concise=True,
     )
@@ -170,7 +173,6 @@ def info_cmd(
     ]
 
     i['metadata'].pop('metrics')
-    # print(metrics.keys())
     if any([history, metadata, attributes, metrics]):
         filtered = {}
         if history:

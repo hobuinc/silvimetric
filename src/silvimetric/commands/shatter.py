@@ -30,8 +30,8 @@ def final(
     config.finished = finished
     storage.save_shatter_meta(config)
 
-    persist(delayed(storage.consolidate)(config.timestamp))
-    compute(delayed(storage.vacuum)())
+    storage.consolidate(config.timestamp)
+    storage.vacuum()
 
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
@@ -44,16 +44,16 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
     :return: Point data array from PDAL.
     """
 
-    attrs = [a.name for a in storage.get_attributes()]
+    attrs = [*[a.name for a in storage.get_attributes()], 'xi', 'yi']
     data = Data(filename, storage.config, bounds=extents.bounds)
     p = data.pipeline
-    data.execute()
+    data.execute(allowed_dims = [*attrs, 'X', 'Y'])
 
     points = p.get_dataframe(0)
     points = points.loc[points.Y < extents.bounds.maxy]
     points = points.loc[points.Y >= extents.bounds.miny]
     points = points.loc[points.X >= extents.bounds.minx]
-    points = points.loc[points.X < extents.bounds.maxx, [*attrs, 'xi', 'yi']]
+    points = points.loc[points.X < extents.bounds.maxx][attrs]
 
     points.loc[:, 'xi'] = np.floor(points.xi)
     # ceil for y because origin is at top left
@@ -125,21 +125,20 @@ def write(
     return p
 
 
+@delayed
 def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     """Create dask bags and the order of operations."""
-
-    timestamp = config.timestamp
 
     # remove any extents that have already been done, only skip if full overlap
     if config.mbr:
         if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
             return 0
 
-    points = delayed(get_data)(leaf, config.filename, storage)
-    listed_data = delayed(agg_list)(points, config.time_slot)
-    metric_data = delayed(run_graph)(points, storage.get_metrics())
-    joined_data = delayed(join)(listed_data, metric_data)
-    point_count = delayed(write)(joined_data, storage, timestamp)
+    points = get_data(leaf, config.filename, storage)
+    listed_data = agg_list(points, config.time_slot)
+    metric_data = run_graph(points, storage.get_metrics())
+    joined_data = join(listed_data, metric_data)
+    point_count = write(joined_data, storage, config.timestamp)
 
     return point_count
 
@@ -157,6 +156,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     :return: Number of points processed.
     """
     ## If dask is distributed, use the futures feature
+    leaves = [delayed(leaf) for leaf in leaves]
+    storage = delayed(storage)
+
     processes = [do_one(leaf, config, storage) for leaf in leaves]
     dc = get_client()
     if dc is not None:
@@ -221,19 +223,19 @@ def shatter(config: ShatterConfig) -> int:
     storage.save_shatter_meta(config)
 
     config.log.debug('Grabbing leaf nodes.')
-    es = extents.chunk(data, pc_threshold=(15 * 10**6))
+    es = extents.chunk(data, pc_threshold=(11 * 10**6))
 
     for e in es:
         if config.tile_size is not None:
             leaves = e.get_leaf_children(config.tile_size)
         else:
-            leaves = itertools.chain(e.chunk(data))
+            leaves = e.chunk(data, pc_threshold=(600*10**3))
 
         # Begin main operations
         config.log.debug('Shattering.')
         try:
             run(leaves, config, storage)
-            persist(delayed(storage.consolidate)(config.timestamp))
+            storage.consolidate(config.timestamp)
         except Exception as e:
             final(config, storage)
             raise e

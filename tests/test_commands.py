@@ -37,8 +37,8 @@ class TestCommands(object):
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[0].to_json()
 
-        d = config_split[1].date[0]
-        i = info.info(tdb_filepath, start_time=d, end_time=d)
+        ts = config_split[1].timestamp
+        i = info.info(tdb_filepath, timestamp=ts)
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[1].to_json()
 

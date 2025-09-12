@@ -373,22 +373,22 @@ class Storage:
 
     def get_history(
         self,
-        start_time: datetime,
-        end_time: datetime,
-        bounds: Bounds,
+        timestamp: Optional[tuple[int, int]]=None,
+        bounds: Optional[Bounds]=None,
         name: Optional[str] = None,
         concise: bool = False,
     ):
         """
         Retrieve history of the database at current point in time.
 
-        :param start_time: Query parameter, starting datetime of process.
-        :param end_time: Query parameter, ending datetime of process.
+        :param timestamp: Query parameter, tuple of start and end timestamps.
         :param bounds: Query parameter, bounds to query by.
         :param name: Query paramter, shatter process uuid., by default None
         :param concise: Whether or not to give shortened version of history.
         :return: Returns list of array fragments that meet query parameters.
         """
+        if bounds is None:
+            bounds = self.config.root
 
         m = []
         for idx in range(1, self.config.next_time_slot):
@@ -401,15 +401,8 @@ class Storage:
                 continue
 
             # filter dates
-            if isinstance(s.date, tuple) and len(s.date) == 2:
-                if s.date[1] < start_time or s.date[0] > end_time:
-                    continue
-            elif isinstance(s.date, tuple) and len(s.date) == 1:
-                if s.date[0] < start_time or s.date[0] > end_time:
-                    continue
-            else:
-                if s.date < start_time or s.date > end_time:
-                    continue
+            if timestamp is not None and not ts_overlap(s.timestamp, timestamp):
+                continue
 
             if concise:
                 h = s.history_json()
@@ -473,24 +466,21 @@ class Storage:
         return sh_cfg
 
     def vacuum(self):
-        for vac_type in ['commits', 'fragments', 'fragment_meta']:
-            c = tiledb.Config({'sm.vacuum.mode': vac_type})
-            tiledb.vacuum(self.config.tdb_dir, config=c)
+        tiledb.vacuum(self.config.tdb_dir)
         self.config.log.debug('Vacuuming complete.')
 
-    def consolidate(self, timestamp) -> None:
+    def consolidate(self, timestamp: tuple[int, int]) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
         time traveling.
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
-        for con_type in ['commits', 'fragments', 'fragment_meta']:
-            c = tiledb.Config({
-                'sm.consolidation.mode': con_type,
-                'sm.consolidation.max_fragment_size': (300*2**20) #300MB
-            })
-            tiledb.consolidate(
-                self.config.tdb_dir, timestamp=timestamp, config=c
-            )
+        c = tiledb.Config({
+            'sm.consolidation.mode': 'fragments',
+            'sm.consolidation.max_fragment_size': (300*2**20) #300MB
+        })
+        tiledb.consolidate(
+            self.config.tdb_dir, timestamp=timestamp, config=c
+        )
         self.config.log.debug(f'Consolidated time slot {timestamp}.')

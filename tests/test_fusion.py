@@ -15,11 +15,11 @@ class TestFusion:
     # Intensity values and Mode values are slightly off from FUSION.
     # Intensity values are scaled in FUSION, and Mode is selected slightly
     # differently, so values are expected to be off.
-    @pytest.mark.skip()
+    # @pytest.mark.skip()
     def test_against_fusion(
         self,
-        configure_dask: None,
-        # threaded_dask,
+        # configure_dask: None,
+        threaded_dask,
         plumas_shatter_config: sm.ShatterConfig,
         plumas_tif_dir: str,
         metric_map: dict,

@@ -6,6 +6,7 @@ from silvimetric import all_metrics as s
 from silvimetric import l_moments
 from silvimetric.resources.attribute import Attribute
 from silvimetric.resources.taskgraph import Graph
+from silvimetric.resources.attribute import Pdal_Attributes as dims
 
 from test_shatter import confirm_one_entry
 
@@ -43,14 +44,14 @@ class TestMetrics:
     ):
         # TODO fix this, changed to hilbert ordering and changed
         # to not using sort in groupbys
-        metrics = list(s.values())
-        graph = Graph(metrics)
+        ms = list(s.values())
+        graph = Graph(ms)
         metrics = graph.run(metric_data)
         assert isinstance(metrics, pd.DataFrame)
         # cannot use pandas compare because dataframes may not have identical
         # column ordering, so compare values of each column
-        for m in metrics.columns:
-            assert all(metrics[m] == metric_data_results[m])
+        for m in metric_data_results.columns:
+            assert all(metric_data_results[m] == metrics[m])
 
     def test_dependencies(self, metric_data: pd.DataFrame):
         # should be able to create a dependency graph

@@ -23,7 +23,7 @@ from .. import __version__
 class Config(ABC):
     """Base config"""
 
-    tdb_dir: str
+    tdb_dir: str = field()
     """Path to TileDB directory to use."""
     log: Log = field(default_factory=lambda: Log('INFO'))
     """Log object."""
@@ -63,11 +63,11 @@ class Config(ABC):
 class StorageConfig(Config):
     """Config for constructing a Storage object"""
 
-    root: Bounds
+    root: Bounds = field()
     """Root project bounding box"""
-    crs: pyproj.CRS
+    crs: pyproj.CRS = field()
     """Coordinate reference system, same for all data in a project"""
-    resolution: float = 30.0
+    resolution: float = field(default=30.0)
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
     alignment: str = 'AlignToCenter'
     """Alignment of pixels in database, same for all data in a project,
@@ -82,14 +82,16 @@ class StorageConfig(Config):
     """List of :class:`silvimetric.resources.attribute.Attribute` attributes
     that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
     Intensity"""
-    metrics: list[Metric] = field(default_factory=lambda: [])
+    metrics: list[Metric] = field(
+        default_factory=lambda: list(grid_metrics.get_grid_metrics().values())
+    )
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
     that represent derived data, defaults to values in grid_metrics object"""
-    version: str = __version__
+    version: str = field(default=__version__)
     """Silvimetric version"""
-    capacity: int = 1000000
+    capacity: int = field(default=1000000)
     """TileDB Capacity, defaults to 1000000"""
-    next_time_slot: int = 1
+    next_time_slot: int = field(default=1)
     """Next time slot to be allocated to a shatter process. Increment after
     use., defaults to 1"""
 
@@ -101,14 +103,14 @@ class StorageConfig(Config):
             self.crs = crs
         else:
             self.crs = pyproj.CRS.from_user_input(crs)
-        if not len(self.attrs):
-            self.attrs = [
-                Attributes[a]
-                for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
-            ]
-        if not len(self.metrics):
-            gm = grid_metrics.get_grid_metrics()
-            self.metrics = list(gm.values())
+        # if not len(self.attrs):
+        #     self.attrs = [
+        #         Attributes[a]
+        #         for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
+        #     ]
+        # if not len(self.metrics):
+        #     gm = grid_metrics.get_grid_metrics()
+        #     self.metrics = list(gm.values())
 
         if not self.crs.is_projected:
             raise Exception(
@@ -177,20 +179,20 @@ class StorageConfig(Config):
 class ApplicationConfig(Config):
     """Base application config"""
 
-    debug: bool = (False,)
+    debug: bool = field(default=False)
     """Debug mode, defaults to False"""
 
     # Dask configuration
-    dasktype: str = 'processes'
+    dasktype: str = field(default='processes')
     """Dask parallelization type. For information see
     https://docs.dask.org/en/stable/scheduling.html#local-threads """
-    scheduler: str = 'distributed'
+    scheduler: str = field(default='distributed')
     """Dask scheduler, defaults to 'distributed'"""
-    workers: int = 12
+    workers: int = field(default=12)
     """Number of dask workers"""
-    threads: int = 4
+    threads: int = field(default=4)
     """Number of threads per dask worker"""
-    watch: bool = False
+    watch: bool = field(default=False)
     """Open dask diagnostic page in default web browser"""
 
     def to_json(self):
@@ -233,13 +235,13 @@ class ShatterConfig(Config):
     provided., defaults to uuid.uuid()"""
     tile_size: Union[int, None] = field(default=None)
     """The number of cells to include in a tile., defaults to None"""
-    start_time: float = 0
+    start_time: float = field(default=0)
     """The process starting time in seconds since Jan 1 1970., defaults to 0"""
-    end_time: float = 0
+    end_time: float = field(default=0)
     """The process ending time in seconds since Jan 1 1970., defaults to 0"""
-    point_count: int = 0
+    point_count: int = field(default=0)
     """The number of points that has been processed so far., defaults to 0"""
-    mbr: Mbr = field(default_factory=tuple)
+    mbr: Mbr = field(default_factory=lambda: tuple())
     """The minimum bounding rectangle derived from TileDB array fragments.
     This will be used to for resuming shatter processes and making sure it
     doesn't repeat work., defaults to tuple()"""
@@ -247,7 +249,7 @@ class ShatterConfig(Config):
     """Finished flag for shatter process., defaults to False"""
     time_slot: int = 0
     """The time slot that has been reserved for this shatter process. Will be
-    used as the timestamp in tiledb writes to better organize and manage
+    used as an attribute in tiledb writes to better organize and manage
     processes., defaults to 0"""
 
     def __post_init__(self) -> None:
@@ -345,10 +347,10 @@ class ExtractConfig(Config):
 
     out_dir: str
     """The directory where derived rasters should be written."""
-    attrs: list[Attribute] = field(default_factory=list)
+    attrs: list[Attribute] = field(default_factory=lambda: [])
     """List of attributes to use in shatter. If this is not set it
     will be filled by the attributes in the database instance."""
-    metrics: list[Metric] = field(default_factory=list)
+    metrics: list[Metric] = field(default_factory=lambda: [])
     """A list of metrics to use in shatter. If this is not set it
     will be filled by the metrics in the database instance."""
     bounds: Bounds = field(default=None)

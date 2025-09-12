@@ -3,7 +3,6 @@ import json
 import copy
 from urllib.parse import urlparse
 from typing import Optional
-import time
 
 import boto3
 import pdal
@@ -181,13 +180,16 @@ class Data:
         # return our pipeline
         return pdal.Pipeline(stages)
 
-    def execute(self):
+    def execute(self, allowed_dims: Optional[list[str]]=None):
         """Execute PDAL pipeline
-
+        :param allowed_dims: List of PDAL Dimension names to fetch from PDAL.
         :raises Exception: PDAL error message passed from execution
         """
         try:
-            self.pipeline.execute()
+            if allowed_dims is not None:
+                self.pipeline.execute(allowed_dims=allowed_dims)
+            else:
+                self.pipeline.execute()
             if self.pipeline.log and self.pipeline.log is not None:
                 self.log.debug(f'PDAL log: {self.pipeline.log}')
         except Exception as e:

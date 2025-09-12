@@ -47,16 +47,16 @@ def scan(
         )
         logger.debug(json.dumps(thresholds, indent=2))
 
-        with ProgressBar():
-            extents = Extents.from_sub(tdb_dir, data.bounds)
-            logger.info('Gathering initial chunks...')
-            count = dask.delayed(data.estimate_count)(extents.bounds).persist()
-            cell_counts = extent_handle(
-                extents, data, resolution, point_count, depth, log
-            )
+        extents = Extents.from_sub(tdb_dir, data.bounds)
+        logger.info('Gathering initial chunks...')
+        count = dask.delayed(data.estimate_count)(extents.bounds).persist()
+        cell_counts = extent_handle(
+            extents, data, resolution, point_count, depth, log
+        )
 
-            np_cell_counts = np.array(cell_counts)
-            num_cells = np.sum(np_cell_counts).item()
+        np_cell_counts = np.array(cell_counts)
+        num_cells = np.sum(np_cell_counts).item()
+        if np_cell_counts.size > 1:
             q1, q3 = np.percentile(np_cell_counts, [25,75])
             iqr = q3 - q1
             low_bounds = q1 - (1.5 * iqr)
@@ -64,34 +64,36 @@ def scan(
 
             adjusted = np_cell_counts[np_cell_counts > low_bounds]
             adjusted = adjusted[adjusted < up_bounds]
+        else:
+            adjusted = np_cell_counts
 
-            std = np.std(adjusted)
-            mean = np.mean(adjusted)
-            median = np.median(adjusted)
-            rec = median
+        std = np.std(adjusted)
+        mean = np.mean(adjusted)
+        median = np.median(adjusted)
+        rec = median
 
-            pc_info = dict(
-                pc_info=dict(
-                    storage_bounds=tdb.config.root.to_json(),
-                    data_bounds=data.bounds.to_json(),
-                    count=dask.compute(count),
-                )
+        pc_info = dict(
+            pc_info=dict(
+                storage_bounds=tdb.config.root.to_json(),
+                data_bounds=data.bounds.to_json(),
+                count=dask.compute(count),
             )
-            tiling_info = dict(
-                tile_info=dict(
-                    num_cells=num_cells,
-                    num_tiles=len(cell_counts),
-                    mean=mean,
-                    std_dev=std,
-                    median=median,
-                    recommended=rec,
-                )
+        )
+        tiling_info = dict(
+            tile_info=dict(
+                num_cells=num_cells,
+                num_tiles=len(cell_counts),
+                mean=mean,
+                std_dev=std,
+                median=median,
+                recommended=rec,
             )
+        )
 
-            final_info = pc_info | tiling_info
-            logger.info(json.dumps(final_info, indent=2))
+        final_info = pc_info | tiling_info
+        logger.info(json.dumps(final_info, indent=2))
 
-            return final_info
+        return final_info
 
 
 def extent_handle(

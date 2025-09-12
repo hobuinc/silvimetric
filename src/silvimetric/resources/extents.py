@@ -113,17 +113,20 @@ class Extents(object):
         data = delayed(data)
         pc_threshold = delayed(pc_threshold)
         tasks = [self.filter(data, pc_threshold)]
-
+        chunks = []
         while tasks:
             batches = list(itertools.batched(tasks, 1000))
             for batch in batches:
                 results = compute(batch)[0]
                 tasks = []
                 for r in results:
-                    if isinstance(r, Extents):
-                        yield r
+                    if r is None:
+                        continue
+                    elif isinstance(r, Extents):
+                        chunks.append(r)
                     else:
                         tasks = tasks + r
+        return chunks
 
     @delayed
     def filter(
@@ -151,7 +154,7 @@ class Extents(object):
 
         # is it empty?
         if not pc:
-            return self
+            return None
         else:
             # has it hit the threshold yet?
             next_split_x = (maxx - minx) / 2

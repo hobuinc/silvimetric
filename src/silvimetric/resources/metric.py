@@ -93,16 +93,18 @@ class Metric:
                 ' object.'
             )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Self):
+        f1 = [f.__name__ for f in self.filters]
+        f2 = [f.__name__ for f in other.filters]
         if self.name != other.name:
             return False
         elif self.dtype != other.dtype:
             return False
         elif self.dependencies != other.dependencies:
             return False
-        elif self._method != other._method:
+        elif not all(f in f2 for f in f1):
             return False
-        elif self.filters != other.filters:
+        elif self._method != other._method:
             return False
         elif self.attributes != other.attributes:
             return False

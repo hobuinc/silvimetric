@@ -2,6 +2,7 @@ import os
 import uuid
 import datetime
 from math import ceil
+import copy
 
 import pytest
 import numpy as np
@@ -77,7 +78,6 @@ class Test_Shatter(object):  # noqa: D101
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -86,15 +86,17 @@ class Test_Shatter(object):  # noqa: D101
 
         og_timestamp = shatter_config.timestamp
 
+        shatter_config2 = copy.deepcopy(shatter_config)
         d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
-        dt_timestamp = tuple(int(d.timestamp()) for d in d2)
+        dt_timestamp = tuple([int(d2[0].timestamp()), int(d2[1].timestamp())])
+        # dt_timestamp = tuple([shatter_config.timestamp[0] + 1, shatter_config.timestamp[1]+1])
         # change attributes to make it a new run
-        shatter_config.name = uuid.uuid4()
-        shatter_config.mbr = ()
-        shatter_config.time_slot = storage.reserve_time_slot()
-        shatter_config.date = d2
-        shatter_config.timestamp = dt_timestamp
-        shatter(shatter_config)
+        shatter_config2.name = uuid.uuid4()
+        shatter_config2.mbr = ()
+        shatter_config2.time_slot = storage.reserve_time_slot()
+        shatter_config2.date = d2
+        shatter_config2.timestamp = dt_timestamp
+        shatter(shatter_config2)
         confirm_one_entry(storage, maxy, base, test_point_count, 2)
 
         # check that you can query results by datetime
@@ -173,7 +175,6 @@ class Test_Shatter(object):  # noqa: D101
         sh_cfg: str,
         test_point_count: int,
         request: pytest.FixtureRequest,
-        maxy: float,
         alignment: str,
         threaded_dask,
     ):

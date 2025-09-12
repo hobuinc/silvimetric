@@ -121,9 +121,11 @@ def extract_config(
 
 @pytest.fixture(scope='function')
 def metrics() -> Generator[list[Metric], None, None]:
+    mean = all_metrics['mean']
+    median = all_metrics['median']
     yield [
-        copy.deepcopy(all_metrics['mean']),
-        copy.deepcopy(all_metrics['median']),
+        Metric('mean', dtype=mean.dtype, method=mean._method),
+        Metric('median', dtype=median.dtype, method=median._method)
     ]
 
 
