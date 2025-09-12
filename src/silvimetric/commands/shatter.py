@@ -140,6 +140,8 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     joined_data = join(listed_data, metric_data)
     point_count = write(joined_data, storage, config.timestamp)
 
+    del joined_data, metric_data, listed_data, points
+
     return point_count
 
 
@@ -239,6 +241,6 @@ def shatter(config: ShatterConfig) -> int:
         except Exception as e:
             final(config, storage)
             raise e
-    final(config, storage, finished=True)
+    compute(delayed(final)(config, storage, finished=True))
 
     return config.point_count
