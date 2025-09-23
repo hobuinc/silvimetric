@@ -104,8 +104,8 @@ def get_metrics(
     exploded.rename(columns={'X': 'xi', 'Y': 'yi'}, inplace=True)
     graph = Graph(storage.config.metrics)
     metric_data = graph.run(exploded)
-    #rename index from xi,yi to X,Y
-    metric_data.index = metric_data.index.rename(['Y','X'])
+    # rename index from xi,yi to X,Y
+    metric_data.index = metric_data.index.rename(['Y', 'X'])
 
     return metric_data
 
@@ -124,7 +124,7 @@ def handle_overlaps(
     :return: Dataframe of rerun data.
     """
 
-    ma_list = storage.get_derived_names()
+    ma_list = storage.get_derived_names(config.metrics, config.attrs)
     att_list = [a.name for a in config.attrs]
 
     minx = extents.x1
@@ -139,14 +139,13 @@ def handle_overlaps(
     for a in config.attrs:
         att_meta[a.name] = a.dtype
 
-    with storage.open('r') as tdb:
+    with storage.open('r', timestamp=config.timestamp) as tdb:
         storage.config.log.info('Looking for overlaps...')
         data = tdb.query(
             attrs=[*ma_list],
             order='F',
             coords=True,
         ).df[minx:maxx, miny:maxy]
-        data = data
 
         # find values that are not unique, means they have multiple entries
         data = data.set_index(['Y', 'X'])
@@ -189,7 +188,7 @@ def extract(config: ExtractConfig) -> None:
     dask.config.set({'dataframe.convert-string': False})
 
     storage = Storage.from_db(config.tdb_dir)
-    ma_list = storage.get_derived_names()
+    ma_list = storage.get_derived_names(config.metrics, config.attrs)
     config.log.debug(f'Extracting metrics {[m for m in ma_list]}')
     root_bounds = storage.config.root
 
@@ -207,7 +206,7 @@ def extract(config: ExtractConfig) -> None:
     yis = final.index.get_level_values(0).astype(np.int64)
     new_idx = pd.MultiIndex.from_product(
         (range(yis.min(), yis.max() + 1), range(xis.min(), xis.max() + 1))
-    ).rename(['Y','X'])
+    ).rename(['Y', 'X'])
     final = final.reindex(new_idx)
 
     xs = root_bounds.minx + xis * config.resolution

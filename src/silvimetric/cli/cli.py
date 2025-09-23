@@ -365,7 +365,7 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
             report_path = f'reports/{config.name}.html'
             with performance_report(report_path):
                 shatter.shatter(config)
-            print(f'Writing report to {report_path}.')
+            app.log.debug(f'Writing report to {report_path}.')
     else:
         shatter.shatter(config)
 

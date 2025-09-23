@@ -182,9 +182,10 @@ class MetricParamType(click.ParamType):
                         else:
                             metrics.udpate(list(m))
                 except Exception as e:
-                    print(e)
                     self.fail(
-                        f'{val!r} is not available in Metrics', param, ctx
+                        f'{e} when trying to implement metric {val!r}',
+                        param,
+                        ctx,
                     )
         return list(metrics)
 
@@ -213,7 +214,6 @@ def dask_handle(
             p.register()
 
     elif scheduler == 'distributed':
-
         dask_config['scheduler'] = scheduler
         if dasktype == 'processes':
             cluster = LocalCluster(

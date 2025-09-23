@@ -62,14 +62,13 @@ class Config(ABC):
 @dataclass
 class StorageConfig(Config):
     """Config for constructing a Storage object"""
-
     root: Bounds = field()
     """Root project bounding box"""
     crs: pyproj.CRS = field()
     """Coordinate reference system, same for all data in a project"""
     resolution: float = field(default=30.0)
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
-    alignment: str = 'AlignToCenter'
+    alignment: str = field(default='AlignToCenter')
     """Alignment of pixels in database, same for all data in a project,
     options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
 
@@ -103,14 +102,6 @@ class StorageConfig(Config):
             self.crs = crs
         else:
             self.crs = pyproj.CRS.from_user_input(crs)
-        # if not len(self.attrs):
-        #     self.attrs = [
-        #         Attributes[a]
-        #         for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
-        #     ]
-        # if not len(self.metrics):
-        #     gm = grid_metrics.get_grid_metrics()
-        #     self.metrics = list(gm.values())
 
         if not self.crs.is_projected:
             raise Exception(
@@ -226,7 +217,7 @@ class ShatterConfig(Config):
 
     filename: str
     """Input filename referencing a PDAL pipeline or point cloud file."""
-    date: Tuple[datetime, datetime]
+    date: Tuple[datetime, datetime] = field(default=None)
     """A date range representing data collection times."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
@@ -251,8 +242,12 @@ class ShatterConfig(Config):
     """The time slot that has been reserved for this shatter process. Will be
     used as an attribute in tiledb writes to better organize and manage
     processes., defaults to 0"""
+    version: str = field(default=__version__)
+    """SilviMetric Version"""
 
     def __post_init__(self) -> None:
+        if self.date is None:
+            self.timestamp = None
         if isinstance(self.date, datetime):
             self.date = (self.date, self.date)
         if isinstance(self.date, list):
@@ -347,25 +342,46 @@ class ExtractConfig(Config):
 
     out_dir: str
     """The directory where derived rasters should be written."""
-    attrs: list[Attribute] = field(default_factory=lambda: [])
+    attrs: list[Attribute] = field(default=None)
     """List of attributes to use in shatter. If this is not set it
     will be filled by the attributes in the database instance."""
-    metrics: list[Metric] = field(default_factory=lambda: [])
+    metrics: list[Metric] = field(default=None)
     """A list of metrics to use in shatter. If this is not set it
     will be filled by the metrics in the database instance."""
     bounds: Bounds = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
+    date: Tuple[datetime, datetime] = field(
+        default_factory=lambda : tuple([
+            datetime(1970, 1, 1), datetime.now()
+        ])
+    )
+    """A date range representing data collection times."""
 
     def __post_init__(self) -> None:
         from .storage import Storage
 
         config = Storage.from_db(self.tdb_dir).config
-        if not len(self.attrs):
+        if self.attrs is None:
             self.attrs = config.attrs
-        if not len(self.metrics):
+        if self.metrics is None:
             self.metrics = config.metrics
         if self.bounds is None:
             self.bounds: Bounds = config.root
+
+        if isinstance(self.date, datetime):
+            self.date = (self.date, self.date)
+        if isinstance(self.date, list):
+            self.date = tuple(d for d in self.date)
+        if len(self.date) > 2 or len(self.date) < 1:
+            raise ValueError(
+                f'Invalid date range ({self.date}). Must be either 1 or 2 values.'
+            )
+        if len(self.date) == 1:
+            self.date = (self.date[0], self.date[0])
+        self.timestamp = (
+            int(self.date[0].timestamp()),
+            int(self.date[1].timestamp()),
+        )
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)

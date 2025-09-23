@@ -9,7 +9,6 @@ dependencies:
   - pdal
   - python-pdal>=3.5.0
   - numpy
-  - shapely
   - dask>=2024.11.2
   - pyproj
   - gdal

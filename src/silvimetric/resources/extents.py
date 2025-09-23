@@ -271,15 +271,16 @@ class Extents(object):
         return Extents(meta.root, meta.resolution, meta.alignment, meta.root)
 
     @staticmethod
-    def from_sub(tdb_dir: str, sub: Bounds):
+    def from_sub(storage: str | Storage, sub: Bounds):
         """
         Create an Extents that is less than the overall extents of the database.
 
-        :param tdb_dir: TileDB database directory.
+        :param storage: SilviMetric Storage object or path to it.
         :param sub: Desired bounding box.
         :return: Returns resulting Extents.
         """
-        storage = Storage.from_db(tdb_dir)
+        if isinstance(storage, str):
+            storage = Storage.from_db(storage)
 
         meta = storage.get_config()
         res = meta.resolution

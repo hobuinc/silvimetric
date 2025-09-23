@@ -21,8 +21,7 @@ except ImportError:
 else:
 
     class CustomJsonFormatter(jsonlogger.JsonFormatter):
-        """SilviMetric JSON formatter.
-        """
+        """SilviMetric JSON formatter."""
         def add_fields(
             self,
             log_record: Dict[str, Any],
@@ -40,8 +39,7 @@ else:
             return None
 
     class WebSocketHandler(logging.Handler):
-        """Websocket handler for logs.
-        """
+        """Websocket handler for logs."""
         def __init__(
             self, level: str, websocket: 'websocket.WebSocket'
         ) -> None:
@@ -60,8 +58,7 @@ else:
 
 
 class Log:
-    """Class for coordinating logging.
-    """
+    """Class for coordinating logging."""
     def __init__(
         self,
         log_level: int,
@@ -134,6 +131,10 @@ class Log:
 
     def __eq__(self, other):
         return self.to_json() == other.to_json()
+
+    def error(self, msg: str):
+        """Forward warning messages down to logger"""
+        self.logger.error(msg)
 
     def warning(self, msg: str):
         """Forward warning messages down to logger"""

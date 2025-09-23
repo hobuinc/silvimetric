@@ -178,9 +178,10 @@ class Data:
         stages.append(assign_y)
 
         # return our pipeline
-        return pdal.Pipeline(stages)
+        a = pdal.Pipeline(stages)
+        return a
 
-    def execute(self, allowed_dims: Optional[list[str]]=None):
+    def execute(self, allowed_dims: Optional[list[str]] = None):
         """Execute PDAL pipeline
         :param allowed_dims: List of PDAL Dimension names to fetch from PDAL.
         :raises Exception: PDAL error message passed from execution
@@ -195,7 +196,11 @@ class Data:
         except Exception as e:
             if self.pipeline.log and self.pipeline.log is not None:
                 self.log.debug(f'PDAL log: {self.pipeline.log}')
-            print(self.pipeline.pipeline, e)
+            msg = (
+                f'Error: {e} when executing pipeline: '
+                f'{self.pipeline.pipeline}'
+            )
+            self.storageconfig.log.error(msg)
             raise e
 
     def get_array(self) -> np.ndarray:
@@ -230,7 +235,7 @@ class Data:
                 stages = self.pipeline.stages
 
             for stage in stages:
-                stage_type, stage_kind = stage.type.split('.')
+                stage_type, _ = stage.type.split('.')
                 if stage_type == 'readers':
                     return stage
         else:
@@ -256,7 +261,6 @@ class Data:
         :param bounds: query bounding box
         :return: estimated point count
         """
-
         reader = self.get_reader()
         if bounds:
             reader._options['bounds'] = str(bounds)

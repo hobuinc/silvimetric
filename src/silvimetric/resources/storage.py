@@ -138,7 +138,6 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            allows_duplicates=True,
             sparse=True,
             offsets_filters=tiledb.FilterList(
                 [
@@ -263,28 +262,46 @@ class Storage:
         ctx = tiledb.Ctx(cfg)
         return ctx
 
-    def get_attributes(self) -> list[Attribute]:
+    def get_attributes(
+        self, names: Optional[list[str]] = None
+    ) -> list[Attribute]:
         """
         Find list of attribute names from storage config.
 
+        :param names: List of Metric names to get.
         :return: List of attribute names.
         """
+        if names is not None:
+            return [a for a in self.config.attrs if a.name in names]
+
         return self.config.attrs
 
-    def get_metrics(self) -> list[Metric]:
+    def get_metrics(self, names: Optional[list[str]] = None) -> list[Metric]:
         """
         Find List of metric names from storage config
 
+        :param names: List of Metric names to get.
         :return: List of metric names.
         """
+        if names is not None:
+            return [m for m in self.config.metrics if m.name in names]
         return self.config.metrics
 
-    def get_derived_names(self) -> list[str]:
+    def get_derived_names(
+        self,
+        metrics: Optional[list[str, Metric]]=None,
+        attributes: Optional[list[str, Attribute]]=None,
+    ) -> list[str]:
+        if metrics is None:
+            metrics = self.config.metrics
+        if attributes is None:
+            attributes = self.config.attrs
+
         # if no attributes are set in the metric, use all
         return [
             m.entry_name(a.name)
-            for m in self.config.metrics
-            for a in self.config.attrs
+            for m in metrics
+            for a in attributes
             if not m.attributes or a.name in [ma.name for ma in m.attributes]
         ]
 
@@ -373,8 +390,8 @@ class Storage:
 
     def get_history(
         self,
-        timestamp: Optional[tuple[int, int]]=None,
-        bounds: Optional[Bounds]=None,
+        timestamp: Optional[tuple[int, int]] = None,
+        bounds: Optional[Bounds] = None,
         name: Optional[str] = None,
         concise: bool = False,
     ):
@@ -476,11 +493,11 @@ class Storage:
         time traveling.
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
-        c = tiledb.Config({
-            'sm.consolidation.mode': 'fragments',
-            'sm.consolidation.max_fragment_size': (300*2**20) #300MB
-        })
-        tiledb.consolidate(
-            self.config.tdb_dir, timestamp=timestamp, config=c
+        c = tiledb.Config(
+            {
+                'sm.consolidation.mode': 'fragments',
+                'sm.consolidation.max_fragment_size': (300 * 2**20),  # 300MB
+            }
         )
+        tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp, config=c)
         self.config.log.debug(f'Consolidated time slot {timestamp}.')

@@ -48,8 +48,8 @@ def scan(
         logger.debug(json.dumps(thresholds, indent=2))
 
         extents = Extents.from_sub(tdb_dir, data.bounds)
-        logger.info('Gathering initial chunks...')
-        count = dask.delayed(data.estimate_count)(extents.bounds).persist()
+        logger.debug('Gathering initial chunks...')
+        count = data.estimate_count(extents.bounds)
         cell_counts = extent_handle(
             extents, data, resolution, point_count, depth, log
         )
@@ -141,7 +141,8 @@ def extent_handle(
 
     if extent.bounds == extent.root:
         extent.root = chunk.bounds
-
+    data = data
+    chunk = chunk
     curr = db.from_delayed(
         tile_info(chunk, data, res_threshold, pc_threshold, depth_threshold)
     )
