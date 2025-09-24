@@ -1,8 +1,6 @@
 import json
-import operator
 
 from math import floor
-from datetime import datetime
 from typing_extensions import Optional
 
 import tiledb
@@ -32,7 +30,7 @@ class Storage:
             )
 
         self.config: StorageConfig = config
-        self._reader: tiledb.SparseArray = None
+        self._reader: tiledb.DenseArray = None
 
     def __enter__(self):
         return self
@@ -131,14 +129,12 @@ class Storage:
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(
             domain=domain,
-            cell_order='hilbert',
             attrs=[
                 count_att,
                 proc_att,
                 *dim_atts,
                 *metric_atts,
             ],
-            sparse=True,
             offsets_filters=tiledb.FilterList(
                 [
                     tiledb.PositiveDeltaFilter(),
@@ -149,8 +145,8 @@ class Storage:
         )
         schema.check()
 
-        tiledb.SparseArray.create(config.tdb_dir, schema)
-        with tiledb.SparseArray(config.tdb_dir, 'w') as writer:
+        tiledb.DenseArray.create(config.tdb_dir, schema)
+        with tiledb.DenseArray(config.tdb_dir, 'w') as writer:
             writer.meta['config'] = str(config)
 
         s = Storage(config)
@@ -258,7 +254,6 @@ class Storage:
         cfg = tiledb.Config()
         cfg['vfs.s3.connect_scale_factor'] = '25'
         cfg['vfs.s3.connect_max_retries'] = '10'
-        # cfg['vfs.s3.max_parallel_ops'] = '1'
         ctx = tiledb.Ctx(cfg)
         return ctx
 
@@ -292,6 +287,11 @@ class Storage:
         metrics: Optional[list[str, Metric]]=None,
         attributes: Optional[list[str, Attribute]]=None,
     ) -> list[str]:
+        """
+        Return names of TileDB Attribute names based on combination of
+        Metrics and SilviMetric Attributes. If none are specified, grab
+        all Metrics and Attributes from Storage Config.
+        """
         if metrics is None:
             metrics = self.config.metrics
         if attributes is None:
@@ -335,9 +335,9 @@ class Storage:
             self._reader.reopen()
             return self._reader
 
-    def write(self, data_in: pd.DataFrame, timestamp):
+    def write(self, data_in: pd.DataFrame, timestamp, time_slot):
+        """Write to TileDB Array."""
         data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
-
         attr_dict = {f'{a.name}': a.dtype for a in self.config.attrs}
         xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
         metr_dict = {
@@ -349,24 +349,27 @@ class Storage:
 
         varlen_types = {a.dtype for a in self.config.attrs}
 
+        # so tiledb knows how to fill null spots
         fillna_dict = {
             f'{m.entry_name(a.name)}': m.nan_value
             for m in self.config.metrics
             for a in self.config.attrs
         }
+        fillna_dict['count'] = 0
+        fillna_dict['shatter_process_num'] = time_slot
 
         ctx = self.get_tdb_context()
-
         tiledb.from_pandas(
             uri=self.config.tdb_dir,
             ctx=ctx,
-            sparse=True,
+            sparse=False,
             dataframe=data_in,
             mode='append',
             timestamp=timestamp,
             column_types=dtype_dict,
             varlen_types=varlen_types,
             fillna=fillna_dict,
+            fit_to_df=True
         )
 
     def reserve_time_slot(self) -> int:

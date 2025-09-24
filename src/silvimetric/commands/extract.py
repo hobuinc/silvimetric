@@ -159,7 +159,7 @@ def handle_overlaps(
                 attrs=[*att_list],
                 order='F',
                 coords=True,
-                use_arrow=False,
+                # use_arrow=False,
             )
             .df[:, :]
             .set_index(['Y', 'X'])
@@ -184,7 +184,8 @@ def extract(config: ExtractConfig) -> None:
 
     :param config: ExtractConfig.
     """
-
+    import dask.dataframe as ddf
+    import dask.array as da
     dask.config.set({'dataframe.convert-string': False})
 
     storage = Storage.from_db(config.tdb_dir)
@@ -200,7 +201,9 @@ def extract(config: ExtractConfig) -> None:
     )
 
     # figure out if there are any overlaps and handle them
-    final = handle_overlaps(config, storage, e)
+    # final = handle_overlaps(config, storage, e)
+    final = da.from_tiledb(config.tdb_dir)[ma_list]
+
 
     xis = final.index.get_level_values(1).astype(np.int64)
     yis = final.index.get_level_values(0).astype(np.int64)

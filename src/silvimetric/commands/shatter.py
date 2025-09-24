@@ -47,7 +47,7 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
     attrs = [*[a.name for a in storage.get_attributes()], 'xi', 'yi']
     data = Data(filename, storage.config, bounds=extents.bounds)
     p = data.pipeline
-    data.execute(allowed_dims = [*attrs, 'X', 'Y'])
+    data.execute(allowed_dims=[*attrs, 'X', 'Y'])
 
     points = p.get_dataframe(0)
     points = points.loc[points.Y < extents.bounds.maxy]
@@ -55,9 +55,10 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
     points = points.loc[points.X >= extents.bounds.minx]
     points = points.loc[points.X < extents.bounds.maxx][attrs]
 
-    points.loc[:, 'xi'] = np.floor(points.xi)
+    points.loc[:, 'xi'] = np.floor(points.xi).astype(np.int32)
     # ceil for y because origin is at top left
-    points.loc[:, 'yi'] = np.ceil(points.yi)
+    points.loc[:, 'yi'] = np.ceil(points.yi).astype(np.int32)
+
     return points
 
 
@@ -70,28 +71,54 @@ def run_graph(data_in: pd.DataFrame, metrics: list[Metric]) -> pd.DataFrame:
     return graph.run(data_in)
 
 
-def agg_list(data_in: pd.DataFrame, proc_num: int) -> pd.DataFrame:
+def agg_list(
+    data_in: pd.DataFrame, proc_num: int, extents: Extents
+) -> pd.DataFrame:
     """
     Make variable-length point data attributes into lists
     """
     # groupby won't set index on an empty array
     if data_in.empty:
-        return data_in.set_index(['xi', 'yi'])
+        return data_in.set_index(['yi', 'xi'])
 
     old_dtypes = data_in.dtypes
-    xyi_dtypes = {'xi': np.float64, 'yi': np.float64}
+    xyi_dtypes = {'xi': np.int32, 'yi': np.int32}
     o = np.dtype('O')
     first_col_name = data_in.columns[0]
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    gb = coerced.groupby(['xi', 'yi'], sort=False)
+    gb = coerced.groupby(['yi', 'xi'], sort=True)
     counts_df = gb[first_col_name].agg('count').rename('count')
     listed = (
         gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
         .join(counts_df)
         .assign(shatter_process_num=proc_num)
     )
+
+    # TileDB can't handle null cell writes for variable length arrays, so
+    # make sure that any index in the dense block that doesn't have a value
+    # is fill with a designated null value
+    yi_vals = listed.index.get_level_values(0)
+    xi_vals = listed.index.get_level_values(1)
+    xrange = range(xi_vals.min(), xi_vals.max())
+    yrange = range(yi_vals.min(), yi_vals.max())
+    mi = pd.MultiIndex.from_product([yrange, xrange], names=['yi', 'xi'])
+    listed = listed.reindex(mi)
+    isna = listed[first_col_name].isna()
+    if isna.any().any():
+        for c in col_dtypes.keys():
+            dtype = old_dtypes[c]
+            kind = np.dtype(dtype).kind
+            if kind in ['i', 'f']:
+                nan_value = -9999
+            elif kind == 'u':
+                nan_value = 0
+            else:
+                nan_value = -9999
+            listed.loc[isna, c] = pd.Series(
+                [np.array([nan_value], dtype=old_dtypes[c])] * isna.sum()
+            ).values
 
     return listed
 
@@ -104,7 +131,10 @@ def join(list_data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
 
 
 def write(
-    data_in: pd.DataFrame, storage: Storage, timestamp: tuple[int, int]
+    data_in: pd.DataFrame,
+    storage: Storage,
+    timestamp: tuple[int, int],
+    proc_num: int
 ) -> int:
     """
     Write cell data to database
@@ -116,7 +146,7 @@ def write(
     if data_in.empty:
         return 0
 
-    storage.write(data_in, timestamp)
+    storage.write(data_in, timestamp, proc_num)
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
@@ -135,10 +165,10 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
             return 0
 
     points = get_data(leaf, config.filename, storage)
-    listed_data = agg_list(points, config.time_slot)
+    listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
-    point_count = write(joined_data, storage, config.timestamp)
+    point_count = write(joined_data, storage, config.timestamp, config.time_slot)
 
     del joined_data, metric_data, listed_data, points
 
@@ -231,7 +261,7 @@ def shatter(config: ShatterConfig) -> int:
         if config.tile_size is not None:
             leaves = e.get_leaf_children(config.tile_size)
         else:
-            leaves = e.chunk(data, pc_threshold=(600*10**3))
+            leaves = e.chunk(data, pc_threshold=(600 * 10**3))
 
         # Begin main operations
         config.log.debug('Shattering.')

@@ -3,6 +3,7 @@ import numpy as np
 import pdal
 from tiledb import Attr, ZstdFilter, FilterList
 from .array_extensions import AttributeArray, AttributeDtype
+import pandas as pd
 
 
 class Attribute:
@@ -19,6 +20,7 @@ class Attribute:
         else:
             # AttributeDtype takes any dtype that can be passed to np.dtype
             try:
+                # self.dtype = pd.Float32Dtype()
                 self.dtype = AttributeDtype(subtype=dtype)
             except Exception as e:
                 raise AttributeError(
@@ -51,12 +53,15 @@ class Attribute:
         """
         return Attr(
             name=self.name,
+            # dtype=self.dtype.type,
             dtype=self.dtype.subtype,
             var=True,
             filters=FilterList([ZstdFilter()]),
+            nullable=True
         )
 
     def to_json(self) -> object:
+        # return {'name': self.name, 'dtype': np.dtype(self.dtype.type).str}
         return {'name': self.name, 'dtype': np.dtype(self.dtype.subtype).str}
 
     @staticmethod
