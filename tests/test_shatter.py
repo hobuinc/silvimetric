@@ -89,7 +89,7 @@ class Test_Shatter(object):  # noqa: D101
         shatter_config2 = copy.deepcopy(shatter_config)
         d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
         dt_timestamp = tuple([int(d2[0].timestamp()), int(d2[1].timestamp())])
-        # dt_timestamp = tuple([shatter_config.timestamp[0] + 1, shatter_config.timestamp[1]+1])
+
         # change attributes to make it a new run
         shatter_config2.name = uuid.uuid4()
         shatter_config2.mbr = ()
@@ -97,7 +97,8 @@ class Test_Shatter(object):  # noqa: D101
         shatter_config2.date = d2
         shatter_config2.timestamp = dt_timestamp
         shatter(shatter_config2)
-        confirm_one_entry(storage, maxy, base, test_point_count, 2)
+        # with dense arrays, these should end up being the same values
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
         # check that you can query results by datetime
         with storage.open('r', timestamp=dt_timestamp) as a:
@@ -123,35 +124,37 @@ class Test_Shatter(object):  # noqa: D101
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
 
-    def test_parallel(
-        self,
-        storage: Storage,
-        attrs: list[Attribute],
-        dims: dict,
-        threaded_dask: None,
-        metrics: list[Metric],
-    ):
-        # test that writing in parallel doesn't affect ordering of values
-        # constrained by NumberOfReturns being uint8
+    # TODO: remove this test. I don't think it's valid anymore after switching
+    # to a dense array with no duplicate values
+    # def test_parallel(
+    #     self,
+    #     storage: Storage,
+    #     attrs: list[Attribute],
+    #     dims: dict,
+    #     threaded_dask: None,
+    #     metrics: list[Metric],
+    # ):
+    #     # test that writing in parallel doesn't affect ordering of values
+    #     # constrained by NumberOfReturns being uint8
 
-        count = 255
-        tl = [
-            write(0, 0, val, storage, attrs, dims, metrics)
-            for val in range(count)
-        ]
+    #     count = 255
+    #     tl = [
+    #         write(0, 0, val, storage, attrs, dims, metrics)
+    #         for val in range(count)
+    #     ]
 
-        dask.compute(tl)
+    #     dask.compute(tl)
 
-        with storage.open('r') as r:
-            d = r[0, 0]
-            for idx in range(count):
-                assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
-                assert bool(
-                    np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx])
-                )
-                assert bool(
-                    np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx])
-                )
+    #     with storage.open('r') as r:
+    #         d = r[0, 0]
+    #         for idx in range(count):
+    #             assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
+    #             assert bool(
+    #                 np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx])
+    #             )
+    #             assert bool(
+    #                 np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx])
+    #             )
 
     def test_config(
         self,

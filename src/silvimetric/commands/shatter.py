@@ -101,8 +101,8 @@ def agg_list(
     # is fill with a designated null value
     yi_vals = listed.index.get_level_values(0)
     xi_vals = listed.index.get_level_values(1)
-    xrange = range(xi_vals.min(), xi_vals.max())
-    yrange = range(yi_vals.min(), yi_vals.max())
+    xrange = range(xi_vals.min(), xi_vals.max() + 1)
+    yrange = range(yi_vals.min(), yi_vals.max() + 1)
     mi = pd.MultiIndex.from_product([yrange, xrange], names=['yi', 'xi'])
     listed = listed.reindex(mi)
     isna = listed[first_col_name].isna()
