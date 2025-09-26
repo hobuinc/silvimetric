@@ -170,7 +170,7 @@ class TestCli(object):
             catch_exceptions=False,
         )
         assert res.exit_code == 0
-        confirm_one_entry(storage, maxy, base, test_point_count, 1)
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
     def test_cli_scan(
         self,
