@@ -16,9 +16,8 @@ def info(
     """
     Collect information about database in current state
 
-    :param tdb: SilviMetric Storage or TileDB directory path.
-    :param start_time: Process starting time query, defaults to None
-    :param end_time: Process ending time query, defaults to None
+    :param storage: SilviMetric Storage or TileDB directory path.
+    :param timestamp: Tuple of seconds since epoch.
     :param bounds: Bounds query, defaults to None
     :param name: Name query, defaults to None
     :return: Returns json object containing information on database.

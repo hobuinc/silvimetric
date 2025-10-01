@@ -48,7 +48,7 @@ class TestCommands(object):
         for i, pid in enumerate(ids):
             manage.delete(tdb_filepath, pid)
 
-            h = info.info(tdb_dir=tdb_filepath, name=pid)
+            h = info.info(tdb_filepath, name=pid)
             assert h['history']
             assert h['history'][0]['name'] == str(pid)
             assert not h['history'][0]['finished']
@@ -58,31 +58,17 @@ class TestCommands(object):
         s = Storage.from_db(tdb_filepath)
         assert s.config.next_time_slot == 5
 
-    # TODO: re-add this once we figure out how to run certain tests serially
-    # def test_311_failure(self, shatter_config, dask_proc_client):
-    #     # make sure we handle tiledb contexts correctly within dask
-
-    #     tdb_dir = shatter_config.tdb_dir
-    #     shatter.shatter(shatter_config)
-
-    #     i = info.info(tdb_dir)
-    #     history = i['history'][-1]
-
-    #     finished_config = ShatterConfig.from_dict(history)
-    #     sh_id = finished_config.name
-    #     manage.delete(tdb_dir, sh_id)
-
     def test_restart(
         self, tdb_filepath: str, config_split: List[ShatterConfig]
     ):
         ids = [c.name for c in config_split]
 
         for pid in ids:
-            h1 = info.info(tdb_dir = tdb_filepath, name=pid)
+            h1 = info.info(storage=tdb_filepath, name=pid)
             mbr1 = h1['history'][0]['mbr']
 
             manage.restart(tdb_filepath, pid)
-            h2 = info.info(tdb_dir = tdb_filepath, name=pid)
+            h2 = info.info(storage=tdb_filepath, name=pid)
             mbr2 = h2['history'][0]['mbr']
 
             assert mbr1 == mbr2

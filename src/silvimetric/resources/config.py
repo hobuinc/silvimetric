@@ -246,6 +246,10 @@ class ShatterConfig(Config):
     """SilviMetric Version"""
 
     def __post_init__(self) -> None:
+        from .storage import Storage
+
+        if isinstance(self.tdb_dir, Storage):
+            self.tdb_dir = self.tdb_dir.config.tdb_dir
         if self.date is None:
             self.timestamp = None
         if isinstance(self.date, datetime):
@@ -360,7 +364,12 @@ class ExtractConfig(Config):
     def __post_init__(self) -> None:
         from .storage import Storage
 
-        config = Storage.from_db(self.tdb_dir).config
+        if isinstance(self.tdb_dir, Storage):
+            config = self.tdb_dir.config
+            self.tdb_dir = config.tdb_dir
+        else:
+            config = Storage.from_db(self.tdb_dir).config
+
         if self.attrs is None:
             self.attrs = config.attrs
         if self.metrics is None:

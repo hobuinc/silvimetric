@@ -433,7 +433,7 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 )
 @click.pass_obj
 def delete_cmd(app, task_id):
-    manage.delete(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.delete(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('restart')
@@ -446,7 +446,7 @@ def delete_cmd(app, task_id):
 )
 @click.pass_obj
 def restart_cmd(app, task_id):
-    manage.restart(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.restart(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('resume')
@@ -459,7 +459,7 @@ def restart_cmd(app, task_id):
 )
 @click.pass_obj
 def resume_cmd(app, task_id):
-    manage.resume(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.resume(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 if __name__ == '__main__':
