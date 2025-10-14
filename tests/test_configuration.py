@@ -1,5 +1,6 @@
 from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 import numpy as np
+import datetime
 
 
 class Test_Configuration(object):
@@ -29,6 +30,8 @@ class Test_Configuration(object):
         assert shatter_config == sh_cfg
 
         # extract
+        # adding date to the config since extract creates dates if not provided
+        extract_config.date = (datetime.datetime(2011,1,1), datetime.datetime(2012,1,1))
         ex_str = str(extract_config)
         ex_cfg = ExtractConfig.from_string(ex_str)
         assert extract_config == ex_cfg

@@ -396,35 +396,47 @@ class ExtractConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = self.bounds.to_json()
+        d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
         return d
 
     @classmethod
-    def from_string(cls, data: str):
-        x = json.loads(data)
-        if 'metrics' in x:
-            ms = [Metric.from_dict(m) for m in x['metrics']]
-        if 'attrs' in x:
-            attrs = [Attribute.from_dict(a) for a in x['attrs']]
-        if 'bounds' in x:
-            bounds = Bounds(*x['bounds'])
-        if 'log' in x:
-            l = x['log']  # noqa: E741
+    def from_dict(cls, data: object):
+        if 'metrics' in data:
+            ms = [Metric.from_dict(m) for m in data['metrics']]
+        if 'attrs' in data:
+            attrs = [Attribute.from_dict(a) for a in data['attrs']]
+        if 'bounds' in data:
+            bounds = Bounds(*data['bounds'])
+        if 'log' in data:
+            l = data['log']  # noqa: E741
             log = Log(
                 l['log_level'], l['logdir'], l['logtype'], l['logfilename']
             )
         else:
             log = Log('INFO')
-        n = cls(
-            tdb_dir=x['tdb_dir'],
-            out_dir=x['out_dir'],
+        if isinstance(data['date'], list):
+            date = tuple(
+                (datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in data['date'])
+            )
+        else:
+            date = datetime.strptime(data['date'], '%Y-%m-%dT%H:%M:%SZ')
+
+        return cls(
+            tdb_dir=data['tdb_dir'],
+            out_dir=data['out_dir'],
             attrs=attrs,
             metrics=ms,
-            debug=x['debug'],
+            debug=data['debug'],
             bounds=bounds,
             log=log,
+            date=date
         )
 
-        return n
+
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        return ExtractConfig.from_dict(x)
 
     def __repr__(self):
         return json.dumps(self.to_json())
