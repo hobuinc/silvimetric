@@ -21,7 +21,7 @@ class Test_Storage(object):
         with storage.open('r') as st:
             s: tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
-            assert s.attr('count').dtype == np.int32
+            assert s.attr('count').dtype == np.uint32
 
             for a in attrs:
                 assert s.has_attr(a.name)
@@ -36,9 +36,9 @@ class Test_Storage(object):
         with storage.open('r') as st:
             sc = st.schema
             assert sc.has_attr('shatter_process_num')
-            assert sc.attr('shatter_process_num').dtype == np.uint64
+            assert sc.attr('shatter_process_num').dtype == np.uint16
             assert sc.has_attr('count')
-            assert sc.attr('count').dtype == np.int32
+            assert sc.attr('count').dtype == np.uint32
 
             for a in attrs:
                 assert sc.has_attr(a.name)

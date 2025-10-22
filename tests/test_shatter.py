@@ -49,16 +49,14 @@ def confirm_one_entry(storage, maxy, base, pointcount):
 
         for xi in range(xdom):
             for yi in range(ydom):
-                try:
-                    z = vals.loc[xi,yi].Z
-                    if isinstance(z, np.ndarray):
-                        assert np.all(z == (val_const - yi - 1))
-                    elif isinstance(z, pd.Series):
-                        for z1 in z.values:
-                            np.all(z1 == (val_const - yi - 1))
-                except Exception as e:
-                    print('asfasdf')
-
+                z = vals.loc[xi,yi].Z
+                zmean = vals.loc[xi,yi].m_Z_mean
+                if isinstance(z, np.ndarray):
+                    assert np.all(z == (val_const - yi - 1))
+                elif isinstance(z, pd.Series):
+                    for z1 in z.values:
+                        np.all(z1 == (val_const - yi - 1))
+                assert z.mean() == zmean
 
 class Test_Shatter(object):  # noqa: D101
     def test_command(

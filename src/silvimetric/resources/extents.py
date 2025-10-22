@@ -1,12 +1,10 @@
 import math
 import numpy as np
 import itertools
+from typing import Self
 
-from dask.distributed import get_client
-from dask.delayed import delayed, Delayed
+from dask.delayed import delayed
 from dask import compute
-
-from math import ceil
 
 from .bounds import Bounds
 from .storage import Storage
@@ -41,6 +39,8 @@ class Extents(object):
         """Alignment of pixels in database."""
         self.cell_count = int((self.rangex * self.rangey) / self.resolution**2)
         """Number of cells in this Extents"""
+        # TODO add checks for values being outside the bounds. Either throw or
+        # adjust the bounds and emit a warning.
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         """Minimum X index"""
@@ -51,6 +51,7 @@ class Extents(object):
         """Minimum Y index, or maximum Y value in point cloud"""
         self.y2 = math.ceil((self.root.maxy - miny) / resolution)
         """Maximum Y index, or minimum Y value in point cloud"""
+
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
         """Minimum bounding rectangle of this Extents"""
 
@@ -97,7 +98,7 @@ class Extents(object):
         self,
         data: Data,
         pc_threshold=600000,
-    ):
+    ) -> list[Self]:
         """
         Split up a dataset into tiles based on the point threshold. Unlike Scan
         this will not stop at a specific depth, but keep going until finding
@@ -107,9 +108,6 @@ class Extents(object):
         :param pc_threshold: Point count threshold., defaults to 600000
         :return: Return list of Extents that fit the criteria
         """
-        def add_lists(l1, l2):
-            return list(itertools.chain(l1,l2))
-
         data = delayed(data)
         pc_threshold = delayed(pc_threshold)
         tasks = [self.filter(data, pc_threshold)]
@@ -259,14 +257,15 @@ class Extents(object):
         ]
 
     @staticmethod
-    def from_storage(tdb_dir: str):
+    def from_storage(storage: str|Storage):
         """
         Create Extents from information stored in database.
 
-        :param tdb_dir: TileDB database directory.
+        :param storage: SilviMetric Storage object or path to it.
         :return: Returns resulting Extents.
         """
-        storage = Storage.from_db(tdb_dir)
+        if isinstance(storage, str):
+            storage = Storage.from_db(storage)
         meta = storage.get_config()
         return Extents(meta.root, meta.resolution, meta.alignment, meta.root)
 

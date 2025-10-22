@@ -79,7 +79,7 @@ def agg_list(
     """
     # groupby won't set index on an empty array
     if data_in.empty:
-        return data_in.set_index(['yi', 'xi'])
+        return data_in.set_index(['xi', 'yi'])
 
     old_dtypes = data_in.dtypes
     xyi_dtypes = {'xi': np.int32, 'yi': np.int32}
@@ -88,7 +88,7 @@ def agg_list(
     col_dtypes = {a: o for a in data_in.columns if a not in ['xi', 'yi']}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
-    gb = coerced.groupby(['yi', 'xi'], sort=True)
+    gb = coerced.groupby(['xi', 'yi'], sort=True)
     counts_df = gb[first_col_name].agg('count').rename('count')
     listed = (
         gb.agg(lambda x: np.array(x, old_dtypes[x.name]))
@@ -103,7 +103,7 @@ def agg_list(
     xi_vals = listed.index.get_level_values(1)
     xrange = range(xi_vals.min(), xi_vals.max() + 1)
     yrange = range(yi_vals.min(), yi_vals.max() + 1)
-    mi = pd.MultiIndex.from_product([yrange, xrange], names=['yi', 'xi'])
+    mi = pd.MultiIndex.from_product([yrange, xrange], names=['xi', 'yi'])
     listed = listed.reindex(mi)
     isna = listed[first_col_name].isna()
     if isna.any().any():
@@ -168,6 +168,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
+    a = np.any(joined_data.m_Z_mean != 21 - joined_data.yi - 1)
     point_count = write(joined_data, storage, config.timestamp, config.time_slot)
 
     del joined_data, metric_data, listed_data, points

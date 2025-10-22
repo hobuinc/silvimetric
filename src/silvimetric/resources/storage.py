@@ -82,25 +82,25 @@ class Storage:
         dim_row = tiledb.Dim(
             name='X',
             domain=(0, xi),
-            dtype=np.int32,
+            dtype=np.uint64,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
-            dtype=np.int32,
+            dtype=np.uint64,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(
             name='count',
-            dtype=np.int32,
+            dtype=np.uint32,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
-            dtype=np.uint64,
+            dtype=np.uint16,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_atts = [attr.schema() for attr in config.attrs]

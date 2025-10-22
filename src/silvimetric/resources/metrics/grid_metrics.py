@@ -3,7 +3,7 @@ import numpy as np
 
 from ..attribute import Attributes as A
 from ..metric import Metric
-from .percentiles import percentiles, pct_base
+from .percentiles import percentiles
 from .l_moments import l_moments
 from .stats import statistics
 from .p_moments import product_moments

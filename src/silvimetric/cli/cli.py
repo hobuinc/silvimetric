@@ -402,15 +402,13 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE"""
 
-    # TODO only allow metrics and attributes to be added if they're present
-    # in the storage config.
-    # dask_handle(
-    #     app.dasktype,
-    #     app.scheduler,
-    #     app.workers,
-    #     app.threads,
-    #     app.watch,
-    # )
+    dask_handle(
+        app.dasktype,
+        app.scheduler,
+        app.workers,
+        app.threads,
+        app.watch,
+    )
 
     config = ExtractConfig(
         tdb_dir=app.tdb_dir,
@@ -433,7 +431,7 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 )
 @click.pass_obj
 def delete_cmd(app, task_id):
-    manage.delete(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.delete(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('restart')
@@ -446,7 +444,7 @@ def delete_cmd(app, task_id):
 )
 @click.pass_obj
 def restart_cmd(app, task_id):
-    manage.restart(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.restart(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('resume')
@@ -459,7 +457,7 @@ def restart_cmd(app, task_id):
 )
 @click.pass_obj
 def resume_cmd(app, task_id):
-    manage.resume(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.resume(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 if __name__ == '__main__':

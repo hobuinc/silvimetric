@@ -103,6 +103,7 @@ def extract_config(
     metrics: list[Metric],
     shatter_config: ShatterConfig,
     extract_attrs: list[str],
+    date
 ):
     from silvimetric.commands import shatter
 
@@ -115,6 +116,7 @@ def extract_config(
         out_dir=tif_filepath,
         attrs=extract_attrs,
         metrics=metrics,
+        date=date
     )
     yield c
 
