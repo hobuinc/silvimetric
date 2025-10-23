@@ -34,3 +34,4 @@ autzen-aligned.tdb/
 .DS_Store
 
 docs/source/conf.py
+*.code-workspace
