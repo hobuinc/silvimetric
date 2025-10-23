@@ -22,6 +22,10 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
     :return: Config of process that was deleted.
     """
 
+    # NOTE: this process is not perfect due to the technology employed by
+    # tiledb. After consolidations, this should eventually show up as working
+    # but may not immediately show results
+
     logger = get_logger(log)
     if isinstance(storage, str):
         storage = Storage.from_db(storage)
@@ -37,7 +41,7 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
         time_slot = config.time_slot
     except KeyError as e:
         raise ValueError(
-            f'Shatter process with ID {name} is missing a timestamp.'
+            f'Shatter process with ID {name} is missing a time slot.'
         ) from e
 
     logger.info(f'Deleting task {name}.')

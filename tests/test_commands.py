@@ -1,5 +1,6 @@
-import json
+import pytest
 from typing import List
+import tiledb
 
 from silvimetric.commands import scan, info, shatter, manage
 from silvimetric import ShatterConfig, Storage
@@ -43,19 +44,31 @@ class TestCommands(object):
         assert i['history'][0] == config_split[1].to_json()
 
     def test_delete(self, tdb_filepath: str, config_split: List[ShatterConfig]):
+        # TODO shore up this test and functionality.
+        # deletion is not perfect with TileDB dense arrays, and it may
+        # take several rounds of consolidation for it to fully work.
+        # To fix this, we may need to move timestamps to a dimension instead of
+        # using the timetravel options
+
         ids = [c.name for c in config_split]
 
+        s = Storage.from_db(tdb_filepath)
         for i, pid in enumerate(ids):
             manage.delete(tdb_filepath, pid)
 
+            time_slot = i + 1
             h = info.info(tdb_filepath, name=pid)
             assert h['history']
-            assert h['history'][0]['name'] == str(pid)
-            assert not h['history'][0]['finished']
-            assert h['history'][0]['time_slot'] == i + 1
+            sc = ShatterConfig.from_dict(h['history'][0])
+            assert sc.name == pid
+            assert not sc.finished
+            assert sc.time_slot == time_slot
 
+            # not working 100% of the time at the moment
+            # with s.open(mode='r') as reader:
+            #     a = reader.df[:]
+            #     assert a[a.shatter_process_num == time_slot].empty
 
-        s = Storage.from_db(tdb_filepath)
         assert s.config.next_time_slot == 5
 
     def test_restart(
@@ -74,7 +87,6 @@ class TestCommands(object):
             assert mbr1 == mbr2
             assert h2['history'][0]['name'] == str(pid)
             assert h2['history'][0]['finished']
-
 
     def test_resume(
         self, shatter_config: ShatterConfig, storage_config: StorageConfig

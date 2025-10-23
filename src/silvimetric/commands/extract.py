@@ -1,19 +1,11 @@
 from pathlib import Path
-from rasterio.transform import Affine
 
-from multiprocessing import Lock
-import dask.array as da
-
-import tiledb
 from osgeo import gdal, osr
 import dask
 import numpy as np
 import pandas as pd
-import dask.dataframe as dd
-
 
 from .. import Storage, Extents, ExtractConfig, Bounds
-from ..resources.writer import RasterioDataset
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -52,7 +44,7 @@ def write_tif(
     crs = config.crs
     srs = osr.SpatialReference()
     srs.ImportFromWkt(crs.to_wkt())
-    minx, miny, maxx, maxy = bounds.get()
+    minx, _miny, _maxx, maxy = bounds.get()
     ysize, xsize = data.shape
 
     transform = [

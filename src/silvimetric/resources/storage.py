@@ -97,11 +97,13 @@ class Storage:
             name='count',
             dtype=np.uint32,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            fill=0
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
             dtype=np.uint16,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            fill=0
         )
         dim_atts = [attr.schema() for attr in config.attrs]
 
@@ -335,8 +337,9 @@ class Storage:
             self._reader.reopen()
             return self._reader
 
-    def write(self, data_in: pd.DataFrame, timestamp, time_slot):
+    def write(self, data_in: pd.DataFrame, timestamp):
         """Write to TileDB Array."""
+
         data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
         attr_dict = {f'{a.name}': a.dtype for a in self.config.attrs}
         xy_dict = {'X': data_in.X.dtype, 'Y': data_in.Y.dtype}
@@ -356,7 +359,35 @@ class Storage:
             for a in self.config.attrs
         }
         fillna_dict['count'] = 0
-        fillna_dict['shatter_process_num'] = time_slot
+        fillna_dict['shatter_process_num'] = 0
+
+        # TileDB can't handle null cell writes for variable length arrays, so
+        # make sure that any index in the dense block that doesn't have a value
+        # is fill with a designated null value
+        xi_vals = data_in.X
+        yi_vals = data_in.Y
+        xrange = range(xi_vals.min(), xi_vals.max() + 1)
+        yrange = range(yi_vals.min(), yi_vals.max() + 1)
+        mi = pd.MultiIndex.from_product([xrange, yrange], names=['X', 'Y'])
+        d = data_in.set_index(['X','Y'])
+
+        listed = d.reindex(mi)
+        listed = listed.fillna(fillna_dict)
+        isna = listed[self.config.attrs[0].name].isna()
+        if isna.any():
+            for attr, attr_type in attr_dict.items():
+                dtype = attr_type.subtype
+                kind = np.dtype(dtype).kind
+                if kind in ['i', 'f']:
+                    nan_value = -9999
+                elif kind == 'u':
+                    nan_value = 0
+                else:
+                    nan_value = -9999
+                listed.loc[isna, attr] = pd.Series(
+                    [np.array([nan_value], dtype=dtype)] * isna.sum()
+                ).values
+            data_in = listed.reset_index()
 
         ctx = self.get_tdb_context()
         tiledb.from_pandas(
@@ -474,22 +505,30 @@ class Storage:
         sh_cfg.mbr = ()
         sh_cfg.finished = False
 
-        self.config.log.debug('Deleting fragments...')
-        d = self.open('d')
-        d.query(cond=f'shatter_process_num=={time_slot}').submit()
-        d.close()
+
+        self.config.log.debug('Overwriting data.')
+        tsr = self.open('r',timestamp=sh_cfg.timestamp)
+        indices = tsr.query(
+            coords=True,
+            cond=f'shatter_process_num=={time_slot}').df[:]
+        # query returns tiles, so may still need to parse it down afterward
+        del_data = indices[indices.shatter_process_num == time_slot].set_index(['X','Y'])
+        dd = pd.DataFrame(columns=del_data.columns, index=del_data.index).reset_index()
+        self.write(dd, sh_cfg.timestamp)
 
         self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
             w.meta[f'shatter_{time_slot}'] = json.dumps(sh_cfg.to_json())
 
+        self.consolidate(timestamp=sh_cfg.timestamp)
+        self.vacuum()
         return sh_cfg
 
     def vacuum(self):
         tiledb.vacuum(self.config.tdb_dir)
         self.config.log.debug('Vacuuming complete.')
 
-    def consolidate(self, timestamp: tuple[int, int]) -> None:
+    def consolidate(self, timestamp: Optional[tuple[int, int]]=None) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of

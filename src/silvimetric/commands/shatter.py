@@ -98,29 +98,29 @@ def agg_list(
         .assign(shatter_process_num=proc_num)
     )
 
-    # TileDB can't handle null cell writes for variable length arrays, so
-    # make sure that any index in the dense block that doesn't have a value
-    # is fill with a designated null value
-    yi_vals = listed.index.get_level_values(0)
-    xi_vals = listed.index.get_level_values(1)
-    xrange = range(xi_vals.min(), xi_vals.max() + 1)
-    yrange = range(yi_vals.min(), yi_vals.max() + 1)
-    mi = pd.MultiIndex.from_product([yrange, xrange], names=['xi', 'yi'])
-    listed = listed.reindex(mi)
-    isna = listed[first_col_name].isna()
-    if isna.any().any():
-        for c in col_dtypes.keys():
-            dtype = old_dtypes[c]
-            kind = np.dtype(dtype).kind
-            if kind in ['i', 'f']:
-                nan_value = -9999
-            elif kind == 'u':
-                nan_value = 0
-            else:
-                nan_value = -9999
-            listed.loc[isna, c] = pd.Series(
-                [np.array([nan_value], dtype=old_dtypes[c])] * isna.sum()
-            ).values
+    # # TileDB can't handle null cell writes for variable length arrays, so
+    # # make sure that any index in the dense block that doesn't have a value
+    # # is fill with a designated null value
+    # yi_vals = listed.index.get_level_values(0)
+    # xi_vals = listed.index.get_level_values(1)
+    # xrange = range(xi_vals.min(), xi_vals.max() + 1)
+    # yrange = range(yi_vals.min(), yi_vals.max() + 1)
+    # mi = pd.MultiIndex.from_product([yrange, xrange], names=['xi', 'yi'])
+    # listed = listed.reindex(mi)
+    # isna = listed[first_col_name].isna()
+    # if isna.any().any():
+    #     for c in col_dtypes.keys():
+    #         dtype = old_dtypes[c]
+    #         kind = np.dtype(dtype).kind
+    #         if kind in ['i', 'f']:
+    #             nan_value = -9999
+    #         elif kind == 'u':
+    #             nan_value = 0
+    #         else:
+    #             nan_value = -9999
+    #         listed.loc[isna, c] = pd.Series(
+    #             [np.array([nan_value], dtype=old_dtypes[c])] * isna.sum()
+    #         ).values
 
     return listed
 
@@ -136,7 +136,6 @@ def write(
     data_in: pd.DataFrame,
     storage: Storage,
     timestamp: tuple[int, int],
-    proc_num: int
 ) -> int:
     """
     Write cell data to database
@@ -148,7 +147,7 @@ def write(
     if data_in.empty:
         return 0
 
-    storage.write(data_in, timestamp, proc_num)
+    storage.write(data_in, timestamp)
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
@@ -170,8 +169,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
-    a = np.any(joined_data.m_Z_mean != 21 - joined_data.yi - 1)
-    point_count = write(joined_data, storage, config.timestamp, config.time_slot)
+    point_count = write(joined_data, storage, config.timestamp)
 
     del joined_data, metric_data, listed_data, points
 
@@ -181,7 +179,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
 Leaves = Generator[Extents, None, None]
 
 
-def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
+def run(leaves: Leaves, config: ShatterConfig, storage: Storage, resume=True) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
 
@@ -260,20 +258,29 @@ def shatter(config: ShatterConfig) -> int:
     config.log.debug('Grabbing leaf nodes.')
     es = extents.chunk(data, pc_threshold=(11 * 10**6))
 
+    config.log.debug('Shattering.')
+    count = 0
     for e in es:
+        count = count + 1
         if config.tile_size is not None:
             leaves = e.get_leaf_children(config.tile_size)
         else:
             leaves = e.chunk(data, pc_threshold=(600 * 10**3))
 
+        config.log.debug(f'Shattering extent #{count}.')
         # Begin main operations
-        config.log.debug('Shattering.')
         try:
             run(leaves, config, storage)
             storage.consolidate(config.timestamp)
         except Exception as e:
             final(config, storage)
             raise e
-    compute(delayed(final)(config, storage, finished=True))
+
+    if get_client() is not None:
+        # only do this if we can do it on a distributed scheduler so we
+        # can throw it to the background
+        persist(delayed(final)(config, storage, finished=True))
+    else:
+        final(config, storage, finished=True)
 
     return config.point_count

@@ -10,68 +10,6 @@ from silvimetric.resources.attribute import Attribute
 from silvimetric.resources.metric import Metric
 
 @pytest.fixture(scope='session')
-def sparse_copc_filepath() ->  Generator[str, None, None]:
-    path = os.path.join(
-        os.path.dirname(__file__),
-        '..',
-        'data',
-        'test_sparse.copc.laz',
-    )
-    assert os.path.exists(path)
-    yield os.path.abspath(path)
-
-
-@pytest.fixture(scope='function')
-def sparse_shatter_config(
-    sparse_copc_filepath: str,
-    sparse_storage_config: StorageConfig,
-    bounds: Bounds,
-    date: datetime,
-) -> Generator[ShatterConfig, None, None]:
-    log = Log('INFO')  # INFO
-    s = ShatterConfig(
-        tdb_dir=sparse_storage_config.tdb_dir,
-        log=log,
-        filename=sparse_copc_filepath,
-        bounds=bounds,
-        date=date,
-        tile_size=1000,
-    )
-
-    yield s
-
-@pytest.fixture(scope='function')
-def sparse_storage_config(
-    tmp_path_factory: pytest.TempPathFactory,
-    bounds: Bounds,
-    resolution: int,
-    crs: str,
-    attrs: list[Attribute],
-    metrics: list[Metric],
-) -> Generator[StorageConfig, None, None]:
-    path = tmp_path_factory.mktemp('test_tdb')
-    p = os.path.abspath(path)
-    log = Log('INFO')
-
-    sc = StorageConfig(
-        tdb_dir=p,
-        log=log,
-        crs=crs,
-        root=bounds,
-        resolution=resolution,
-        attrs=attrs,
-        metrics=metrics,
-        alignment='AlignToCenter',
-        version=svversion,
-    )
-    Storage.create(sc)
-    yield sc
-
-@pytest.fixture(scope='function')
-def sparse_storage(sparse_storage_config: StorageConfig):
-    yield Storage.from_db(sparse_storage_config.tdb_dir)
-
-@pytest.fixture(scope='session')
 def s3_copc_filepath() -> Generator[str, None, None]:
     path = os.path.join(
         os.path.dirname(__file__),

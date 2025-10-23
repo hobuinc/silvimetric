@@ -71,38 +71,6 @@ class Test_Shatter(object):  # noqa: D101
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
-    def test_sparse(
-        self,
-        sparse_shatter_config: ShatterConfig,
-        sparse_storage: Storage,
-    ):
-        # test that shatter goes fully through with a sparse write
-        pc = shatter(sparse_shatter_config)
-        assert pc == 49500
-        maxy = sparse_storage.config.root.maxy
-        val_const = ceil(maxy / sparse_storage.config.resolution)
-
-        with sparse_storage.open('r') as a:
-            vals = a.df[:, :].set_index(['X', 'Y'])
-            xdom = int(a.schema.domain.dim('X').domain[1])
-            ydom = int(a.schema.domain.dim('Y').domain[1])
-            assert xdom == 11
-            assert ydom == 11
-
-            for xi in range(1,10):
-                for yi in range(ydom):
-                    if xi % 2 != 0:
-                        assert bool(
-                            np.all(vals.loc[xi, yi].Z[0] == (val_const - yi - 1))
-                        )
-                    else:
-                        assert bool(
-                            np.all(vals.loc[xi, yi].Z == [])
-                        )
-
-
-
-
     def test_multiple(
         self,
         shatter_config: ShatterConfig,

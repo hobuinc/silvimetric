@@ -26,7 +26,6 @@ def config_split(
                 date=date,
                 bounds=b,
                 name=uuid.uuid4(),
-                tile_size=4,
                 tdb_dir=sc.tdb_dir,
                 log=sc.log,
             )
