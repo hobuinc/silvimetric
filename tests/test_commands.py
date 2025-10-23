@@ -6,6 +6,8 @@ from silvimetric.commands import scan, info, shatter, manage
 from silvimetric import ShatterConfig, Storage
 from silvimetric.resources.config import StorageConfig
 
+from test_shatter import confirm_one_entry
+
 
 class TestCommands(object):
     def test_scan(
@@ -72,21 +74,28 @@ class TestCommands(object):
         assert s.config.next_time_slot == 5
 
     def test_restart(
-        self, tdb_filepath: str, config_split: List[ShatterConfig]
+        self,
+        tdb_filepath: str,
+        config_split: List[ShatterConfig],
+        maxy: float,
+        test_point_count: int,
     ):
         ids = [c.name for c in config_split]
-
+        s = Storage.from_db(tdb_filepath)
         for pid in ids:
-            h1 = info.info(storage=tdb_filepath, name=pid)
+            h1 = info.info(storage=s, name=pid)
             mbr1 = h1['history'][0]['mbr']
 
             manage.restart(tdb_filepath, pid)
-            h2 = info.info(storage=tdb_filepath, name=pid)
+            h2 = info.info(storage=s, name=pid)
             mbr2 = h2['history'][0]['mbr']
 
             assert mbr1 == mbr2
             assert h2['history'][0]['name'] == str(pid)
             assert h2['history'][0]['finished']
+
+        base = 11 if s.config.alignment == 'AlignToCenter' else 10
+        confirm_one_entry(s, maxy, base, test_point_count)
 
     def test_resume(
         self, shatter_config: ShatterConfig, storage_config: StorageConfig

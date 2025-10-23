@@ -82,7 +82,11 @@ def resume(storage: str|Storage, name: str, log: Log = None) -> int:
 
     logger.info(f'Resuming task {name}.')
     res = info(storage=storage, name=name)
-    assert len(res['history']) == 1
+    if len(res['history']) > 1:
+        raise ValueError(f'More than one config found with name {name}.')
+    if len(res['history']) < 0:
+        raise ValueError(f'No config found with name {name}.')
+
     config = res['history'][0]
     if isinstance(config, dict):
         # if the tdb_dir is different, don't continue writing to the old one

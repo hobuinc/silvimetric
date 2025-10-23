@@ -179,7 +179,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
 Leaves = Generator[Extents, None, None]
 
 
-def run(leaves: Leaves, config: ShatterConfig, storage: Storage, resume=True) -> int:
+def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     Coordinate running of shatter process and handle any interruptions
 
