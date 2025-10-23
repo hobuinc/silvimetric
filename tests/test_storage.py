@@ -21,7 +21,7 @@ class Test_Storage(object):
         with storage.open('r') as st:
             s: tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
-            assert s.attr('count').dtype == np.int32
+            assert s.attr('count').dtype == np.uint32
 
             for a in attrs:
                 assert s.has_attr(a.name)
@@ -36,9 +36,9 @@ class Test_Storage(object):
         with storage.open('r') as st:
             sc = st.schema
             assert sc.has_attr('shatter_process_num')
-            assert sc.attr('shatter_process_num').dtype == np.uint64
+            assert sc.attr('shatter_process_num').dtype == np.uint16
             assert sc.has_attr('count')
-            assert sc.attr('count').dtype == np.int32
+            assert sc.attr('count').dtype == np.uint32
 
             for a in attrs:
                 assert sc.has_attr(a.name)
@@ -120,11 +120,7 @@ class Test_Storage(object):
         sh_c_2 = storage.get_shatter_meta(shc_copy.time_slot)
         assert sh_c_2 == shc_copy
 
-        history = storage.get_history(
-            start_time=datetime.datetime(1970, 1, 1),
-            end_time=datetime.datetime.now(),
-            bounds=storage.config.root,
-        )
+        history = storage.get_history()
         assert len(history) == 2
 
         assert ShatterConfig.from_json(history[0])== shatter_config

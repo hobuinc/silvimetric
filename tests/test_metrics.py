@@ -6,6 +6,7 @@ from silvimetric import all_metrics as s
 from silvimetric import l_moments
 from silvimetric.resources.attribute import Attribute
 from silvimetric.resources.taskgraph import Graph
+from silvimetric.resources.attribute import Pdal_Attributes as dims
 
 from test_shatter import confirm_one_entry
 
@@ -18,7 +19,7 @@ class TestMetrics:
         g = Graph(metrics).init()
         assert g.initialized
         assert all(n.initialized for n in g.nodes.values())
-        assert list(g.nodes.keys()) == [
+        assert not set(g.nodes.keys()) ^ set([
             'l1',
             'l2',
             'l3',
@@ -27,7 +28,8 @@ class TestMetrics:
             'lskewness',
             'lkurtosis',
             'lmombase',
-        ]
+        ])
+
         g.run(metric_data)
         for node in g.nodes.values():
             assert isinstance(node.results, pd.DataFrame)
@@ -40,11 +42,16 @@ class TestMetrics:
         metric_data: pd.DataFrame,
         metric_data_results: pd.DataFrame,
     ):
-        metrics = list(s.values())
-        graph = Graph(metrics)
+        # TODO fix this, changed to hilbert ordering and changed
+        # to not using sort in groupbys
+        ms = list(s.values())
+        graph = Graph(ms)
         metrics = graph.run(metric_data)
         assert isinstance(metrics, pd.DataFrame)
-        assert all(metrics == metric_data_results)
+        # cannot use pandas compare because dataframes may not have identical
+        # column ordering, so compare values of each column
+        for m in metric_data_results.columns:
+            assert all(metric_data_results[m] == metrics[m])
 
     def test_dependencies(self, metric_data: pd.DataFrame):
         # should be able to create a dependency graph

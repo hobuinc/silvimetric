@@ -65,6 +65,11 @@ class AttrParamType(click.ParamType):
     # TODO add import similar to metrics
     def convert(self, value, param, ctx) -> list[Attribute]:
         attrs: set[Attribute] = set()
+        if not value:
+            return set(
+                Attributes[a]
+                for a in ['Z', 'ReturnNumber', 'NumberOfReturns', 'Intensity']
+            )
         parsed_values = value.split(',')
         for val in parsed_values:
             try:
@@ -94,7 +99,7 @@ class MetricParamType(click.ParamType):
 
     def convert(self, value, param, ctx) -> list[Metric]:
         if value is None or not value:
-            return list(grid_metrics('Z').values())
+            return list(grid_metrics.get_grid_metrics('Z').values())
         parsed_values = value.split(',')
         metrics: set[Metric] = set()
         for val in parsed_values:
@@ -177,9 +182,10 @@ class MetricParamType(click.ParamType):
                         else:
                             metrics.udpate(list(m))
                 except Exception as e:
-                    print(e)
                     self.fail(
-                        f'{val!r} is not available in Metrics', param, ctx
+                        f'{e} when trying to implement metric {val!r}',
+                        param,
+                        ctx,
                     )
         return list(metrics)
 
@@ -208,12 +214,6 @@ def dask_handle(
             p.register()
 
     elif scheduler == 'distributed':
-        # raise Exception("Dask distributed scheduler is currently disabled. "
-        #     "Please select another scheduler ('single-threaded' or 'local')")
-
-        # TODO: this is disabled for now. Distributed dask keeps crashing when
-        # used for shatter.
-
         dask_config['scheduler'] = scheduler
         if dasktype == 'processes':
             cluster = LocalCluster(

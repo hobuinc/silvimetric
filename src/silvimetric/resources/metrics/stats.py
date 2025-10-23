@@ -42,11 +42,6 @@ def m_cv(data, *args):
         return np.nan
     return stddev / mean
 
-
-def m_iq(data):
-    return stats.iqr(data)
-
-
 def m_crr(data, *args):
     mean, minimum, maximum = args
     den = maximum - minimum
@@ -80,7 +75,6 @@ minimum = Metric('min', np.float32, m_min)
 maximum = Metric('max', np.float32, m_max)
 stddev = Metric('stddev', np.float32, m_stddev)
 cv = Metric('cv', np.float32, m_cv, [stddev, mean])
-iq = Metric('iq', np.float32, m_iq)
 crr = Metric('canopy_relief_ratio', np.float32, m_crr, [mean, minimum, maximum])
 sqmean = Metric('sqmean', np.float32, m_sqmean)
 cumean = Metric('cumean', np.float32, m_cumean)
@@ -92,7 +86,6 @@ statistics: dict[str, Metric] = dict(
     max=maximum,
     stddev=stddev,
     cv=cv,
-    iq=iq,
     crr=crr,
     sqmean=sqmean,
     cumean=cumean,

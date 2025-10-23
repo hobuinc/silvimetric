@@ -11,7 +11,7 @@ from silvimetric.resources.config import StorageConfig
 def filtered(
     copc_data: Data, extents: Extents
 ) -> Generator[List[Extents], None, None]:
-    yield list(extents.chunk(copc_data, 1))
+    yield list(extents.chunk(copc_data))
 
 
 @pytest.fixture(scope='function')

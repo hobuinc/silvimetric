@@ -17,7 +17,6 @@ def scan(
     point_count: int = 600000,
     resolution: float = 100,
     depth: int = 6,
-    filter_empty: bool = False,
     log: Log = None,
 ):
     """
@@ -29,7 +28,6 @@ def scan(
     :param point_count: Point count threshold., defaults to 600000
     :param resolution: Resolution threshold., defaults to 100
     :param depth: Tree depth threshold., defaults to 6
-    :param filter_empty: Remove empty Extents. This takes longer, but is more
     accurate., defaults to False
 
     :return: Returns list of point counts.
@@ -49,46 +47,53 @@ def scan(
         )
         logger.debug(json.dumps(thresholds, indent=2))
 
-        with ProgressBar():
-            extents = Extents.from_sub(tdb_dir, data.bounds)
-            logger.info('Gathering initial chunks...')
-            count = dask.delayed(data.estimate_count)(extents.bounds).persist()
+        extents = Extents.from_sub(tdb_dir, data.bounds)
+        logger.debug('Gathering initial chunks...')
+        count = data.estimate_count(extents.bounds)
+        cell_counts = extent_handle(
+            extents, data, resolution, point_count, depth, log
+        )
 
-            if filter_empty:
-                chunks = extents.chunk(data, resolution, point_count, depth)
-                cell_counts = [ch.cell_count for ch in chunks]
+        np_cell_counts = np.array(cell_counts)
+        num_cells = np.sum(np_cell_counts).item()
+        if np_cell_counts.size > 1:
+            q1, q3 = np.percentile(np_cell_counts, [25,75])
+            iqr = q3 - q1
+            low_bounds = q1 - (1.5 * iqr)
+            up_bounds = q3 + (1.5 * iqr)
 
-            else:
-                cell_counts = extent_handle(
-                    extents, data, resolution, point_count, depth, log
-                )
+            adjusted = np_cell_counts[np_cell_counts > low_bounds]
+            adjusted = adjusted[adjusted < up_bounds]
+        else:
+            adjusted = np_cell_counts
 
-            num_cells = np.sum(cell_counts).item()
-            std = np.std(cell_counts)
-            mean = np.mean(cell_counts)
-            rec = int(mean)
+        std = np.std(adjusted)
+        mean = np.mean(adjusted)
+        median = np.median(adjusted)
+        rec = median
 
-            pc_info = dict(
-                pc_info=dict(
-                    storage_bounds=tdb.config.root.to_json(),
-                    data_bounds=data.bounds.to_json(),
-                    count=dask.compute(count),
-                )
+        pc_info = dict(
+            pc_info=dict(
+                storage_bounds=tdb.config.root.to_json(),
+                data_bounds=data.bounds.to_json(),
+                count=dask.compute(count),
             )
-            tiling_info = dict(
-                tile_info=dict(
-                    num_cells=num_cells,
-                    num_tiles=len(cell_counts),
-                    mean=mean,
-                    std_dev=std,
-                    recommended=rec,
-                )
+        )
+        tiling_info = dict(
+            tile_info=dict(
+                num_cells=num_cells,
+                num_tiles=len(cell_counts),
+                mean=mean,
+                std_dev=std,
+                median=median,
+                recommended=rec,
             )
+        )
 
-            final_info = pc_info | tiling_info
-            logger.info(json.dumps(final_info, indent=2))
+        final_info = pc_info | tiling_info
+        logger.info(json.dumps(final_info, indent=2))
 
-            return final_info
+        return final_info
 
 
 def extent_handle(
@@ -136,7 +141,8 @@ def extent_handle(
 
     if extent.bounds == extent.root:
         extent.root = chunk.bounds
-
+    data = data
+    chunk = chunk
     curr = db.from_delayed(
         tile_info(chunk, data, res_threshold, pc_threshold, depth_threshold)
     )
@@ -179,7 +185,6 @@ def tile_info(
 
     :return: Returns list of Extents that fit thresholds.
     """
-
     pc = data.estimate_count(extent.bounds)
     target_pc = pc_threshold
     minx, miny, maxx, maxy = extent.bounds.get()
@@ -193,6 +198,14 @@ def tile_info(
         next_split_x = (maxx - minx) / 2
         next_split_y = (maxy - miny) / 2
 
+        def end_early():
+            pc_per_cell = pc / (area / extent.resolution**2)
+            cell_estimate = math.ceil(target_pc / pc_per_cell)
+            tile_count = math.floor(extent.cell_count / cell_estimate)
+            remainder = extent.cell_count % cell_estimate
+
+            return [cell_estimate for x in range(tile_count)] + [remainder]
+
         # if the next split would put our area below the resolution, or if
         # the point count is less than the threshold (600k) then use this
         # tile as the work unit.
@@ -200,13 +213,10 @@ def tile_info(
             return [extent.cell_count]
         elif pc < target_pc:
             return [extent.cell_count]
-        elif area < res_threshold**2 or depth >= depth_threshold:
-            pc_per_cell = pc / (area / extent.resolution**2)
-            cell_estimate = math.ceil(target_pc / pc_per_cell)
-            tile_count = math.floor(extent.cell_count / cell_estimate)
-            remainder = extent.cell_count % cell_estimate
-
-            return [cell_estimate for x in range(tile_count)] + [remainder]
+        elif area < res_threshold**2:
+            return end_early()
+        elif depth >= depth_threshold:
+            return end_early()
 
         else:
             return [

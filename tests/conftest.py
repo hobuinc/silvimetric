@@ -72,7 +72,8 @@ def storage_config(
 
 @pytest.fixture(scope='function')
 def storage(storage_config: StorageConfig):
-    yield Storage(storage_config)
+    st = Storage(storage_config)
+    yield st
 
 
 @pytest.fixture(scope='function')
@@ -102,6 +103,7 @@ def extract_config(
     metrics: list[Metric],
     shatter_config: ShatterConfig,
     extract_attrs: list[str],
+    date
 ):
     from silvimetric.commands import shatter
 
@@ -114,15 +116,18 @@ def extract_config(
         out_dir=tif_filepath,
         attrs=extract_attrs,
         metrics=metrics,
+        date=date
     )
     yield c
 
 
 @pytest.fixture(scope='function')
 def metrics() -> Generator[list[Metric], None, None]:
+    mean = all_metrics['mean']
+    median = all_metrics['median']
     yield [
-        copy.deepcopy(all_metrics['mean']),
-        copy.deepcopy(all_metrics['median']),
+        Metric('mean', dtype=mean.dtype, method=mean._method),
+        Metric('median', dtype=median.dtype, method=median._method)
     ]
 
 

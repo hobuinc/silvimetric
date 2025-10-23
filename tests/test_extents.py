@@ -1,11 +1,13 @@
 from typing import List
 import numpy as np
 import datetime
+import itertools
+import copy
 
-from silvimetric import Extents
+from silvimetric import Extents, Data
 from silvimetric.commands.shatter import run
 from silvimetric.resources.config import ShatterConfig
-from silvimetric.resources.storage import Storage
+from silvimetric.resources.storage import Storage, StorageConfig
 
 
 
@@ -91,14 +93,12 @@ def check_indexing(extents: Extents, leaf_list):
     Max base: {b_indices[:,1].max()}
     """
 
-    # check that all original indices are in derived indices
-    for xy in b_indices:
-        assert xy in indices, f'Derived indices missing index: {xy}'
+    comps = np.sort(b_indices[:][:,1]) == np.sort(indices[:][:,1])
+    assert comps.all()
 
-    for xy in indices:
-        assert xy in b_indices, (
-            f'Derived indices created index outside of bounds: {xy}'
-        )
+    comps = np.sort(b_indices[:][:,0]) == np.sort(indices[:][:,0])
+    assert comps.all()
+
 
 
 class TestExtents(object):
@@ -115,27 +115,6 @@ class TestExtents(object):
         check_for_holes(unfiltered, extents)
         check_for_overlap(unfiltered, extents)
 
-    # def test_cells(self, copc_filepath, unfiltered, resolution):
-    #     flag = False
-    #     bad_chunks = []
-    #     for leaf in unfiltered:
-    #         reader = pdal.Reader(copc_filepath)
-    #         crop = pdal.Filter.crop(bounds=str(leaf))
-    #         p = reader | crop
-    #         count = p.execute()
-    #         # idx = leaf.get_indices()
-    #         # xs = np.unique(idx['x'])
-    #         # ys = np.unique(idx['y'])
-    #         # chunk_pc = resolution**2 * xs.size * ys.size
-    #         if count == 0:
-    #             continue
-    #         if count == resolution**2:
-    #             continue
-    #         else:
-    #             flag = True
-    #             bad_chunks.append(leaf)
-    #     assert flag == False, f"{[str(leaf) for leaf in bad_chunks]} are bad"
-
     def test_pointcount(
         self,
         filtered: List[Extents],
@@ -144,12 +123,13 @@ class TestExtents(object):
         shatter_config: ShatterConfig,
         storage: Storage,
     ):
+        newsc = copy.deepcopy(shatter_config)
         with storage.open('w'):
             shatter_config.start_time = (
                 datetime.datetime.now().timestamp() * 1000
             )
             fc = run(filtered, shatter_config, storage)
-            ufc = run(unfiltered, shatter_config, storage)
+            ufc = run(unfiltered, newsc, storage)
 
             assert fc == ufc, f"""
                 Filtered and unfiltered point counts don't match.
@@ -160,3 +140,27 @@ class TestExtents(object):
             assert test_point_count == ufc, f"""
                 Unfiltered point counts don't match.
                 Expected {test_point_count}, got {ufc}"""
+
+    def test_chunking(
+        self, autzen_storage: StorageConfig, threaded_dask
+    ):
+        import os
+        file = os.path.join(
+            os.path.dirname(__file__), 'data', 'autzen-classified.copc.laz'
+        )
+        data = Data(file, autzen_storage)
+        ex = Extents(
+            data.bounds,
+            autzen_storage.resolution,
+            autzen_storage.alignment,
+            autzen_storage.root,
+        )
+        chs = list(ex.chunk(data, (5*10**6)))
+        inner_chunks = []
+        for ch in chs:
+            inner_chunks = inner_chunks + list(itertools.chain(ch.chunk(data)))
+        for c1 in inner_chunks:
+            c1: Extents
+            assert all(c1.disjoint(c2) for c2 in inner_chunks if c2 != c1)
+        check_for_holes(inner_chunks, ex)
+        check_indexing(ex, inner_chunks)

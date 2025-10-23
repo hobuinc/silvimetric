@@ -8,4 +8,4 @@ class Test_Western(object):
         with western_storage.open('r') as st:
             s: tiledb.ArraySchema = st.schema
             assert s.has_attr('count')
-            assert s.attr('count').dtype == np.int32
+            assert s.attr('count').dtype == np.uint32

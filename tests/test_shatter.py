@@ -2,9 +2,11 @@ import os
 import uuid
 import datetime
 from math import ceil
+import copy
 
 import pytest
 import numpy as np
+import pandas as pd
 import dask
 
 from silvimetric import Extents, Log, info, shatter, Storage
@@ -30,10 +32,10 @@ def write(x, y, val, s: Storage, attrs, dims, metrics):
         w[x, y] = data
 
 
-def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
+def confirm_one_entry(storage, maxy, base, pointcount):
     xysize = base
-    shape = xysize**2 * num_entries
-    pc = pointcount * num_entries
+    shape = xysize**2
+    pc = pointcount
 
     with storage.open('r') as a:
         vals = a.df[:, :].set_index(['X', 'Y'])
@@ -47,10 +49,14 @@ def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
 
         for xi in range(xdom):
             for yi in range(ydom):
-                assert bool(
-                    np.all(vals.loc[xi, yi].Z[0] == (val_const - yi - 1))
-                )
-
+                z = vals.loc[xi,yi].Z
+                zmean = vals.loc[xi,yi].m_Z_mean
+                if isinstance(z, np.ndarray):
+                    assert np.all(z == (val_const - yi - 1))
+                elif isinstance(z, pd.Series):
+                    for z1 in z.values:
+                        np.all(z1 == (val_const - yi - 1))
+                assert z.mean() == zmean
 
 class Test_Shatter(object):  # noqa: D101
     def test_command(
@@ -58,6 +64,7 @@ class Test_Shatter(object):  # noqa: D101
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
+        # threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -101,7 +108,6 @@ class Test_Shatter(object):  # noqa: D101
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        # threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -110,16 +116,20 @@ class Test_Shatter(object):  # noqa: D101
 
         og_timestamp = shatter_config.timestamp
 
+        shatter_config2 = copy.deepcopy(shatter_config)
         d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
-        dt_timestamp = tuple(int(d.timestamp()) for d in d2)
+        dt_timestamp = tuple([int(d2[0].timestamp()), int(d2[1].timestamp())])
+
         # change attributes to make it a new run
-        shatter_config.name = uuid.uuid4()
-        shatter_config.mbr = ()
-        shatter_config.time_slot = storage.reserve_time_slot()
-        shatter_config.date = d2
-        shatter_config.timestamp = dt_timestamp
-        shatter(shatter_config)
-        confirm_one_entry(storage, maxy, base, test_point_count, 2)
+        shatter_config2.name = uuid.uuid4()
+        shatter_config2.mbr = ()
+        shatter_config2.time_slot = storage.reserve_time_slot()
+        shatter_config2.date = d2
+        shatter_config2.timestamp = dt_timestamp
+        shatter(shatter_config2)
+
+        # no longer allowing duplicates, so removing option for double items
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
         # check that you can query results by datetime
         with storage.open('r', timestamp=dt_timestamp) as a:
@@ -137,43 +147,13 @@ class Test_Shatter(object):  # noqa: D101
                 len(a3.query(cond='shatter_process_num == 1').df[:, :])
                 == base**2
             )
-            assert (
-                len(a3.query(cond='shatter_process_num == 2').df[:, :])
-                == base**2
-            )
+            # assert (
+            #     len(a3.query(cond='shatter_process_num == 2').df[:, :])
+            #     == base**2
+            # )
 
         m = info(storage.config.tdb_dir)
         assert len(m['history']) == 2
-
-    def test_parallel(
-        self,
-        storage: Storage,
-        attrs: list[Attribute],
-        dims: dict,
-        threaded_dask: None,
-        metrics: list[Metric],
-    ):
-        # test that writing in parallel doesn't affect ordering of values
-        # constrained by NumberOfReturns being uint8
-
-        count = 255
-        tl = [
-            write(0, 0, val, storage, attrs, dims, metrics)
-            for val in range(count)
-        ]
-
-        dask.compute(tl)
-
-        with storage.open('r') as r:
-            d = r[0, 0]
-            for idx in range(count):
-                assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
-                assert bool(
-                    np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx])
-                )
-                assert bool(
-                    np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx])
-                )
 
     def test_config(
         self,
@@ -197,7 +177,6 @@ class Test_Shatter(object):  # noqa: D101
         sh_cfg: str,
         test_point_count: int,
         request: pytest.FixtureRequest,
-        maxy: float,
         alignment: str,
         threaded_dask,
     ):

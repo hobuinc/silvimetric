@@ -7,9 +7,8 @@ dependencies:
   # - tiledb-py>=0.32.5
   - boto3
   - pdal
-  - python-pdal
+  - python-pdal>=3.5.0
   - numpy
-  - shapely
   - dask>=2024.11.2
   - pyproj
   - gdal
@@ -20,6 +19,8 @@ dependencies:
   - pandas
   - typing_extensions
   - fast-histogram
-  - pip:
-    - dask-cloudprovider[aws]
-    - git+https://github.com/TileDB-Inc/TileDB-Py
+  # - pip:
+    # - dask-cloudprovider[aws] # for using the EC2Cluster
+    # - cryptography #needed for dask-cloudprovider
+    # - git+https://github.com/TileDB-Inc/TileDB-Py # if we have a special branch we need to install
+    # - git+https://github.com/dask/dask-cloudprovider

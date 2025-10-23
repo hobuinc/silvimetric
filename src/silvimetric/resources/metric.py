@@ -93,16 +93,18 @@ class Metric:
                 ' object.'
             )
 
-    def __eq__(self, other):
+    def __eq__(self, other: Self):
+        f1 = [f.__name__ for f in self.filters]
+        f2 = [f.__name__ for f in other.filters]
         if self.name != other.name:
             return False
         elif self.dtype != other.dtype:
             return False
         elif self.dependencies != other.dependencies:
             return False
-        elif self._method != other._method:
+        elif not all(f in f2 for f in f1):
             return False
-        elif self.filters != other.filters:
+        elif self._method != other._method:
             return False
         elif self.attributes != other.attributes:
             return False
@@ -149,7 +151,7 @@ class Metric:
         """Name for use in TileDB and extract file generation."""
         return f'm_{attr}_{self.name}'
 
-    def sanitize_and_run(self, d, locs, args):
+    def sanitize_and_run(self, d, locs, deps):
         """Sanitize arguments, find the indices"""
         # Args are the return values of previous DataFrame aggregations.
         # In order to access the correct location, we need a map of groupby
@@ -158,31 +160,30 @@ class Metric:
         attr = d.name
         attrs = [a.entry_name(attr) for a in self.dependencies]
 
-        if isinstance(args, pd.DataFrame):
-            with mutex:
-                idx = locs.loc[d.index[0]]
-                xi = idx.xi
-                yi = idx.yi
-                pass_args = []
-                for a in attrs:
-                    try:
-                        arg = args.at[(yi, xi), a]
-                        if isinstance(arg, list) or isinstance(arg, tuple):
-                            pass_args.append(arg)
-                        elif np.isnan(arg):
-                            return self.nan_value
-                        else:
-                            pass_args.append(arg)
+        if isinstance(deps, pd.DataFrame):
+            idx = locs.loc[d.index[0]]
+            xi = idx.xi
+            yi = idx.yi
+            pass_args = []
+            for a in attrs:
+                try:
+                    arg = deps.at[(yi, xi), a]
+                    if isinstance(arg, (list, tuple)):
+                        pass_args.append(arg)
+                    elif np.isnan(arg):
+                        return self.nan_value
+                    else:
+                        pass_args.append(arg)
 
-                    except Exception as e:
-                        if self.nan_policy == 'propagate':
-                            return self.nan_value
-                        else:
-                            raise (e)
+                except Exception as e:
+                    if self.nan_policy == 'propagate':
+                        return self.nan_value
+                    else:
+                        raise (e)
         else:
-            pass_args = args
-
-        return self._method(d, *pass_args)
+            pass_args = deps
+        a = self._method(d, *pass_args)
+        return a
 
     def do(self, data: pd.DataFrame, *args) -> pd.DataFrame:
         """Run metric and filters. Use previously run metrics to avoid running
@@ -206,7 +207,7 @@ class Metric:
             data = data[attrs]
 
         idxer = data[idx]
-        gb = data.groupby(idx)
+        gb = data.groupby(idx, sort=False)
 
         # Arguments come in as separate dataframes returned from previous
         # metrics deemed dependencies. If there are dependencies for this
@@ -223,8 +224,8 @@ class Metric:
             merged_args = args
 
         # lambda method for use in dataframe aggregator
-        def runner(d):
-            return self.sanitize_and_run(d, idxer, merged_args)
+        def runner(d, idx=idxer, m_args=merged_args):
+            return self.sanitize_and_run(d, idx, m_args)
 
         # create map of current column name to tuple of new column name and
         # metric method
@@ -232,7 +233,7 @@ class Metric:
         prev_cols = [col for col in cols if col not in idx]
         new_cols = {c: [(self.entry_name(c), runner)] for c in prev_cols}
 
-        val = gb.aggregate(new_cols)
+        val = gb.aggregate(new_cols, raw=True)
 
         # remove hierarchical columns
         val.columns = val.columns.droplevel(0)

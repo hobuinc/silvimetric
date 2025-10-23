@@ -170,7 +170,7 @@ class TestCli(object):
             catch_exceptions=False,
         )
         assert res.exit_code == 0
-        confirm_one_entry(storage, maxy, base, test_point_count, 1)
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
     def test_cli_scan(
         self,
@@ -211,11 +211,9 @@ class TestCli(object):
     ):
         atts = []
         for a in extract_config.attrs:
-            atts.append('-a')
             atts.append(a.name)
         ms = []
         for m in extract_config.metrics:
-            ms.append('-m')
             ms.append(m.name)
         out_dir = extract_config.out_dir
         tdb_dir = extract_config.tdb_dir
@@ -228,8 +226,10 @@ class TestCli(object):
                 '--scheduler',
                 'single-threaded',
                 'extract',
-                *atts,
-                *ms,
+                '-a',
+                ','.join(atts),
+                '-m',
+                ','.join(ms),
                 '--outdir',
                 out_dir,
             ],
@@ -295,7 +295,7 @@ class TestCli(object):
                 shatter_config.tdb_dir,
                 '--scheduler',
                 'single-threaded',
-                'restart',
+                'resume',
                 '--id',
                 pid,
             ],
