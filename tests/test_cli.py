@@ -133,9 +133,9 @@ class TestCli(object):
         storage = Storage.from_db(p)
         with storage.open('r') as a:
             exists_vals = a[:, :]['m_Z_exists']
-            assert all(exists_vals)
+            assert exists_vals.all()
             count_vals = a[:, :]['m_Z_count']
-            assert all(count_vals == 100)
+            assert (count_vals == 100).all()
 
     def test_cli_shatter(
         self,

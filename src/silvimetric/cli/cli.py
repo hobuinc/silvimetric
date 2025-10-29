@@ -151,14 +151,14 @@ def info_cmd(
     start_date = dates[0] if dates else date
     end_date = dates[1] if dates else date
     if start_date is None and end_date is None:
-        timestamp=None
+        info_dates=None
     else:
-        timestamp = tuple(start_date.timestamp(), end_date.timestamp())
+        info_dates = tuple(start_date, end_date)
 
     i = info.info(
         app.tdb_dir,
         bounds=bounds,
-        timestamp=timestamp,
+        dates = info_dates,
         name=name,
         concise=True,
     )
