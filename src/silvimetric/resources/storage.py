@@ -1,7 +1,11 @@
 import json
 
+import os
+from urllib.parse import urlparse
+from pathlib import Path
 from math import floor
-from typing_extensions import Optional
+from typing_extensions import Optional, Union, Literal
+from datetime import datetime
 
 import tiledb
 import numpy as np
@@ -97,13 +101,25 @@ class Storage:
             name='count',
             dtype=np.uint32,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
-            fill=0
+            fill=0,
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
             dtype=np.uint16,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
-            fill=0
+            fill=0,
+        )
+        start_time_att = tiledb.Attr(
+            name='start_time',
+            dtype=np.datetime64('', 'D').dtype,
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            fill=np.datetime64(0, 'D')
+        )
+        end_time_att = tiledb.Attr(
+            name='end_time',
+            dtype=np.datetime64('', 'D').dtype,
+            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            fill=np.datetime64(0, 'D')
         )
         dim_atts = [attr.schema() for attr in config.attrs]
 
@@ -134,6 +150,8 @@ class Storage:
             attrs=[
                 count_att,
                 proc_att,
+                start_time_att,
+                end_time_att,
                 *dim_atts,
                 *metric_atts,
             ],
@@ -286,8 +304,8 @@ class Storage:
 
     def get_derived_names(
         self,
-        metrics: Optional[list[str, Metric]]=None,
-        attributes: Optional[list[str, Attribute]]=None,
+        metrics: Optional[list[str, Metric]] = None,
+        attributes: Optional[list[str, Attribute]] = None,
     ) -> list[str]:
         """
         Return names of TileDB Attribute names based on combination of
@@ -337,7 +355,7 @@ class Storage:
             self._reader.reopen()
             return self._reader
 
-    def write(self, data_in: pd.DataFrame, timestamp):
+    def write(self, data_in: pd.DataFrame, dates: tuple[datetime, datetime]):
         """Write to TileDB Array."""
 
         data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
@@ -369,12 +387,12 @@ class Storage:
         xrange = range(xi_vals.min(), xi_vals.max() + 1)
         yrange = range(yi_vals.min(), yi_vals.max() + 1)
         mi = pd.MultiIndex.from_product([xrange, yrange], names=['X', 'Y'])
-        d = data_in.set_index(['X','Y'])
+        d = data_in.set_index(['X', 'Y'])
 
         listed = d.reindex(mi)
-        listed = listed.fillna(fillna_dict)
         isna = listed[self.config.attrs[0].name].isna()
         if isna.any():
+            listed = listed.fillna(fillna_dict)
             for attr, attr_type in attr_dict.items():
                 dtype = attr_type.subtype
                 kind = np.dtype(dtype).kind
@@ -389,6 +407,11 @@ class Storage:
                 ).values
             data_in = listed.reset_index()
 
+        # timestamp call does seconds since epoch, tiledb requires nanoseconds
+        data_in = data_in.assign(
+            start_time=np.datetime64(dates[0], 'ns')
+        ).assign(end_time=np.datetime64(dates[1], 'ns'))
+
         ctx = self.get_tdb_context()
         tiledb.from_pandas(
             uri=self.config.tdb_dir,
@@ -396,11 +419,10 @@ class Storage:
             sparse=False,
             dataframe=data_in,
             mode='append',
-            timestamp=timestamp,
             column_types=dtype_dict,
             varlen_types=varlen_types,
             fillna=fillna_dict,
-            fit_to_df=True
+            fit_to_df=True,
         )
 
     def reserve_time_slot(self) -> int:
@@ -424,7 +446,7 @@ class Storage:
 
     def get_history(
         self,
-        timestamp: Optional[tuple[int, int]] = None,
+        dates: Optional[tuple[datetime, datetime]] = None,
         bounds: Optional[Bounds] = None,
         name: Optional[str] = None,
         concise: bool = False,
@@ -432,7 +454,7 @@ class Storage:
         """
         Retrieve history of the database at current point in time.
 
-        :param timestamp: Query parameter, tuple of start and end timestamps.
+        :param dates: Query parameter, tuple of start and end datetimes.
         :param bounds: Query parameter, bounds to query by.
         :param name: Query paramter, shatter process uuid., by default None
         :param concise: Whether or not to give shortened version of history.
@@ -452,8 +474,14 @@ class Storage:
                 continue
 
             # filter dates
-            if timestamp is not None and not ts_overlap(s.timestamp, timestamp):
-                continue
+            start_ts = s.date[0].timestamp()
+            end_ts = s.date[1].timestamp()
+
+            if dates is not None:
+                q_start_ts = dates[0].timestamp()
+                q_end_ts = dates[0].timestamp()
+                if not ts_overlap((q_start_ts, q_end_ts), (start_ts, end_ts)):
+                    continue
 
             if concise:
                 h = s.history_json()
@@ -463,7 +491,7 @@ class Storage:
 
         return m
 
-    def mbrs(self, timestamp):
+    def mbrs(self, config: ShatterConfig):
         """
         Get minimum bounding rectangle of a given shatter process. If this
         process has been finished and consolidated the mbr will be much less
@@ -472,25 +500,53 @@ class Storage:
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
-        af_all = self.get_fragments_by_time(timestamp)
-        mbrs_list = tuple(mbrs for af in af_all for mbrs in af.mbrs)
+        # TODO timestamp changes, check to make sure correct
+        from .extents import Extents
+
+        ex = Extents.from_sub(self, config.bounds)
+        af_all = self.get_fragments(config.timestamp, config.bounds)
+        mbrs_list = tuple(af.nonempty_domain for af in af_all)
+        # mbrs = tuple(m for m in mbrs_list if not ex.disjoint_by_mbr(m))
         mbrs = tuple(
-            tuple(tuple(a.item() for a in mb) for mb in m) for m in mbrs_list
+            tuple(
+                tuple(a.item() for a in mb)
+                for mb in m
+            )
+            for m in mbrs_list if not ex.disjoint_by_mbr(m)
         )
         return mbrs
 
-    def get_fragments_by_time(self, timestamp) -> list[tiledb.FragmentInfo]:
+    def get_fragments(
+        self, timestamp: tuple[int, int], bounds: Optional[Bounds] = None
+    ) -> list[tiledb.FragmentInfo]:
         """
         Get TileDB array fragments from the time slot specified.
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :return: Array fragments from time slot.
         """
+        from .extents import Extents
 
         af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
-        return [a for a in af if ts_overlap(a.timestamp_range, timestamp)]
+        if bounds is not None:
+            ex = Extents.from_sub(self, bounds)
+        fragments = []
+        for a in af:
+            if not ts_overlap(a.timestamp_range, timestamp):
+                continue
+            if bounds is not None:
+                if a.mbrs:
+                    if all(ex.disjoint_by_mbr(mbr) for mbr in a.mbrs):
+                        continue
+                elif a.nonempty_domain:
+                    if ex.disjoint_by_mbr(a.nonempty_domain):
+                        continue
+            fragments.append(a)
+        return fragments
 
-    def delete(self, time_slot: int) -> ShatterConfig:
+        # return [a for a in af if ts_overlap(a.timestamp_range, timestamp)]
+
+    def delete(self, config: ShatterConfig) -> ShatterConfig:
         """
         Delete Shatter process and all associated data from database.
 
@@ -498,48 +554,113 @@ class Storage:
         :return: Config of deleted Shatter process
         """
 
-        self.config.log.debug(f'Deleting time slot {time_slot}...')
+        self.config.log.debug(f'Deleting shatter process {config.name}...')
+        vfs = tiledb.VFS(ctx=self.get_tdb_context())
+        fragments = self.get_fragments(
+            timestamp=config.timestamp, bounds=config.bounds
+        )
+        for fragment in fragments:
+            parsed = urlparse(fragment.uri)
+            sans_protocol = parsed.path
+            fragname = os.path.basename(sans_protocol) + '.wrt'
+
+            frag_path = Path(sans_protocol)
+            commit_path = frag_path / '..' / '..' / '__commits' / fragname
+
+            vfs.remove_dir(frag_path)
+            vfs.remove_file(commit_path)
 
         r = self.open('r')
-        sh_cfg = ShatterConfig.from_string(r.meta[f'shatter_{time_slot}'])
+        sh_cfg = ShatterConfig.from_string(
+            r.meta[f'shatter_{config.time_slot}']
+        )
         sh_cfg.mbr = ()
         sh_cfg.finished = False
+        sh_cfg.start_timestamp = None
+        sh_cfg.end_timestamp = None
 
+        # self.config.log.debug('Overwriting data.')
+        # # TODO timestamp change: update config with newest timestamp after
+        # # rewriting everything to null
+        # tsr = self.open('r', timestamp=sh_cfg.timestamp)
+        # indices = tsr.query(
+        #     coords=True, cond=f'shatter_process_num=={time_slot}'
+        # ).df[:]
+        # # query returns tiles, so may still need to parse it down afterward
+        # del_data = indices[indices.shatter_process_num == time_slot].set_index(
+        #     ['X', 'Y']
+        # )
+        # dd = pd.DataFrame(
+        #     columns=del_data.columns, index=del_data.index
+        # ).reset_index()
+        # self.write(dd, sh_cfg.timestamp)
 
-        self.config.log.debug('Overwriting data.')
-        tsr = self.open('r',timestamp=sh_cfg.timestamp)
-        indices = tsr.query(
-            coords=True,
-            cond=f'shatter_process_num=={time_slot}').df[:]
-        # query returns tiles, so may still need to parse it down afterward
-        del_data = indices[indices.shatter_process_num == time_slot].set_index(['X','Y'])
-        dd = pd.DataFrame(columns=del_data.columns, index=del_data.index).reset_index()
-        self.write(dd, sh_cfg.timestamp)
-
-        self.config.log.debug('Rewriting config.')
+        # self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
-            w.meta[f'shatter_{time_slot}'] = json.dumps(sh_cfg.to_json())
+            w.meta[f'shatter_{config.time_slot}'] = json.dumps(sh_cfg.to_json())
 
-        self.consolidate(timestamp=sh_cfg.timestamp)
-        self.vacuum()
+        # # loop until it's been updated?
+        # self.consolidate(timestamp=sh_cfg.timestamp)
+        # self.vacuum()
+        # import time
+
+        # count = 0
+        # # TODO I don't like this, but need to make sure that the db has been
+        # # updated before moving on
+        # while True:
+        #     with tiledb.open(self.config.tdb_dir, mode='r') as r:
+        #         test_vals = r.query(
+        #             coords=True, cond=f'shatter_process_num=={time_slot}'
+        #         ).df[:]
+        #         if test_vals[test_vals.shatter_process_num == time_slot].empty:
+        #             break
+        #         count = count + 1
+        #         print(f'retry {count}')
+        #         time.sleep(1)
+        #         r.close()
+
         return sh_cfg
 
-    def vacuum(self):
-        tiledb.vacuum(self.config.tdb_dir)
+    ManageType = Union[
+        Literal['fragments', 'fragment_meta', 'commits', 'array_meta']
+    ]
+
+    def vacuum(self, mode: ManageType = 'fragments'):
+        c = tiledb.Config(
+            {
+                'sm.vacuum.mode': mode,
+            }
+        )
+        tiledb.vacuum(self.config.tdb_dir, config=c)
         self.config.log.debug('Vacuuming complete.')
 
-    def consolidate(self, timestamp: Optional[tuple[int, int]]=None) -> None:
+    def consolidate(
+        self,
+        timestamp: Optional[tuple[int, int]] = None,
+        mode: Optional[ManageType] = 'fragments',
+    ) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
         This makes the database perform better, but reduces the granularity of
         time traveling.
+
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param mode: TileDB consolidation mode.
         """
+        ts_start = timestamp[0] if timestamp is not None else 0
+        ts_end_def = int(datetime.now().timestamp()*1000)
+        ts_end = timestamp[1] if timestamp is not None else ts_end_def
         c = tiledb.Config(
             {
-                'sm.consolidation.mode': 'fragments',
+                'sm.consolidation.mode': mode,
+                'sm.consolidation.timestamp_start': ts_start,
+                'sm.consolidation.timestamp_end': ts_end,
                 'sm.consolidation.max_fragment_size': (300 * 2**20),  # 300MB
             }
         )
-        tiledb.consolidate(self.config.tdb_dir, timestamp=timestamp, config=c)
+        tiledb.consolidate(
+            self.config.tdb_dir,
+            ctx=tiledb.Ctx(c),
+            config=c
+        )
         self.config.log.debug(f'Consolidated time slot {timestamp}.')

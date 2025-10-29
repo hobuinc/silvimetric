@@ -226,10 +226,10 @@ class ShatterConfig(Config):
     provided., defaults to uuid.uuid()"""
     tile_size: Union[int, None] = field(default=None)
     """The number of cells to include in a tile., defaults to None"""
-    start_time: float = field(default=0)
-    """The process starting time in seconds since Jan 1 1970., defaults to 0"""
-    end_time: float = field(default=0)
-    """The process ending time in seconds since Jan 1 1970., defaults to 0"""
+    start_timestamp: float = field(default=None)
+    """The process start timestamp., defaults to None"""
+    end_timestamp: float = field(default=None)
+    """The process ending timestamp., defaults to None"""
     point_count: int = field(default=0)
     """The number of points that has been processed so far., defaults to 0"""
     mbr: Mbr = field(default_factory=lambda: tuple())
@@ -250,8 +250,6 @@ class ShatterConfig(Config):
 
         if isinstance(self.tdb_dir, Storage):
             self.tdb_dir = self.tdb_dir.config.tdb_dir
-        if self.date is None:
-            self.timestamp = None
         if isinstance(self.date, datetime):
             self.date = (self.date, self.date)
         if isinstance(self.date, list):
@@ -262,13 +260,19 @@ class ShatterConfig(Config):
             )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
-        self.timestamp = (
-            int(self.date[0].timestamp()),
-            int(self.date[1].timestamp()),
-        )
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
+
+    @property
+    def timestamp(self):
+        end_time_temp = int(datetime.now().timestamp()*1000)
+        if self.start_timestamp is None:
+            return tuple((0, end_time_temp))
+        if self.end_timestamp is None:
+            return tuple((self.start_timestamp, end_time_temp))
+        else:
+            return tuple((self.start_timestamp, self.end_timestamp))
 
     def history_json(self):
         # removing a attrs and metrics, since they'll be in the storage log
@@ -325,8 +329,8 @@ class ShatterConfig(Config):
             name=uuid.UUID(x['name']),
             bounds=Bounds(*x['bounds']),
             tile_size=x['tile_size'],
-            start_time=x['start_time'],
-            end_time=x['end_time'],
+            start_timestamp=x['start_timestamp'],
+            end_timestamp=x['end_timestamp'],
             point_count=x['point_count'],
             mbr=mbr,
             date=date,
@@ -387,10 +391,6 @@ class ExtractConfig(Config):
             )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
-        self.timestamp = (
-            int(self.date[0].timestamp()),
-            int(self.date[1].timestamp()),
-        )
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)

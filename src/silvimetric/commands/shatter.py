@@ -1,11 +1,10 @@
 import numpy as np
 import signal
-import datetime
+from datetime import datetime
 import copy
 
 from typing_extensions import Generator
 import pandas as pd
-import itertools
 
 from dask.distributed import CancelledError
 from distributed.client import _get_global_client as get_client
@@ -24,15 +23,19 @@ def final(
     storage: Storage,
     finished: bool = False,
 ):
+    # do consolidation first so that new fragments are written before
+    # the timestamp is changed
+    config.log.debug('Final consolidation.')
+    storage.consolidate(config.timestamp)
+    storage.vacuum()
+
     # modify config to reflect result of shattter process
-    config.log.debug('Saving shatter metadata')
-    config.mbr = storage.mbrs(config.timestamp)
-    config.end_time = datetime.datetime.now().timestamp() * 1000
+    config.log.debug('Saving shatter metadata.')
+    config.end_timestamp = int(datetime.now().timestamp() * 1000)
+    config.mbr = storage.mbrs(config=config)
     config.finished = finished
     storage.save_shatter_meta(config)
 
-    storage.consolidate(config.timestamp)
-    storage.vacuum()
 
 
 def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
@@ -86,7 +89,7 @@ def agg_list(
     xyi_dtypes = {'xi': np.int32, 'yi': np.int32}
     o = np.dtype('O')
     first_col_name = data_in.columns[0]
-    cols = [a for a in data_in.columns if a not in ['xi','yi']]
+    cols = [a for a in data_in.columns if a not in ['xi', 'yi']]
     col_dtypes = {a: o for a in cols}
 
     coerced = data_in.astype(col_dtypes | xyi_dtypes)
@@ -97,31 +100,6 @@ def agg_list(
         .join(counts_df)
         .assign(shatter_process_num=proc_num)
     )
-
-    # # TileDB can't handle null cell writes for variable length arrays, so
-    # # make sure that any index in the dense block that doesn't have a value
-    # # is fill with a designated null value
-    # yi_vals = listed.index.get_level_values(0)
-    # xi_vals = listed.index.get_level_values(1)
-    # xrange = range(xi_vals.min(), xi_vals.max() + 1)
-    # yrange = range(yi_vals.min(), yi_vals.max() + 1)
-    # mi = pd.MultiIndex.from_product([yrange, xrange], names=['xi', 'yi'])
-    # listed = listed.reindex(mi)
-    # isna = listed[first_col_name].isna()
-    # if isna.any().any():
-    #     for c in col_dtypes.keys():
-    #         dtype = old_dtypes[c]
-    #         kind = np.dtype(dtype).kind
-    #         if kind in ['i', 'f']:
-    #             nan_value = -9999
-    #         elif kind == 'u':
-    #             nan_value = 0
-    #         else:
-    #             nan_value = -9999
-    #         listed.loc[isna, c] = pd.Series(
-    #             [np.array([nan_value], dtype=old_dtypes[c])] * isna.sum()
-    #         ).values
-
     return listed
 
 
@@ -135,19 +113,20 @@ def join(list_data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
 def write(
     data_in: pd.DataFrame,
     storage: Storage,
-    timestamp: tuple[int, int],
+    dates: tuple[datetime, datetime],
 ) -> int:
     """
     Write cell data to database
 
     :param data_in: Data to be written to database.
-    :param tdb: TileDB write stream.
+    :param storage: SilviMetric Storage object.
+    :param dates: Tuple of start and end datetimes for dataset.
     :return: Number of points written.
     """
     if data_in.empty:
         return 0
 
-    storage.write(data_in, timestamp)
+    storage.write(data_in, dates)
 
     pc = data_in['count'].sum().item()
     p = copy.deepcopy(pc)
@@ -164,12 +143,11 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     if config.mbr:
         if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
             return 0
-
     points = get_data(leaf, config.filename, storage)
     listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
-    point_count = write(joined_data, storage, config.timestamp)
+    point_count = write(joined_data, storage, config.date)
 
     del joined_data, metric_data, listed_data, points
 
@@ -232,7 +210,7 @@ def shatter(config: ShatterConfig) -> int:
     """
 
     # get start time in milliseconds
-    config.start_time = datetime.datetime.now().timestamp() * 1000
+    config.start_timestamp = int(datetime.now().timestamp() * 1000)
 
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)
@@ -272,6 +250,7 @@ def shatter(config: ShatterConfig) -> int:
         try:
             run(leaves, config, storage)
             storage.consolidate(config.timestamp)
+            storage.vacuum()
         except Exception as e:
             final(config, storage)
             raise e

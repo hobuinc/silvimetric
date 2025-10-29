@@ -49,14 +49,15 @@ def confirm_one_entry(storage, maxy, base, pointcount):
 
         for xi in range(xdom):
             for yi in range(ydom):
-                z = vals.loc[xi,yi].Z
-                zmean = vals.loc[xi,yi].m_Z_mean
+                z = vals.loc[xi, yi].Z
+                zmean = vals.loc[xi, yi].m_Z_mean
                 if isinstance(z, np.ndarray):
                     assert np.all(z == (val_const - yi - 1))
                 elif isinstance(z, pd.Series):
                     for z1 in z.values:
                         np.all(z1 == (val_const - yi - 1))
                 assert z.mean() == zmean
+
 
 class Test_Shatter(object):  # noqa: D101
     def test_command(
@@ -82,45 +83,47 @@ class Test_Shatter(object):  # noqa: D101
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
-        og_timestamp = shatter_config.timestamp
-
         shatter_config2 = copy.deepcopy(shatter_config)
         d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
-        dt_timestamp = tuple([int(d2[0].timestamp()), int(d2[1].timestamp())])
 
         # change attributes to make it a new run
         shatter_config2.name = uuid.uuid4()
         shatter_config2.mbr = ()
         shatter_config2.time_slot = storage.reserve_time_slot()
         shatter_config2.date = d2
-        shatter_config2.timestamp = dt_timestamp
+        shatter_config2.start_timestamp = None
+        shatter_config2.end_timestamp = None
         shatter(shatter_config2)
 
         # no longer allowing duplicates, so removing option for double items
         confirm_one_entry(storage, maxy, base, test_point_count)
 
         # check that you can query results by datetime
-        with storage.open('r', timestamp=dt_timestamp) as a:
+        with storage.open('r', timestamp=shatter_config2.timestamp) as a:
             assert np.all(a.df[:, :].shatter_process_num == 2)
             assert len(a.df[:, :]) == base**2
 
-        with storage.open('r', timestamp=og_timestamp) as a2:
+        with storage.open('r', timestamp=shatter_config.timestamp) as a2:
             assert np.all(a2.df[:, :].shatter_process_num == 1)
             assert len(a2.df[:, :]) == base**2
 
         with storage.open(
-            'r', timestamp=(dt_timestamp[0], og_timestamp[1])
+            'r',
+            timestamp=(
+                shatter_config.timestamp[0],
+                shatter_config2.timestamp[1],
+            ),
         ) as a3:
-            assert (
-                len(a3.query(cond='shatter_process_num == 1').df[:, :])
-                == base**2
-            )
-            # assert (
-            #     len(a3.query(cond='shatter_process_num == 2').df[:, :])
-            #     == base**2
-            # )
+            vals = a3.df[:, :]
+            vals = vals[vals.shatter_process_num != 0]
 
-        m = info(storage.config.tdb_dir)
+            proc1 = vals.shatter_process_num == 1
+            assert not proc1.any()
+
+            proc2 = vals.shatter_process_num == 2
+            assert proc2.all()
+
+        m = info(storage)
         assert len(m['history']) == 2
 
     def test_config(

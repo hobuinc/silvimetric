@@ -89,7 +89,11 @@ def get_data(
 
     ma_list = storage.get_derived_names(config.metrics, config.attrs)
 
-    with storage.open('r', timestamp=config.timestamp) as tdb:
+    with storage.open('r') as tdb:
+        # tiledb queries need dates as int64 values
+        start_datetime = np.datetime64(config.date[0], 'D').astype(np.int64).item()
+        end_datetime = np.datetime64(config.date[1], 'D').astype(np.int64).item()
+        cond = f'end_time >= {start_datetime} and start_time <= {end_datetime}'
         xdim = tdb.schema.domain.dim('X').domain
         ydim = tdb.schema.domain.dim('Y').domain
         minx = max(extents.x1, xdim[0])
@@ -100,9 +104,13 @@ def get_data(
         # older versions of silvimetric supported multiple values, and
         # for backwards compatibility we will try to accept it still
         data = tdb.query(
-            attrs=[*ma_list],
+            attrs=[*ma_list, 'end_time', 'start_time'],
             order='F',
+            cond=cond,
             coords=True).df[minx:maxx - 1, miny:maxy - 1]
+
+        data = data[data.end_time >= np.datetime64(config.date[0], 'D')]
+        data = data[data.start_time <= np.datetime64(config.date[1], 'D')]
 
         # find values that are not unique, means they have multiple entries
         # TODO phase this out at some point, storage is no longer created

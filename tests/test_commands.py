@@ -40,8 +40,8 @@ class TestCommands(object):
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[0].to_json()
 
-        ts = config_split[1].timestamp
-        i = info.info(tdb_filepath, timestamp=ts)
+        dates = config_split[1].date
+        i = info.info(tdb_filepath, dates=dates)
         assert len(i['history']) == 1
         assert i['history'][0] == config_split[1].to_json()
 
@@ -67,9 +67,16 @@ class TestCommands(object):
             assert sc.time_slot == time_slot
 
             # not working 100% of the time at the moment
-            # with s.open(mode='r') as reader:
-            #     a = reader.df[:]
-            #     assert a[a.shatter_process_num == time_slot].empty
+            with s.open(mode='r', timestamp=sc.timestamp) as reader:
+                if time_slot == 4:
+                    # tiledb errors if there is no valid subarray available
+                    with pytest.raises(tiledb.libtiledb.TileDBError):
+                        a = reader.df[:]
+                else:
+                    a = reader.df[:]
+                    assert a[a.shatter_process_num == time_slot].empty
+
+
 
         assert s.config.next_time_slot == 5
 
@@ -95,6 +102,7 @@ class TestCommands(object):
             assert h2['history'][0]['finished']
 
         base = 11 if s.config.alignment == 'AlignToCenter' else 10
+        maxy = maxy + 15 if s.config.alignment == 'AlignToCenter' else maxy
         confirm_one_entry(s, maxy, base, test_point_count)
 
     def test_resume(

@@ -1,14 +1,14 @@
-from datetime import datetime
 from uuid import UUID
 from typing_extensions import Union
+from typing import Optional
+from datetime import datetime
 
 from .. import Storage, Bounds
-from typing import Optional
 
 
 def info(
-    storage: str,
-    timestamp: Optional[tuple[int, int]] = None,
+    storage: Union[str, Storage],
+    dates: Optional[tuple[datetime, datetime]] = None,
     bounds: Optional[Bounds] = None,
     name: Optional[Union[str, UUID]] = None,
     concise: Optional[bool] = False,
@@ -17,9 +17,9 @@ def info(
     Collect information about database in current state
 
     :param storage: SilviMetric Storage or TileDB directory path.
-    :param timestamp: Tuple of seconds since epoch.
-    :param bounds: Bounds query, defaults to None
-    :param name: Name query, defaults to None
+    :param dates: DateTime range query, defaults to None.
+    :param bounds: Bounds query, defaults to None.
+    :param name: Name query, defaults to None.
     :return: Returns json object containing information on database.
     """
     if isinstance(storage, str):
@@ -42,7 +42,7 @@ def info(
     }
 
     try:
-        history = storage.get_history(timestamp, bounds, name, concise)
+        history = storage.get_history(dates, bounds, name, concise)
         if bool(history) and isinstance(history, list):
             history = [h for h in history]
         elif bool(history):

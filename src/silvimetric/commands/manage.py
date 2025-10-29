@@ -45,7 +45,7 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
         ) from e
 
     logger.info(f'Deleting task {name}.')
-    return storage.delete(time_slot)
+    return storage.delete(config)
 
 
 def restart(storage: str|Storage, name: str, log: Log = None) -> int:
@@ -61,9 +61,13 @@ def restart(storage: str|Storage, name: str, log: Log = None) -> int:
 
     logger = get_logger(log)
 
-    cfg = delete(storage=storage, name=name, log=log)
+    res = info(storage=storage, name=name)
+    config = ShatterConfig.from_dict(res['history'][0])
+    config.mbr = ()
+    config.finished = False
+
     logger.info(f'Restarting task {name} with same config.')
-    return shatter(cfg)
+    return shatter(config)
 
 
 def resume(storage: str|Storage, name: str, log: Log = None) -> int:
