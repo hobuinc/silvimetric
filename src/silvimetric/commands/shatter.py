@@ -53,7 +53,11 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
     p = data.pipeline
     data.execute(allowed_dims=[*attrs, 'X', 'Y'])
 
-    points = p.get_dataframe(0)
+    try:
+        points = p.get_dataframe(0)
+    except IndexError:
+        return pd.DataFrame()
+
     points = points.loc[points.Y < extents.bounds.maxy]
     points = points.loc[points.Y >= extents.bounds.miny]
     points = points.loc[points.X >= extents.bounds.minx]
@@ -144,6 +148,8 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
         if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
             return 0
     points = get_data(leaf, config.filename, storage)
+    if points.empty:
+        return 0
     listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
@@ -250,7 +256,6 @@ def shatter(config: ShatterConfig) -> int:
         try:
             run(leaves, config, storage)
             storage.consolidate(config.timestamp)
-            storage.vacuum()
         except Exception as e:
             final(config, storage)
             raise e
