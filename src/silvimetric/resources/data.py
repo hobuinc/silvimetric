@@ -188,7 +188,8 @@ class Data:
         """
         try:
             if allowed_dims is not None:
-                self.pipeline.execute(allowed_dims=allowed_dims)
+                # self.pipeline.execute(allowed_dims=allowed_dims)
+                self.pipeline.execute()
             else:
                 self.pipeline.execute()
             if self.pipeline.log and self.pipeline.log is not None:
