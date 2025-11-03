@@ -285,4 +285,6 @@ class Data:
 
         pipeline = reader.pipeline()
         pipeline.execute()
+        if not pipeline.arrays:
+            return 0
         return len(pipeline.arrays[0])

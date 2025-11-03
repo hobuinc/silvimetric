@@ -5,6 +5,7 @@ from typing import Self
 
 from dask.delayed import delayed
 from dask import compute
+import copy
 
 from .bounds import Bounds
 from .storage import Storage

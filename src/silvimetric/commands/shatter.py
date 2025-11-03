@@ -12,7 +12,7 @@ from distributed.client import _get_global_client as get_client
 from dask.delayed import delayed
 import dask.bag as db
 from dask import compute, persist
-from dask.distributed import futures_of, as_completed
+from dask.distributed import futures_of, as_completed, KilledWorker
 
 from .. import Extents, Storage, Data, ShatterConfig, Metric
 from ..resources.taskgraph import Graph
@@ -174,24 +174,46 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     """
     ## If dask is distributed, use the futures feature
     leaves = [delayed(leaf) for leaf in leaves]
-    storage = delayed(storage)
 
-    processes = [do_one(leaf, config, storage) for leaf in leaves]
+    config_arg = delayed(config)
+    storage_arg = delayed(storage)
+
+    processes = [do_one(leaf, config_arg, storage_arg) for leaf in leaves]
+    proc_dict = {p.key: l for p in processes for l in leaves}
     dc = get_client()
     if dc is not None:
+        failures = []
         count = 1
         futures = futures_of(persist(processes))
-        for _, pc in as_completed(futures, with_results=True):
+        res = as_completed(futures, with_results=True, raise_errors=False)
+        for future, pc in res:
+            if future.status == 'error':
+                failures.append(future, proc_dict[future.key])
+                continue
+
+                # oldleaf: Extents = proc_dict[future.key].compute(scheduler='threads')
+                # if pc[0] is KilledWorker:
+                #     splits = [delayed(s) for s in oldleaf.split()]
+                #     add_futures = []
+                #     for l in splits:
+                #         temp_future= futures_of(persist([do_one(l, config_arg, storage_arg)]))
+                #         proc_dict[temp_future.key] = l
+                #         add_futures.append(temp_future)
+                #     for f in add_futures:
+                #         res.add(f)
+                # else:
+                #     config.log.error(f'Failed task for bounds: {oldleaf.bounds}'
+                #         f'with error {pc}')
+
             if pc is None:
                 continue
             if isinstance(pc, int):
                 config.point_count = config.point_count + pc
                 count = count + 1
-            elif isinstance(pc, BaseException):
-                config.log.warning(pc)
-            elif isinstance(pc, CancelledError):
-                config.log.warning(pc)
             del pc
+
+        if failures:
+            print('asdfasdf')
 
     else:
         # Handle non-distributed dask scenarios
@@ -240,7 +262,7 @@ def shatter(config: ShatterConfig) -> int:
     storage.save_shatter_meta(config)
 
     config.log.debug('Grabbing leaf nodes.')
-    es = extents.chunk(data, pc_threshold=(11 * 10**6))
+    es = extents.chunk(data, pc_threshold=config.split_point_count)
 
     config.log.debug('Shattering.')
     count = 0
@@ -249,7 +271,7 @@ def shatter(config: ShatterConfig) -> int:
         if config.tile_size is not None:
             leaves = e.get_leaf_children(config.tile_size)
         else:
-            leaves = e.chunk(data, pc_threshold=(600 * 10**3))
+            leaves = e.chunk(data, pc_threshold=config.tile_point_count)
 
         config.log.debug(f'Shattering extent #{count}.')
         # Begin main operations
