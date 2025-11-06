@@ -188,7 +188,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         res = as_completed(futures, with_results=True, raise_errors=False)
         for future, pc in res:
             if future.status == 'error':
-                failures.append(future, proc_dict[future.key])
+                failures.append(proc_dict[future.key])
                 continue
 
                 # oldleaf: Extents = proc_dict[future.key].compute(scheduler='threads')
@@ -213,7 +213,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
             del pc
 
         if failures:
-            print('asdfasdf')
+            print(failures)
 
     else:
         # Handle non-distributed dask scenarios

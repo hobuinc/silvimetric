@@ -116,7 +116,7 @@ class Extents(object):
         while tasks:
             batches = list(itertools.batched(tasks, 1000))
             for batch in batches:
-                results = compute(batch)[0]
+                results = compute(batch, scheduler='threads')[0]
                 tasks = []
                 for r in results:
                     if r is None:

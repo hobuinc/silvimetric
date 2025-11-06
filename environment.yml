@@ -1,11 +1,12 @@
-name: silvimetric
+name: pdal-sm
 channels:
   - conda-forge
 dependencies:
   - python>=3.10, <3.13
   - pip
-  - tiledb-py>=0.32.5
+  # - tiledb-py>=0.32.5
   - boto3
+  - tiledb>=2.29.2
   - pdal
   - python-pdal>=3.5.0
   - numpy
@@ -19,7 +20,8 @@ dependencies:
   - pandas
   - typing_extensions
   - fast-histogram
-  # - pip:
+  - pip:
+    - git+https://github.com/TileDB-Inc/TileDB-Py
     # - dask-cloudprovider[aws] # for using the EC2Cluster
     # - cryptography #needed for dask-cloudprovider
     # - git+https://github.com/TileDB-Inc/TileDB-Py # if we have a special branch we need to install
