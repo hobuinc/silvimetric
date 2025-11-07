@@ -4,7 +4,7 @@ channels:
 dependencies:
   - python>=3.10, <3.13
   - pip
-  - tiledb-py>=0.35.2
+  # - tiledb-py>=0.32.5
   - boto3
   - tiledb>=2.29.2
   - pdal
@@ -20,3 +20,5 @@ dependencies:
   - pandas
   - typing_extensions
   - fast-histogram
+  - pip:
+    - tiledb>=0.35.2
