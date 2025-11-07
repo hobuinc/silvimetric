@@ -76,7 +76,7 @@ def scan(
             pc_info=dict(
                 storage_bounds=tdb.config.root.to_json(),
                 data_bounds=data.bounds.to_json(),
-                count=dask.compute(count),
+                count=count,
             )
         )
         tiling_info = dict(
@@ -151,7 +151,7 @@ def extent_handle(
     curr_depth = 0
     while curr.npartitions > 0:
         logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
-        n = curr.compute()
+        n = curr.compute(scheduler='threads')
         to_add = [x for x in n if isinstance(x, int)]
         a = a + to_add
 
