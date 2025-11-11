@@ -114,9 +114,9 @@ class Extents(object):
         tasks = [self.filter(data, pc_threshold)]
         chunks = []
         while tasks:
-            batches = list(itertools.batched(tasks, 1000))
+            batches = list(itertools.batched(tasks, 500))
             for batch in batches:
-                results = compute(batch, scheduler='threads')[0]
+                results = compute(batch)[0]
                 tasks = []
                 for r in results:
                     if r is None:

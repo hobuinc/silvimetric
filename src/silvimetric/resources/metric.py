@@ -17,6 +17,7 @@ from tiledb import Attr, FilterList, ZstdFilter
 import numpy as np
 import dill
 import pandas as pd
+import marshal
 
 from distributed import Future
 from .attribute import Attribute
@@ -112,7 +113,7 @@ class Metric:
             return True
 
     def __hash__(self):
-        return hash(
+        val = hash(
             (
                 'name',
                 self.name,
@@ -131,6 +132,7 @@ class Metric:
                 frozenset(self.attributes),
             )
         )
+        return val
 
     def schema(self, attr: Attribute) -> Any:
         """
@@ -143,7 +145,7 @@ class Metric:
         return Attr(
             name=entry_name,
             dtype=self.dtype,
-            filters=FilterList([ZstdFilter()]),
+            # filters=FilterList([ZstdFilter()]),
             nullable=True
         )
 
@@ -268,7 +270,7 @@ class Metric:
         return data
 
     def to_json(self) -> dict[str, any]:
-        return {
+        val = {
             'name': self.name,
             'dtype': np.dtype(self.dtype).str,
             'dependencies': [d.to_json() for d in self.dependencies],
@@ -278,12 +280,12 @@ class Metric:
             ],
             'attributes': [a.to_json() for a in self.attributes],
         }
+        return val
 
     @staticmethod
     def from_dict(data: dict) -> 'Metric':
         name = data['name']
         dtype = np.dtype(data['dtype'])
-        method = dill.loads(base64.b64decode(data['method'].encode()))
 
         if (
             'dependencies' in data.keys()
@@ -303,6 +305,10 @@ class Metric:
         else:
             attributes = []
 
+        # TODO acquire GIL
+        # need to hold gil when we touch the interpreter
+        # only one thread can change state of interpreter at a time
+        method = dill.loads(base64.b64decode(data['method'].encode()))
         if (
             'filters' in data.keys()
             and data['filters']

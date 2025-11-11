@@ -18,6 +18,9 @@ from .metrics import grid_metrics
 from .attribute import Attribute, Attributes
 from .. import __version__
 
+from threading import Lock
+mutex = Lock()
+
 
 @dataclass(kw_only=True)
 class Config(ABC):
@@ -133,7 +136,8 @@ class StorageConfig(Config):
         x = json.loads(data)
         root = Bounds(*x['root'])
         if 'metrics' in x:
-            ms = [Metric.from_dict(m) for m in x['metrics']]
+            with mutex:
+                ms = [Metric.from_dict(m) for m in x['metrics']]
         else:
             ms = []
         if 'attrs' in x:
@@ -416,7 +420,8 @@ class ExtractConfig(Config):
     @classmethod
     def from_dict(cls, data: object):
         if 'metrics' in data:
-            ms = [Metric.from_dict(m) for m in data['metrics']]
+            with mutex:
+                ms = [Metric.from_dict(m) for m in data['metrics']]
         if 'attrs' in data:
             attrs = [Attribute.from_dict(a) for a in data['attrs']]
         if 'bounds' in data:

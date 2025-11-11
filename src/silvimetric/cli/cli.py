@@ -184,10 +184,10 @@ def info_cmd(
         if metrics:
             filtered['metrics'] = ms
 
-        app.log.info(json.dumps(filtered, indent=2))
+        print(json.dumps(filtered, indent=2))
 
     else:
-        app.log.info(json.dumps(i, indent=2))
+        print(json.dumps(i, indent=2))
         return
 
 

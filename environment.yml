@@ -5,11 +5,11 @@ dependencies:
   - python>=3.10, <3.13
   - pip
   - cloudpickle>=3.1.2
-  # - tiledb-py>=0.32.5
   - boto3
   - tiledb>=2.29.2
-  - pdal
-  - python-pdal>=3.5.0
+  - tiledb-py>=0.35.2
+  - libpdal-core>=2.9.2
+  - python-pdal
   - numpy
   - dask>=2024.11.2
   - pyproj
@@ -21,5 +21,4 @@ dependencies:
   - pandas
   - typing_extensions
   - fast-histogram
-  - pip:
-    - tiledb>=0.35.2
+  - dask-cloudprovider

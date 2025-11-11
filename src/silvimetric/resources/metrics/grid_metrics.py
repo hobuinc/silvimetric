@@ -23,12 +23,11 @@ def _grid_crr(data, *args):
     return (mean - data_min) / den
 
 _grid_crr_metric = Metric('canopy_relief_ratio', np.float32, _grid_crr)
+def f_z_gt_val(data, elev_key, val):
+    return data[data[elev_key] > val]
 
 def make_elev_filter(val, elev_key):
-    def f_z_gt_val(data):
-        return data[data[elev_key] > val]
-
-    return f_z_gt_val
+    return lambda data, elev_key=elev_key, val=val: f_z_gt_val(data, elev_key, val)
 
 
 def _get_grid_metrics(elev_key='Z'):

@@ -87,12 +87,14 @@ class Storage:
             name='X',
             domain=(0, xi),
             dtype=np.uint64,
+            tile=1000,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
+            tile=1000,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
@@ -155,13 +157,6 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            offsets_filters=tiledb.FilterList(
-                [
-                    tiledb.PositiveDeltaFilter(),
-                    tiledb.BitWidthReductionFilter(),
-                    tiledb.ZstdFilter(),
-                ]
-            ),
         )
         schema.check()
 
@@ -274,6 +269,7 @@ class Storage:
         cfg = tiledb.Config()
         cfg['vfs.s3.connect_scale_factor'] = '25'
         cfg['vfs.s3.connect_max_retries'] = '10'
+        # cfg['vfs.s3.max_parallel_ops'] = '1'
         ctx = tiledb.Ctx(cfg)
         return ctx
 
@@ -412,10 +408,9 @@ class Storage:
             start_time=np.datetime64(dates[0], 'ns')
         ).assign(end_time=np.datetime64(dates[1], 'ns'))
 
-        ctx = self.get_tdb_context()
         tiledb.from_pandas(
             uri=self.config.tdb_dir,
-            ctx=ctx,
+            # ctx=ctx,
             sparse=False,
             dataframe=data_in,
             mode='append',

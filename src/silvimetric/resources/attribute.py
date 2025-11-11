@@ -51,10 +51,9 @@ class Attribute:
         """
         return Attr(
             name=self.name,
-            # dtype=self.dtype.type,
             dtype=self.dtype.subtype,
             var=True,
-            filters=FilterList([ZstdFilter()])
+            # filters=FilterList([ZstdFilter()])
         )
 
     def to_json(self) -> object:

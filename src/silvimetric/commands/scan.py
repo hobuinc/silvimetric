@@ -151,7 +151,7 @@ def extent_handle(
     curr_depth = 0
     while curr.npartitions > 0:
         logger.info(f'Chunking {curr.npartitions} tiles at depth {curr_depth}')
-        n = curr.compute(scheduler='threads')
+        n = curr.compute()
         to_add = [x for x in n if isinstance(x, int)]
         a = a + to_add
 
