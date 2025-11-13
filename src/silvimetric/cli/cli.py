@@ -258,6 +258,12 @@ def scan_cmd(
     '--resolution', type=float, default=30.0, help='Summary pixel resolution'
 )
 @click.option(
+    '--xsize', type=float, default=1000, help='TileDB X Tile size.'
+)
+@click.option(
+    '--ysize', type=float, default=1000, help='TileDB Y Tile size.'
+)
+@click.option(
     '--alignment',
     type=str,
     default='AlignToCenter',
@@ -272,6 +278,8 @@ def initialize_cmd(
     resolution: float,
     metrics: list[Metric],
     alignment: str,
+    xsize: int,
+    ysize: int
 ):
     """Initialize silvimetrics DATABASE"""
 
@@ -284,6 +292,8 @@ def initialize_cmd(
         metrics=metrics,
         resolution=resolution,
         alignment=alignment,
+        xsize=xsize,
+        ysize=ysize
     )
     return initialize.initialize(storageconfig)
 

@@ -74,6 +74,10 @@ class StorageConfig(Config):
     alignment: str = field(default='AlignToCenter')
     """Alignment of pixels in database, same for all data in a project,
     options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
+    xsize: int = field(default=1000)
+    """TileDB X Tile size for IO operations."""
+    ysize: int = field(default=1000)
+    """TileDB Y Tile size for IO operations."""
 
     attrs: list[Attribute] = field(
         default_factory=lambda: [
@@ -127,6 +131,8 @@ class StorageConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['root'] = self.root.to_json()
+        d['xsize'] = self.xsize
+        d['ysize'] = self.ysize
         d['next_time_slot'] = self.next_time_slot
 
         return d
@@ -161,6 +167,8 @@ class StorageConfig(Config):
             capacity=x['capacity'],
             version=x['version'],
             next_time_slot=x['next_time_slot'],
+            xsize = x['xsize'],
+            ysize = x['ysize']
         )
 
         return n

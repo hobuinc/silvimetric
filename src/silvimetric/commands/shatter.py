@@ -2,17 +2,17 @@ import numpy as np
 import signal
 from datetime import datetime
 import copy
+import itertools
 
 from typing_extensions import Generator
 import pandas as pd
 
-from dask.distributed import CancelledError
 from distributed.client import _get_global_client as get_client
 
 from dask.delayed import delayed
 import dask.bag as db
 from dask import compute, persist
-from dask.distributed import futures_of, as_completed, KilledWorker
+from dask.distributed import futures_of, as_completed
 
 from .. import Extents, Storage, Data, ShatterConfig, Metric
 from ..resources.taskgraph import Graph
@@ -23,12 +23,6 @@ def final(
     storage: Storage,
     finished: bool = False,
 ):
-    # do consolidation first so that new fragments are written before
-    # the timestamp is changed
-    config.log.debug('Final consolidation.')
-    storage.consolidate(config.timestamp)
-    storage.vacuum()
-
     # modify config to reflect result of shattter process
     config.log.debug('Saving shatter metadata.')
     config.end_timestamp = int(datetime.now().timestamp() * 1000)
@@ -150,9 +144,8 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     listed_data = agg_list(points, config.time_slot, leaf)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
-    # TODO try using a lock here?
     point_count = write(joined_data, storage, config.date)
-    # return 0
+    storage.consolidate(timestamp=config.timestamp)
 
     return point_count
 
@@ -175,43 +168,19 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     dc = get_client()
     failures = []
     if dc is not None:
-        import itertools
-
         # TODO make this a batched operation of like 1000 tasks at a time
         # similar to how scan does it
         leaf_batch = list(itertools.batched(leaves, 2000))
         futures = []
         for batch in leaf_batch:
-            processes = [
-                do_one(leaf, config, storage) for leaf in batch
-            ]
+            processes = [do_one(leaf, config, storage) for leaf in batch]
             count = 1
             futures = futures + futures_of(persist(processes))
-        res = as_completed(futures, with_results=True)
+        res = as_completed(futures, with_results=True, raise_errors=False)
         for future, pc in res:
             if future.status == 'error':
                 failures.append(pc)
                 continue
-
-                # oldleaf: Extents = proc_dict[future.key].compute(
-                #     scheduler='threads'
-                # )
-                # if pc[0] is KilledWorker:
-                #     splits = [delayed(s) for s in oldleaf.split()]
-                #     add_futures = []
-                #     for l in splits:
-                #         temp_future = futures_of(
-                #             persist([do_one(l, config_arg, storage_arg)])
-                #         )
-                #         proc_dict[temp_future.key] = l
-                #         add_futures.append(temp_future)
-                #     for f in add_futures:
-                #         res.add(f)
-                # else:
-                #     config.log.error(
-                #         f'Failed task for bounds: {oldleaf.bounds}'
-                #         f'with error {pc}'
-                #     )
 
             if pc is None:
                 continue
@@ -219,8 +188,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                 config.point_count = config.point_count + pc
                 count = count + 1
 
-        if failures:
-            print(f'Failed {len(failures)} processes.')
+        # TODO write out errors to errors storage path
+
     else:
         processes = [do_one(leaf, config, storage) for leaf in leaves]
         # Handle non-distributed dask scenarios
@@ -269,32 +238,42 @@ def shatter(config: ShatterConfig) -> int:
     storage.save_shatter_meta(config)
 
     config.log.debug('Grabbing leaf nodes.')
-    es = extents.chunk(data, pc_threshold=config.split_point_count)
+    # es = extents.chunk(data, pc_threshold=config.split_point_count)
+    # config.log.debug('Shattering.')
+    # count = 0
 
-    config.log.debug('Shattering.')
+    leaf_size = storage.config.ysize * storage.config.xsize
+    root_ext = Extents(
+        bounds=extents.root,
+        resolution=extents.resolution,
+        alignment=extents.alignment,
+        root=extents.root,
+    )
+    potential_leaves = root_ext.get_leaf_children(leaf_size)
+    tiled_leaves = [
+        leaf
+        for leaf in potential_leaves if not extents.disjoint(leaf)
+    ]
+    full_count = len(tiled_leaves)
     count = 0
-    for e in es:
+    for e in tiled_leaves:
         count = count + 1
         if config.tile_size is not None:
             leaves = e.get_leaf_children(config.tile_size)
         else:
             leaves = e.chunk(data, pc_threshold=config.tile_point_count)
 
-        config.log.debug(f'Shattering extent #{count}.')
-        # Begin main operations
+        config.log.debug(f'Shattering extent #{count}/{full_count}.')
         try:
-            print(e.bounds)
             run(leaves, config, storage)
-            storage.consolidate(config.timestamp)
+            storage.consolidate(timestamp=config.timestamp)
+            storage.vacuum()
+            for mode in ['fragment_meta', 'commits', 'array_meta']:
+                storage.consolidate(mode)
+                storage.vacuum(mode)
         except Exception as e:
             final(config, storage)
             raise e
 
-    if get_client() is not None:
-        # only do this if we can do it on a distributed scheduler so we
-        # can throw it to the background
-        persist(delayed(final)(config, storage, finished=True))
-    else:
-        final(config, storage, finished=True)
-
+    final(config, storage, finished=True)
     return config.point_count

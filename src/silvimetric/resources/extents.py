@@ -5,7 +5,6 @@ from typing import Self
 
 from dask.delayed import delayed
 from dask import compute
-import copy
 
 from .bounds import Bounds
 from .storage import Storage
@@ -114,7 +113,7 @@ class Extents(object):
         tasks = [self.filter(data, pc_threshold)]
         chunks = []
         while tasks:
-            batches = list(itertools.batched(tasks, 500))
+            batches = list(itertools.batched(tasks, 100))
             for batch in batches:
                 results = compute(batch)[0]
                 tasks = []
@@ -258,7 +257,7 @@ class Extents(object):
         ]
 
     @staticmethod
-    def from_storage(storage: str|Storage):
+    def from_storage(storage: str | Storage):
         """
         Create Extents from information stored in database.
 

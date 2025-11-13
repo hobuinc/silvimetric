@@ -87,14 +87,14 @@ class Storage:
             name='X',
             domain=(0, xi),
             dtype=np.uint64,
-            tile=1000,
+            tile=config.xsize,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
-            tile=1000,
+            tile=config.ysize,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
@@ -157,6 +157,13 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
+            offsets_filters=tiledb.FilterList(
+                [
+                    tiledb.PositiveDeltaFilter(),
+                    tiledb.BitWidthReductionFilter(),
+                    tiledb.ZstdFilter(),
+                ]
+            ),
         )
         schema.check()
 
@@ -539,7 +546,6 @@ class Storage:
             fragments.append(a)
         return fragments
 
-        # return [a for a in af if ts_overlap(a.timestamp_range, timestamp)]
 
     def delete(self, config: ShatterConfig) -> ShatterConfig:
         """
@@ -574,45 +580,9 @@ class Storage:
         sh_cfg.start_timestamp = None
         sh_cfg.end_timestamp = None
 
-        # self.config.log.debug('Overwriting data.')
-        # # TODO timestamp change: update config with newest timestamp after
-        # # rewriting everything to null
-        # tsr = self.open('r', timestamp=sh_cfg.timestamp)
-        # indices = tsr.query(
-        #     coords=True, cond=f'shatter_process_num=={time_slot}'
-        # ).df[:]
-        # # query returns tiles, so may still need to parse it down afterward
-        # del_data = indices[indices.shatter_process_num == time_slot].set_index(
-        #     ['X', 'Y']
-        # )
-        # dd = pd.DataFrame(
-        #     columns=del_data.columns, index=del_data.index
-        # ).reset_index()
-        # self.write(dd, sh_cfg.timestamp)
-
         # self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
             w.meta[f'shatter_{config.time_slot}'] = json.dumps(sh_cfg.to_json())
-
-        # # loop until it's been updated?
-        # self.consolidate(timestamp=sh_cfg.timestamp)
-        # self.vacuum()
-        # import time
-
-        # count = 0
-        # # TODO I don't like this, but need to make sure that the db has been
-        # # updated before moving on
-        # while True:
-        #     with tiledb.open(self.config.tdb_dir, mode='r') as r:
-        #         test_vals = r.query(
-        #             coords=True, cond=f'shatter_process_num=={time_slot}'
-        #         ).df[:]
-        #         if test_vals[test_vals.shatter_process_num == time_slot].empty:
-        #             break
-        #         count = count + 1
-        #         print(f'retry {count}')
-        #         time.sleep(1)
-        #         r.close()
 
         return sh_cfg
 
@@ -631,8 +601,8 @@ class Storage:
 
     def consolidate(
         self,
-        timestamp: Optional[tuple[int, int]] = None,
         mode: Optional[ManageType] = 'fragments',
+        timestamp: Optional[tuple[int, int]] = None,
     ) -> None:
         """
         Consolidate the fragments from a shatter process into one fragment.
@@ -650,12 +620,15 @@ class Storage:
                 'sm.consolidation.mode': mode,
                 'sm.consolidation.timestamp_start': ts_start,
                 'sm.consolidation.timestamp_end': ts_end,
-                'sm.consolidation.max_fragment_size': (300 * 2**20),  # 300MB
+                # 'sm.consolidation.max_fragment_size': (300 * 2**20),  # 300MB
             }
         )
-        tiledb.consolidate(
-            self.config.tdb_dir,
-            ctx=tiledb.Ctx(c),
-            config=c
-        )
+        try:
+            tiledb.consolidate(
+                self.config.tdb_dir,
+                ctx=tiledb.Ctx(c),
+                config=c
+            )
+        except Exception as e:
+            self.config.log.warning(f'{e.args}')
         self.config.log.debug(f'Consolidated time slot {timestamp}.')

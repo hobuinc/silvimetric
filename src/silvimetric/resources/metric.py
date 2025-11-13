@@ -17,7 +17,6 @@ from tiledb import Attr, FilterList, ZstdFilter
 import numpy as np
 import dill
 import pandas as pd
-import marshal
 
 from distributed import Future
 from .attribute import Attribute
@@ -145,7 +144,7 @@ class Metric:
         return Attr(
             name=entry_name,
             dtype=self.dtype,
-            # filters=FilterList([ZstdFilter()]),
+            filters=FilterList([ZstdFilter()]),
             nullable=True
         )
 
