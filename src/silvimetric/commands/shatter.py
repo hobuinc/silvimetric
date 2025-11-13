@@ -145,7 +145,8 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
     point_count = write(joined_data, storage, config.date)
-    storage.consolidate(timestamp=config.timestamp)
+
+    del points, joined_data, listed_data, metric_data
 
     return point_count
 
@@ -165,6 +166,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     ## If dask is distributed, use the futures feature
     # leaves = [delayed(leaf) for leaf in leaves]
 
+    start_time = int(datetime.now().timestamp()*1000)
     dc = get_client()
     failures = []
     if dc is not None:
@@ -187,6 +189,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
             if isinstance(pc, int):
                 config.point_count = config.point_count + pc
                 count = count + 1
+            del pc
 
         # TODO write out errors to errors storage path
 
@@ -199,6 +202,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         ]
         pc = sum(pcs)
         config.point_count = config.point_count + pc
+    end_time = int(datetime.now().timestamp()*1000)
+    storage.consolidate(timestamp=(start_time, end_time))
 
     return config.point_count
 
@@ -249,11 +254,14 @@ def shatter(config: ShatterConfig) -> int:
         alignment=extents.alignment,
         root=extents.root,
     )
+    # get leaves reflecting TileDB tile bounds
     potential_leaves = root_ext.get_leaf_children(leaf_size)
-    tiled_leaves = [
+    # filter by tiles that overlap, and get the overlapping extent
+    filtered_leaves = [
         leaf
         for leaf in potential_leaves if not extents.disjoint(leaf)
     ]
+    tiled_leaves = [extents.get_overlap(leaf) for leaf in filtered_leaves]
     full_count = len(tiled_leaves)
     count = 0
     for e in tiled_leaves:
@@ -266,7 +274,6 @@ def shatter(config: ShatterConfig) -> int:
         config.log.debug(f'Shattering extent #{count}/{full_count}.')
         try:
             run(leaves, config, storage)
-            storage.consolidate(timestamp=config.timestamp)
             storage.vacuum()
             for mode in ['fragment_meta', 'commits', 'array_meta']:
                 storage.consolidate(mode)
@@ -274,6 +281,8 @@ def shatter(config: ShatterConfig) -> int:
         except Exception as e:
             final(config, storage)
             raise e
+    storage.consolidate(timestamp=config.timestamp)
+    storage.vacuum()
 
     final(config, storage, finished=True)
     return config.point_count

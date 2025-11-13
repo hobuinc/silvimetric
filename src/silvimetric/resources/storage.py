@@ -157,13 +157,13 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            offsets_filters=tiledb.FilterList(
-                [
-                    tiledb.PositiveDeltaFilter(),
-                    tiledb.BitWidthReductionFilter(),
-                    tiledb.ZstdFilter(),
-                ]
-            ),
+            # offsets_filters=tiledb.FilterList(
+            #     [
+            #         tiledb.PositiveDeltaFilter(),
+            #         tiledb.BitWidthReductionFilter(),
+            #         tiledb.ZstdFilter(),
+            #     ]
+            # ),
         )
         schema.check()
 
@@ -368,6 +368,7 @@ class Storage:
             f'{m.entry_name(a.name)}': np.dtype(m.dtype)
             for m in self.config.metrics
             for a in self.config.attrs
+            if a in m.attributes
         }
         dtype_dict = attr_dict | xy_dict | metr_dict
 
@@ -597,7 +598,6 @@ class Storage:
             }
         )
         tiledb.vacuum(self.config.tdb_dir, config=c)
-        self.config.log.debug('Vacuuming complete.')
 
     def consolidate(
         self,
@@ -631,4 +631,3 @@ class Storage:
             )
         except Exception as e:
             self.config.log.warning(f'{e.args}')
-        self.config.log.debug(f'Consolidated time slot {timestamp}.')

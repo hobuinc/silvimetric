@@ -164,6 +164,8 @@ class MetricParamType(click.ParamType):
                                 ht_break = a
                             else:
                                 continue
+                        # TODO this shouldn't return grid_metrics if we're
+                        # coming from extract
                         metrics.update(
                             list(
                                 grid_metrics.get_grid_metrics(

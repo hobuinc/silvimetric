@@ -256,6 +256,10 @@ class Extents(object):
             for minx, maxx, miny, maxy in coords_list
         ]
 
+    def get_overlap(self, other: Self) -> Self:
+        bounds = Bounds.shared_bounds(self.bounds, other.bounds)
+        return Extents(bounds, self.resolution, self.alignment, self.root)
+
     @staticmethod
     def from_storage(storage: str | Storage):
         """
