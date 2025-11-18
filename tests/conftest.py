@@ -64,6 +64,8 @@ def storage_config(
         metrics=metrics,
         alignment=alignment,
         version=svversion,
+        xsize=5,
+        ysize=5
     )
     Storage.create(sc)
     yield sc

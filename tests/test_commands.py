@@ -68,15 +68,8 @@ class TestCommands(object):
 
             # not working 100% of the time at the moment
             with s.open(mode='r', timestamp=sc.timestamp) as reader:
-                if time_slot == 4:
-                    # tiledb errors if there is no valid subarray available
-                    with pytest.raises(tiledb.libtiledb.TileDBError):
-                        a = reader.df[:]
-                else:
-                    a = reader.df[:]
-                    assert a[a.shatter_process_num == time_slot].empty
-
-
+                a = reader.df[:]
+                assert a[a.shatter_process_num == time_slot].empty
 
         assert s.config.next_time_slot == 5
 

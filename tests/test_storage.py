@@ -79,6 +79,8 @@ class Test_Storage(object):
             attrs=attrs,
             metrics=ms,
             root=bounds,
+            xsize=5,
+            ysize=5
         )
 
         with pytest.raises(ValueError) as e:

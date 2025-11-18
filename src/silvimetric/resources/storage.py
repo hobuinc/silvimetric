@@ -17,11 +17,20 @@ from .bounds import Bounds
 
 
 def ts_overlap(first, second):
+    """Return true if the first and second timestamps share any values."""
     if first[0] > second[1]:
         return False
     if first[1] < second[0]:
         return False
     return True
+
+
+def ts_encompass(first, second):
+    """Return true if the first timestamp completely encompasses the second."""
+    if second[0] >= first[0] and second[1] <= first[1]:
+        return True
+    else:
+        return False
 
 
 class Storage:
@@ -115,13 +124,13 @@ class Storage:
             name='start_time',
             dtype=np.datetime64('', 'D').dtype,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
-            fill=np.datetime64(0, 'D')
+            fill=np.datetime64(0, 'D'),
         )
         end_time_att = tiledb.Attr(
             name='end_time',
             dtype=np.datetime64('', 'D').dtype,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
-            fill=np.datetime64(0, 'D')
+            fill=np.datetime64(0, 'D'),
         )
         dim_atts = [attr.schema() for attr in config.attrs]
 
@@ -511,31 +520,36 @@ class Storage:
         mbrs_list = tuple(af.nonempty_domain for af in af_all)
         # mbrs = tuple(m for m in mbrs_list if not ex.disjoint_by_mbr(m))
         mbrs = tuple(
-            tuple(
-                tuple(a.item() for a in mb)
-                for mb in m
-            )
-            for m in mbrs_list if not ex.disjoint_by_mbr(m)
+            tuple(tuple(a.item() for a in mb) for mb in m)
+            for m in mbrs_list
+            if not ex.disjoint_by_mbr(m)
         )
         return mbrs
 
     def get_fragments(
-        self, timestamp: tuple[int, int], bounds: Optional[Bounds] = None
+        self,
+        timestamp: tuple[int, int],
+        bounds: Optional[Bounds] = None,
+        encompass: bool = False,
     ) -> list[tiledb.FragmentInfo]:
         """
         Get TileDB array fragments from the time slot specified.
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param bounds: Bounds of desired fragments.
+        :param encompass: If true, timestamps and bounds of fragments must be fully encompassed.
         :return: Array fragments from time slot.
         """
         from .extents import Extents
+
+        overlap_method = ts_encompass if encompass else ts_overlap
 
         af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
         if bounds is not None:
             ex = Extents.from_sub(self, bounds)
         fragments = []
         for a in af:
-            if not ts_overlap(a.timestamp_range, timestamp):
+            if not overlap_method(timestamp, a.timestamp_range):
                 continue
             if bounds is not None:
                 if a.mbrs:
@@ -547,30 +561,52 @@ class Storage:
             fragments.append(a)
         return fragments
 
-
     def delete(self, config: ShatterConfig) -> ShatterConfig:
         """
-        Delete Shatter process and all associated data from database.
+        Delete Shatter process and overwrite associated data from database.
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :return: Config of deleted Shatter process
         """
 
         self.config.log.debug(f'Deleting shatter process {config.name}...')
-        vfs = tiledb.VFS(ctx=self.get_tdb_context())
+        # grab fragments that are *fully* encompassed by the bounds and
+        # timestamp provided, and then overwrite that data with nulls.
+        # Consolidate at the end.
         fragments = self.get_fragments(
-            timestamp=config.timestamp, bounds=config.bounds
+            timestamp=config.timestamp, bounds=config.bounds, encompass=True
         )
         for fragment in fragments:
-            parsed = urlparse(fragment.uri)
-            sans_protocol = parsed.path
-            fragname = os.path.basename(sans_protocol) + '.wrt'
+            xs, ys = fragment.nonempty_domain
+            x1, x2 = xs
+            y1, y2 = ys
+            x2 = x2 + 1
+            y2 = y2 + 1
 
-            frag_path = Path(sans_protocol)
-            commit_path = frag_path / '..' / '..' / '__commits' / fragname
 
-            vfs.remove_dir(frag_path)
-            vfs.remove_file(commit_path)
+            # grab index values and recreate bounds from them
+            xrange = np.arange(x1, x2, dtype=np.int64)
+            yrange = np.arange(y1, y2, dtype=np.int64)
+            mi = pd.MultiIndex.from_product([xrange, yrange], names=['X', 'Y'])
+            dtype_arr = np.array([],dtype=[
+                ('xi', np.int64),
+                ('yi', np.int64),
+                ('count', np.int64),
+                ('shatter_process_num', np.uint16),
+                *[(a.name, np.dtype('O')) for a in self.get_attributes()],
+                *[
+                    (m.entry_name(a.name), m.dtype)
+                    for m in self.get_metrics()
+                    for a in self.get_attributes()
+                    if a in m.attributes or not len(m.attributes)
+                ]
+            ])
+            null_df = pd.DataFrame(dtype_arr)
+            null_df = null_df.set_index(['xi','yi']).reindex(mi)
+            null_df = null_df.reset_index()
+            null_dt = np.datetime64(0, 'D')
+            self.write(null_df, (null_dt, null_dt))
+
 
         r = self.open('r')
         sh_cfg = ShatterConfig.from_string(
@@ -613,7 +649,7 @@ class Storage:
         :param mode: TileDB consolidation mode.
         """
         ts_start = timestamp[0] if timestamp is not None else 0
-        ts_end_def = int(datetime.now().timestamp()*1000)
+        ts_end_def = int(datetime.now().timestamp() * 1000)
         ts_end = timestamp[1] if timestamp is not None else ts_end_def
         c = tiledb.Config(
             {
@@ -624,10 +660,6 @@ class Storage:
             }
         )
         try:
-            tiledb.consolidate(
-                self.config.tdb_dir,
-                ctx=tiledb.Ctx(c),
-                config=c
-            )
+            tiledb.consolidate(self.config.tdb_dir, ctx=tiledb.Ctx(c), config=c)
         except Exception as e:
             self.config.log.warning(f'{e.args}')

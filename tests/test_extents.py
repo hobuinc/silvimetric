@@ -182,43 +182,5 @@ class TestExtents(object):
         storage_config = StorageConfig(tdb_dir='asdf.tdb', root=bounds, crs=CRS.from_epsg('3857'), resolution=resolution)
         extents = Extents(bounds=bounds,root=bounds, resolution=resolution, alignment=alignment)
         charlevoix = Data(file, storage_config)
-        del_data = delayed(charlevoix)
 
-        daxs = (da.arange(extents.x1, extents.x2) * storage_config.resolution)
-        daxs = daxs + extents.bounds.minx
-        dfxs = ddf.from_dask_array(daxs, columns='y')
-        dbxs = dfxs.to_bag()
-
-        days = (da.arange(extents.y1, extents.y2) * storage_config.resolution)
-        days = extents.bounds.maxy - days
-        dfys = ddf.from_dask_array(days, columns='x')
-        dbys = dfys.to_bag()
-
-        product_bag = dbxs.product(dbys)
-
-        def ext_maker(row: tuple[float, float], res: int, al: str, r: Bounds, d: Data):
-            minx, maxy = row
-            maxx = minx + res
-            miny = maxy - res
-            bounds = Bounds(minx,miny,maxx,maxy)
-            ext = Extents(
-                bounds=bounds,
-                resolution=resolution,
-                alignment=al,
-                root=r
-            )
-            count = d.count(ext)
-            retpd = pd.DataFrame({'x': [ext.x1], 'y': [ext.y1], 'count': [count]})
-            return retpd
-
-        ext_bag = product_bag.map(
-            ext_maker,
-            res=resolution,
-            al=alignment,
-            r=extents.root,
-            d=del_data
-        )
-        with ProgressBar() as p:
-            ext_list = ext_bag.compute()
-
-        print('done.')
+        extents.chunk()

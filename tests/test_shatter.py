@@ -3,6 +3,7 @@ import uuid
 import datetime
 from math import ceil
 import copy
+import pytest
 
 import numpy as np
 import pandas as pd
@@ -10,8 +11,6 @@ import dask
 
 from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
-from silvimetric.resources.attribute import Attribute
-from silvimetric.resources.metric import Metric
 
 
 @dask.delayed

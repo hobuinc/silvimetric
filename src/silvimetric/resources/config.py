@@ -247,8 +247,6 @@ class ShatterConfig(Config):
     tile_point_count: int = field(default=600*10**3) #600k
     """Target number of points per Tile. Only used if tile_size is None.
     defaults to 600000"""
-    split_point_count: int = field(default=11*10**6) #11M
-    """Number of points per working split. defaults to 11000000"""
     mbr: Mbr = field(default_factory=lambda: tuple())
     """The minimum bounding rectangle derived from TileDB array fragments.
     This will be used to for resuming shatter processes and making sure it

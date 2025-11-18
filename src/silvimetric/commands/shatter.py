@@ -242,11 +242,6 @@ def shatter(config: ShatterConfig) -> int:
         config.bounds = extents.bounds
     storage.save_shatter_meta(config)
 
-    config.log.debug('Grabbing leaf nodes.')
-    # es = extents.chunk(data, pc_threshold=config.split_point_count)
-    # config.log.debug('Shattering.')
-    # count = 0
-
     leaf_size = storage.config.ysize * storage.config.xsize
     root_ext = Extents(
         bounds=extents.root,
