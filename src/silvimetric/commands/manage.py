@@ -37,13 +37,6 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
     except LookupError as e:
         raise KeyError(f'Shatter process with ID {name} does not exist') from e
 
-    try:
-        time_slot = config.time_slot
-    except KeyError as e:
-        raise ValueError(
-            f'Shatter process with ID {name} is missing a time slot.'
-        ) from e
-
     logger.info(f'Deleting task {name}.')
     return storage.delete(config)
 

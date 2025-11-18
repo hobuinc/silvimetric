@@ -5,8 +5,6 @@ import dask
 import math
 import json
 
-from dask.diagnostics import ProgressBar
-
 from .. import Storage, Data, Extents, Bounds, Log
 
 
@@ -123,10 +121,10 @@ def extent_handle(
         logger = log
 
     if extent.root is not None:
-        bminx, bminy, bmaxx, bmaxy = extent.root.get()
+        bminx, _, _, bmaxy = extent.root.get()
         r = extent.root
     else:
-        bminx, bminy, bmaxx, bmaxy = extent.bounds.get()
+        bminx, _, _, bmaxy = extent.bounds.get()
         r = extent.bounds
 
     # make bounds in scale with the desired resolution

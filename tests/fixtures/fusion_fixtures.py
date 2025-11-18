@@ -48,8 +48,8 @@ def plumas_storage_config(tmp_path_factory: pytest.TempPathFactory):
         metrics=gms,
         attrs=attrs,
         tdb_dir=pl_tdb_dir,
-        xsize=100,
-        ysize=100,
+        xsize=10,
+        ysize=10,
     )
     sm.Storage.create(sc)
     yield sc

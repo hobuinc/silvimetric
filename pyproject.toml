@@ -61,6 +61,7 @@ max-line-length = 80
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["E402", "F401"]
 "**/{tests,docs,tools}/*" = ["E402"]
+"**/{tests}/*" = ["D101"]
 
 [tool.setuptools]
 package-dir = {"" =  "src"}

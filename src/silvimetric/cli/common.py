@@ -15,7 +15,7 @@ from ..resources.metrics import (
 )
 from ..resources.metrics import aad, grid_metrics, all_metrics
 
-from .. import Bounds, Attribute, Metric, Attributes, Log
+from .. import Bounds, Attribute, Metric, Attributes
 
 
 class BoundsParamType(click.ParamType):

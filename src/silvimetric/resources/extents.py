@@ -1,7 +1,7 @@
 import math
 import numpy as np
 import itertools
-from typing import Self
+from typing_extensions import Self
 
 from dask.delayed import delayed
 from dask import compute

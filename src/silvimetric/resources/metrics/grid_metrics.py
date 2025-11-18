@@ -9,6 +9,7 @@ from .stats import statistics
 from .p_moments import product_moments
 from .aad import aad
 
+
 # Make special crr. It relies too heavily on other metrics
 # that will have filters applied to them.
 def _grid_crr(data, *args):
@@ -22,12 +23,18 @@ def _grid_crr(data, *args):
 
     return (mean - data_min) / den
 
+
 _grid_crr_metric = Metric('canopy_relief_ratio', np.float32, _grid_crr)
+
+
 def f_z_gt_val(data, elev_key, val):
     return data[data[elev_key] > val]
 
+
 def make_elev_filter(val, elev_key):
-    return lambda data, elev_key=elev_key, val=val: f_z_gt_val(data, elev_key, val)
+    return lambda data, elev_key=elev_key, val=val: f_z_gt_val(
+        data, elev_key, val
+    )
 
 
 def _get_grid_metrics(elev_key='Z'):
@@ -50,7 +57,7 @@ def _get_grid_metrics(elev_key='Z'):
     aad_copy = copy.deepcopy(aad)
 
     assert elev_key in ['Z', 'HeightAboveGround']
-    for m in (pcts| lmom | pmom).values():
+    for m in (pcts | lmom | pmom).values():
         m.attributes = [A[elev_key], A['Intensity']]
         for d in m.dependencies:
             d.attributes = [A[elev_key], A['Intensity']]
@@ -77,13 +84,7 @@ def _get_grid_metrics(elev_key='Z'):
     aad_copy['mad_mode'].attributes = [A[elev_key]]
 
     grid_metrics: dict[str, Metric] = dict(
-        pcts
-        | lmom
-        | stats
-        | pmom
-        | aad_copy
-        | counts
-        | covers
+        pcts | lmom | stats | pmom | aad_copy | counts | covers
     )
     return grid_metrics
 

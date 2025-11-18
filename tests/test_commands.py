@@ -1,6 +1,4 @@
-import pytest
 from typing import List
-import tiledb
 
 from silvimetric.commands import scan, info, shatter, manage
 from silvimetric import ShatterConfig, Storage

@@ -19,6 +19,7 @@ from .attribute import Attribute, Attributes
 from .. import __version__
 
 from threading import Lock
+
 mutex = Lock()
 
 
@@ -65,6 +66,7 @@ class Config(ABC):
 @dataclass
 class StorageConfig(Config):
     """Config for constructing a Storage object"""
+
     root: Bounds = field()
     """Root project bounding box"""
     crs: pyproj.CRS = field()
@@ -167,8 +169,8 @@ class StorageConfig(Config):
             capacity=x['capacity'],
             version=x['version'],
             next_time_slot=x['next_time_slot'],
-            xsize = x['xsize'],
-            ysize = x['ysize']
+            xsize=x['xsize'],
+            ysize=x['ysize'],
         )
 
         return n
@@ -244,7 +246,7 @@ class ShatterConfig(Config):
     """The process ending timestamp., defaults to None"""
     point_count: int = field(default=0)
     """The number of points that has been processed so far., defaults to 0"""
-    tile_point_count: int = field(default=600*10**3) #600k
+    tile_point_count: int = field(default=600 * 10**3)  # 600k
     """Target number of points per Tile. Only used if tile_size is None.
     defaults to 600000"""
     mbr: Mbr = field(default_factory=lambda: tuple())
@@ -271,7 +273,8 @@ class ShatterConfig(Config):
             self.date = tuple(d for d in self.date)
         if len(self.date) > 2 or len(self.date) < 1:
             raise ValueError(
-                f'Invalid date range ({self.date}). Must be either 1 or 2 values.'
+                f'Invalid date range ({self.date}). '
+                'Must be either 1 or 2 values.'
             )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
@@ -281,7 +284,7 @@ class ShatterConfig(Config):
 
     @property
     def timestamp(self):
-        end_time_temp = int(datetime.now().timestamp()*1000)
+        end_time_temp = int(datetime.now().timestamp() * 1000)
         if self.start_timestamp is None:
             return tuple((0, end_time_temp))
         if self.end_timestamp is None:
@@ -374,9 +377,7 @@ class ExtractConfig(Config):
     bounds: Bounds = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     date: Tuple[datetime, datetime] = field(
-        default_factory=lambda : tuple([
-            datetime(1970, 1, 1), datetime.now()
-        ])
+        default_factory=lambda: tuple([datetime(1970, 1, 1), datetime.now()])
     )
     """A date range representing data collection times."""
 
@@ -402,7 +403,8 @@ class ExtractConfig(Config):
             self.date = tuple(d for d in self.date)
         if len(self.date) > 2 or len(self.date) < 1:
             raise ValueError(
-                f'Invalid date range ({self.date}). Must be either 1 or 2 values.'
+                f'Invalid date range ({self.date}). '
+                'Must be either 1 or 2 values.'
             )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
@@ -441,7 +443,10 @@ class ExtractConfig(Config):
             log = Log('INFO')
         if isinstance(data['date'], list):
             date = tuple(
-                (datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ') for d in data['date'])
+                (
+                    datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ')
+                    for d in data['date']
+                )
             )
         else:
             date = datetime.strptime(data['date'], '%Y-%m-%dT%H:%M:%SZ')
@@ -454,9 +459,8 @@ class ExtractConfig(Config):
             debug=data['debug'],
             bounds=bounds,
             log=log,
-            date=date
+            date=date,
         )
-
 
     @classmethod
     def from_string(cls, data: str):

@@ -259,12 +259,6 @@ class Metric:
     def run_filters(self, data: pd.DataFrame) -> pd.DataFrame:
         for f in self.filters:
             ndf = f(data)
-            # TODO should this check be here?
-            if not isinstance(ndf, pd.DataFrame):
-                raise TypeError(
-                    'Filter outputs must be a DataFrame. '
-                    f'Type detected: {type(ndf)}'
-                )
             data = ndf
         return data
 
@@ -304,7 +298,7 @@ class Metric:
         else:
             attributes = []
 
-        # TODO acquire GIL
+        # TODO acquire GIL ?
         # need to hold gil when we touch the interpreter
         # only one thread can change state of interpreter at a time
         method = dill.loads(base64.b64decode(data['method'].encode()))

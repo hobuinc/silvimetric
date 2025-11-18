@@ -13,8 +13,14 @@ from .metric import Metric, Attribute
 from .bounds import Bounds
 
 
-def ts_overlap(first, second):
-    """Return true if the first and second timestamps share any values."""
+def ts_overlap(first: int, second: int):
+    """
+    Return true if the first and second timestamps share any values.
+
+    :param first: First timestamp.
+    :param second: Second timestamp.
+    :return: _description_
+    """
     if first[0] > second[1]:
         return False
     if first[1] < second[0]:
@@ -23,7 +29,13 @@ def ts_overlap(first, second):
 
 
 def ts_encompass(first, second):
-    """Return true if the first timestamp completely encompasses the second."""
+    """
+    Return true if the first timestamp completely encompasses the second.
+
+    :param first: First timestamp.
+    :param second: Second timestamp.
+    :return: _description_
+    """
     if second[0] >= first[0] and second[1] <= first[1]:
         return True
     else:
@@ -56,25 +68,11 @@ class Storage:
         """
         Creates TileDB storage.
 
-        Parameters
-        ----------
-        config : StorageConfig
-            Storage StorageConfig
-        ctx : tiledb.Ctx, optional
-            TileDB Context, by default is None
-
-        Returns
-        -------
-        Storage
-            Returns newly created Storage class
-
-        Raises
-        ------
-        Exception
-            Raises bounding box errors if not of lengths 4 or 6
+        :param config: :class:`silvimetric.resources.config.StorageConfig`
+        :param ctx: :class:`tiledb.Ctx`, defaults to None
+        :raises ValueError: If missing requried dependency in Metrics.
+        :return: :class:`silvimetric.resources.storage.Storage`
         """
-
-        # TODO make any changes to tiledb setup here.
 
         if ctx is None:
             ctx = tiledb.default_ctx()
@@ -188,6 +186,7 @@ class Storage:
         Create Storage object from information stored in a database.
 
         :param tdb_dir: TileDB database directory.
+        :param ctx: :class:`tiledb.Ctx`, defaults to None.
         :return: Returns the derived storage.
         """
         if ctx is None:
@@ -235,12 +234,14 @@ class Storage:
         """
         key = f'shatter_{config.time_slot}'
         data = json.dumps(config.to_json())
-        return self.save_metadata(key, data)
+        self.save_metadata(key, data)
 
     def get_shatter_meta(self, time_slot: int):
         """
         Get shatter metadata from the base TileDB metadata with the name
         convention `shatter_{proc_num}`
+
+        :return: :class:`silvimetric.resources.config.ShatterConfig`
         """
         key = f'shatter_{time_slot}'
         m = self.get_metadata(key)
@@ -508,14 +509,14 @@ class Storage:
         as tuples in the form of ((minx, maxx), (miny, maxy))
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param bounds: :class:`silvimetric.resources.bounds.Bounds`
+
         """
-        # TODO timestamp changes, check to make sure correct
         from .extents import Extents
 
         ex = Extents.from_sub(self, config.bounds)
         af_all = self.get_fragments(config.timestamp, config.bounds)
         mbrs_list = tuple(af.nonempty_domain for af in af_all)
-        # mbrs = tuple(m for m in mbrs_list if not ex.disjoint_by_mbr(m))
         mbrs = tuple(
             tuple(tuple(a.item() for a in mb) for mb in m)
             for m in mbrs_list
@@ -534,7 +535,8 @@ class Storage:
 
         :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :param bounds: Bounds of desired fragments.
-        :param encompass: If true, timestamps and bounds of fragments must be fully encompassed.
+        :param encompass: If true, timestamps and bounds of fragments must be
+            fully encompassed.
         :return: Array fragments from time slot.
         """
         from .extents import Extents
@@ -562,7 +564,7 @@ class Storage:
         """
         Delete Shatter process and overwrite associated data from database.
 
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param config: :class:`silvimetric.resources.config.ShatterConfig`.
         :return: Config of deleted Shatter process
         """
 
@@ -641,8 +643,8 @@ class Storage:
         This makes the database perform better, but reduces the granularity of
         time traveling.
 
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         :param mode: TileDB consolidation mode.
+        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
         """
         ts_start = timestamp[0] if timestamp is not None else 0
         ts_end_def = int(datetime.now().timestamp() * 1000)
@@ -652,7 +654,6 @@ class Storage:
                 'sm.consolidation.mode': mode,
                 'sm.consolidation.timestamp_start': ts_start,
                 'sm.consolidation.timestamp_end': ts_end,
-                # 'sm.consolidation.max_fragment_size': (300 * 2**20),  # 300MB
             }
         )
         try:

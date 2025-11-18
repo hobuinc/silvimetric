@@ -23,6 +23,13 @@ def final(
     storage: Storage,
     finished: bool = False,
 ):
+    """
+    Final method for shatter, add last config attributes and save it to metadata
+
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`.
+    :param storage: :class:`silvimetric.resources.storage.Storage`.
+    :param finished: Shatter finish flag, defaults to False
+    """
     # modify config to reflect result of shattter process
     config.log.debug('Saving shatter metadata.')
     config.end_timestamp = int(datetime.now().timestamp() * 1000)
@@ -65,17 +72,23 @@ def get_data(extents: Extents, filename: str, storage: Storage) -> pd.DataFrame:
 def run_graph(data_in: pd.DataFrame, metrics: list[Metric]) -> pd.DataFrame:
     """
     Run DataFrames through metric processes
+
+    :param data_in: Input DataFrame of point data.
+    :param metrics: List of Metrics to run.
+    :return: DataFrame of derived data.
     """
     graph = Graph(metrics)
 
     return graph.run(data_in)
 
 
-def agg_list(
-    data_in: pd.DataFrame, proc_num: int, extents: Extents
-) -> pd.DataFrame:
+def agg_list(data_in: pd.DataFrame, proc_num: int) -> pd.DataFrame:
     """
     Make variable-length point data attributes into lists
+
+    :param data_in: Input DataFrame of point data.
+    :param proc_num: Shatter process increment.
+    :return: DataFrame of aggregated point data.
     """
     # groupby won't set index on an empty array
     if data_in.empty:
@@ -102,6 +115,10 @@ def agg_list(
 def join(list_data: pd.DataFrame, metric_data: pd.DataFrame) -> pd.DataFrame:
     """
     Join the list data and metric DataFrames together.
+
+    :param list_data: DataFrame from agg_list.
+    :param metric_data: DataFrame from run_graph.
+    :return: Joined DataFrame of Metrics and Attributes.
     """
     return list_data.join(metric_data).reset_index()
 
@@ -115,7 +132,7 @@ def write(
     Write cell data to database
 
     :param data_in: Data to be written to database.
-    :param storage: SilviMetric Storage object.
+    :param storage: :class:`silvimetric.resources.storage.Storage`.
     :param dates: Tuple of start and end datetimes for dataset.
     :return: Number of points written.
     """
@@ -132,7 +149,14 @@ def write(
 
 @delayed
 def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
-    """Create dask bags and the order of operations."""
+    """
+    Create dask bags and the order of operations.
+
+    :param leaf: Extents to operate on.
+    :param config: :class:`silvimetric.resources.config.ShatterConfig`.
+    :param storage: :class:`silvimetric.resources.storage.Storage`.
+    :return: Number of points written.
+    """
 
     # remove any extents that have already been done, only skip if full overlap
     if config.mbr:
@@ -141,7 +165,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     points = get_data(leaf, config.filename, storage)
     if points.empty:
         return 0
-    listed_data = agg_list(points, config.time_slot, leaf)
+    listed_data = agg_list(points, config.time_slot)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
     point_count = write(joined_data, storage, config.date)

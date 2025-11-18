@@ -91,8 +91,12 @@ def get_data(
 
     with storage.open('r') as tdb:
         # tiledb queries need dates as int64 values
-        start_datetime = np.datetime64(config.date[0], 'D').astype(np.int64).item()
-        end_datetime = np.datetime64(config.date[1], 'D').astype(np.int64).item()
+        start_datetime = (
+            np.datetime64(config.date[0], 'D').astype(np.int64).item()
+        )
+        end_datetime = (
+            np.datetime64(config.date[1], 'D').astype(np.int64).item()
+        )
         cond = f'end_time >= {start_datetime} and start_time <= {end_datetime}'
         xdim = tdb.schema.domain.dim('X').domain
         ydim = tdb.schema.domain.dim('Y').domain
@@ -107,7 +111,8 @@ def get_data(
             attrs=[*ma_list, 'end_time', 'start_time'],
             order='F',
             cond=cond,
-            coords=True).df[minx:maxx - 1, miny:maxy - 1]
+            coords=True,
+        ).df[minx : maxx - 1, miny : maxy - 1]
 
         data = data[data.end_time >= np.datetime64(config.date[0], 'D')]
         data = data[data.start_time <= np.datetime64(config.date[1], 'D')]
@@ -164,7 +169,9 @@ def extract(config: ExtractConfig) -> None:
         m_data = unstacked.to_numpy()
 
         futures.append(
-            dask.delayed(write_tif)(e.bounds, m_data, nan_val, ma, dtype, config)
+            dask.delayed(write_tif)(
+                e.bounds, m_data, nan_val, ma, dtype, config
+            )
         )
 
     dask.compute(*futures)
