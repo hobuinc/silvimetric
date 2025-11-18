@@ -1,8 +1,5 @@
 import json
 
-import os
-from urllib.parse import urlparse
-from pathlib import Path
 from math import floor
 from typing_extensions import Optional, Union, Literal
 from datetime import datetime
@@ -617,7 +614,6 @@ class Storage:
         sh_cfg.start_timestamp = None
         sh_cfg.end_timestamp = None
 
-        # self.config.log.debug('Rewriting config.')
         with self.open('w') as w:
             w.meta[f'shatter_{config.time_slot}'] = json.dumps(sh_cfg.to_json())
 

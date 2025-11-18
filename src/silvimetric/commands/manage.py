@@ -65,6 +65,8 @@ def restart(storage: str|Storage, name: str, log: Log = None) -> int:
     config = ShatterConfig.from_dict(res['history'][0])
     config.mbr = ()
     config.finished = False
+    config.start_timestamp = None
+    config.end_timestamp = None
 
     logger.info(f'Restarting task {name} with same config.')
     return shatter(config)

@@ -130,6 +130,8 @@ def metric_shatter_config(
         metrics=metrics,
         alignment=alignment,
         version=svversion,
+        xsize=5,
+        ysize=5
     )
 
     Storage.create(st_config)

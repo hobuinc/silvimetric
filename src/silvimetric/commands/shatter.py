@@ -218,8 +218,9 @@ def shatter(config: ShatterConfig) -> int:
     :return: Number of points processed.
     """
 
-    # get start time in milliseconds
-    config.start_timestamp = int(datetime.now().timestamp() * 1000)
+    # get start time in milliseconds if not already set
+    if config.start_timestamp is None:
+        config.start_timestamp = int(datetime.now().timestamp() * 1000)
 
     # set up tiledb
     storage = Storage.from_db(config.tdb_dir)

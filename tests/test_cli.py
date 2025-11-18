@@ -33,12 +33,13 @@ class TestCli(object):
                 '--scheduler',
                 'single-threaded',
                 'initialize',
-                '--resolution',
-                '10',
+                '--resolution', '10',
                 '--crs',
                 'EPSG:3857',
                 '--bounds',
                 str(bounds),
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )
@@ -69,6 +70,8 @@ class TestCli(object):
                 str(bounds),
                 '-m',
                 'stats,p_moments',
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )
@@ -107,6 +110,8 @@ class TestCli(object):
                 str(bounds),
                 '-m',
                 f'{fakes}',
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )

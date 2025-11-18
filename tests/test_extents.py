@@ -165,22 +165,18 @@ class TestExtents(object):
         check_for_holes(inner_chunks, ex)
         check_indexing(ex, inner_chunks)
 
-    def test_big(self, threaded_dask):
+    def test_big(self):
         from pyproj import CRS
-        import dask.bag as db
-        import dask.array as da
-        import dask.dataframe as ddf
-        from dask import delayed
-        import pandas as pd
-        from dask.diagnostics import ProgressBar
 
-        file = 'https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_MI_Charlevoix_TL_2018_LAS_2019/ept.json'
+        # file = 'https://s3-us-west-2.amazonaws.com/usgs-lidar-public/USGS_LPC_MI_Charlevoix_TL_2018_LAS_2019/ept.json'
 
         resolution = 5
         alignment = 'AlignToCenter'
         bounds = Bounds(**{ "maxx": -9475016, "maxy": 5681265, "minx": -9484547, "miny": 5652971})
         storage_config = StorageConfig(tdb_dir='asdf.tdb', root=bounds, crs=CRS.from_epsg('3857'), resolution=resolution)
         extents = Extents(bounds=bounds,root=bounds, resolution=resolution, alignment=alignment)
-        charlevoix = Data(file, storage_config)
 
-        extents.chunk()
+        tilesize = storage_config.ysize * storage_config.xsize
+        tiled_chunks = extents.get_leaf_children(tilesize)
+        check_for_holes(tiled_chunks, extents)
+        check_indexing(extents, tiled_chunks)
