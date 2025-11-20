@@ -216,4 +216,4 @@ class Test_Shatter(object):  # noqa: D101
         base = 11
         point_count = 108900
         shatter(s3_shatter_config)
-        confirm_one_entry(s3_storage, maxy, base, point_count, 1)
+        confirm_one_entry(s3_storage, maxy, base, point_count)
