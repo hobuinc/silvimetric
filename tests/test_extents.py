@@ -10,7 +10,6 @@ from silvimetric.resources.config import ShatterConfig
 from silvimetric.resources.storage import Storage, StorageConfig, Bounds
 
 
-
 def check_for_overlap(leaves: list[Extents], chunk: Extents):
     for l1 in leaves:
         for l2 in leaves:
@@ -27,8 +26,8 @@ def check_for_holes(leaves: list[Extents], chunk: Extents):
             ind = a
         else:
             ind = np.concatenate([ind, a])
-    dx = ind[:,0]
-    dy = ind[:,1]
+    dx = ind[:, 0]
+    dy = ind[:, 1]
 
     ux = np.unique(dx, axis=0)
     uy = np.unique(dy, axis=0)
@@ -66,39 +65,38 @@ def check_indexing(extents: Extents, leaf_list):
         count += 1
 
     assert (
-        b_indices[:,0].min() == indices[:,0].min()
+        b_indices[:, 0].min() == indices[:, 0].min()
     ), f"""X Minimum indices do not match. \
-    Min derived: {indices[:,0].min()}
-    Min base: {b_indices[:,0].min()}
+    Min derived: {indices[:, 0].min()}
+    Min base: {b_indices[:, 0].min()}
     """
 
     assert (
-        b_indices[:,0].max() == indices[:,0].max()
+        b_indices[:, 0].max() == indices[:, 0].max()
     ), f"""X Maximum indices do not match. \
-    Max derived: {indices[:,0].max()}
-    Max base: {b_indices[:,0].max()}
+    Max derived: {indices[:, 0].max()}
+    Max base: {b_indices[:, 0].max()}
     """
 
     assert (
-        b_indices[:,1].min() == indices[:,1].min()
+        b_indices[:, 1].min() == indices[:, 1].min()
     ), f"""Y Minimum indices do not match. \
-    Min derived: {indices[:,1].min()}
-    Min base: {b_indices[:,1].min()}
+    Min derived: {indices[:, 1].min()}
+    Min base: {b_indices[:, 1].min()}
     """
 
     assert (
-        b_indices[:,1].max() == indices[:,1].max()
+        b_indices[:, 1].max() == indices[:, 1].max()
     ), f"""Y Maximum indices do not match. \
-    Max derived: {indices[:,1].max()}
-    Max base: {b_indices[:,1].max()}
+    Max derived: {indices[:, 1].max()}
+    Max base: {b_indices[:, 1].max()}
     """
 
-    comps = np.sort(b_indices[:][:,1]) == np.sort(indices[:][:,1])
+    comps = np.sort(b_indices[:][:, 1]) == np.sort(indices[:][:, 1])
     assert comps.all()
 
-    comps = np.sort(b_indices[:][:,0]) == np.sort(indices[:][:,0])
+    comps = np.sort(b_indices[:][:, 0]) == np.sort(indices[:][:, 0])
     assert comps.all()
-
 
 
 class TestExtents(object):
@@ -142,23 +140,20 @@ class TestExtents(object):
                 Expected {test_point_count}, got {ufc}"""
 
     def test_chunking(
-        self, autzen_storage: StorageConfig, threaded_dask
+        self, autzen_storage: StorageConfig, autzen_data, threaded_dask
     ):
-        import os
-        file = os.path.join(
-            os.path.dirname(__file__), 'data', 'autzen-classified.copc.laz'
-        )
-        data = Data(file, autzen_storage)
         ex = Extents(
-            data.bounds,
+            autzen_data.bounds,
             autzen_storage.resolution,
             autzen_storage.alignment,
             autzen_storage.root,
         )
-        chs = list(ex.chunk(data, (5*10**6)))
+        chs = list(ex.chunk(autzen_data, (5 * 10**6)))
         inner_chunks = []
         for ch in chs:
-            inner_chunks = inner_chunks + list(itertools.chain(ch.chunk(data)))
+            inner_chunks = inner_chunks + list(
+                itertools.chain(ch.chunk(autzen_data))
+            )
         for c1 in inner_chunks:
             c1: Extents
             assert all(c1.disjoint(c2) for c2 in inner_chunks if c2 != c1)
@@ -172,9 +167,26 @@ class TestExtents(object):
 
         resolution = 5
         alignment = 'AlignToCenter'
-        bounds = Bounds(**{ "maxx": -9475016, "maxy": 5681265, "minx": -9484547, "miny": 5652971})
-        storage_config = StorageConfig(tdb_dir='asdf.tdb', root=bounds, crs=CRS.from_epsg('3857'), resolution=resolution)
-        extents = Extents(bounds=bounds,root=bounds, resolution=resolution, alignment=alignment)
+        bounds = Bounds(
+            **{
+                'maxx': -9475016,
+                'maxy': 5681265,
+                'minx': -9484547,
+                'miny': 5652971,
+            }
+        )
+        storage_config = StorageConfig(
+            tdb_dir='asdf.tdb',
+            root=bounds,
+            crs=CRS.from_epsg('3857'),
+            resolution=resolution,
+        )
+        extents = Extents(
+            bounds=bounds,
+            root=bounds,
+            resolution=resolution,
+            alignment=alignment,
+        )
 
         tilesize = storage_config.ysize * storage_config.xsize
         tiled_chunks = extents.get_leaf_children(tilesize)

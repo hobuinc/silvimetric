@@ -48,6 +48,8 @@ def s3_storage_config(
         metrics=metrics,
         version=svversion,
         tdb_dir=s3_uri,
+        xsize=5,
+        ysize=5
     )
 
 
