@@ -113,17 +113,15 @@ class Extents(object):
         tasks = [self.filter(data, pc_threshold)]
         chunks = []
         while tasks:
-            batches = list(itertools.batched(tasks, 100))
-            for batch in batches:
-                results = compute(batch)[0]
-                tasks = []
-                for r in results:
-                    if r is None:
-                        continue
-                    elif isinstance(r, Extents):
-                        chunks.append(r)
-                    else:
-                        tasks = tasks + r
+            results = compute(*tasks)
+            tasks = []
+            for r in results:
+                if r is None:
+                    continue
+                elif isinstance(r, Extents):
+                    chunks.append(r)
+                else:
+                    tasks = tasks + r
         return chunks
 
     @delayed

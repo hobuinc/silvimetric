@@ -147,7 +147,6 @@ def write(
     return p
 
 
-@delayed
 def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     """
     Create dask bags and the order of operations.
@@ -187,21 +186,14 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     :param storage: :class:`silvimetric.resources.storage.Storage`
     :return: Number of points processed.
     """
-    ## If dask is distributed, use the futures feature
-    # leaves = [delayed(leaf) for leaf in leaves]
 
     start_time = int(datetime.now().timestamp()*1000)
     dc = get_client()
     failures = []
     if dc is not None:
-        # TODO make this a batched operation of like 1000 tasks at a time
-        # similar to how scan does it
-        leaf_batch = list(itertools.batched(leaves, 2000))
-        futures = []
-        for batch in leaf_batch:
-            processes = [do_one(leaf, config, storage) for leaf in batch]
-            count = 1
-            futures = futures + futures_of(persist(processes))
+        # TODO make this a batched operation of like 1000 tasks at a time?
+        # itertools batched would limit us to >python3.12
+        futures = [dc.submit(do_one, leaf=leaf, config=config, storage=storage) for leaf in leaves]
         res = as_completed(futures, with_results=True, raise_errors=False)
         for future, pc in res:
             if future.status == 'error':
@@ -212,13 +204,12 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
                 continue
             if isinstance(pc, int):
                 config.point_count = config.point_count + pc
-                count = count + 1
             del pc
 
-        # TODO write out errors to errors storage path
+        # TODO write out errors to errors storage path?
 
     else:
-        processes = [do_one(leaf, config, storage) for leaf in leaves]
+        processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
         # Handle non-distributed dask scenarios
         results = compute(*processes)
         pcs = [

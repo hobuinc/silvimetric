@@ -51,7 +51,7 @@ class TestMetrics:
         # cannot use pandas compare because dataframes may not have identical
         # column ordering, so compare values of each column
         for m in metric_data_results.columns:
-            assert all(metric_data_results[m] == metrics[m])
+            assert all(metric_data_results[m].values == metrics[m].values)
 
     def test_dependencies(self, metric_data: pd.DataFrame):
         # should be able to create a dependency graph
