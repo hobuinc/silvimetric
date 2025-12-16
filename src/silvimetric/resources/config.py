@@ -18,12 +18,16 @@ from .metrics import grid_metrics
 from .attribute import Attribute, Attributes
 from .. import __version__
 
+from threading import Lock
+
+mutex = Lock()
+
 
 @dataclass(kw_only=True)
 class Config(ABC):
     """Base config"""
 
-    tdb_dir: str
+    tdb_dir: str = field()
     """Path to TileDB directory to use."""
     log: Log = field(default_factory=lambda: Log('INFO'))
     """Log object."""
@@ -36,7 +40,7 @@ class Config(ABC):
         for k in keys:
             if k == 'tdb_dir':
                 tdb_dir = self.__dict__[k]
-                if "://" not in tdb_dir:
+                if '://' not in tdb_dir:
                     d[k] = os.path.abspath(tdb_dir)
                 else:
                     d[k] = tdb_dir
@@ -63,15 +67,19 @@ class Config(ABC):
 class StorageConfig(Config):
     """Config for constructing a Storage object"""
 
-    root: Bounds
+    root: Bounds = field()
     """Root project bounding box"""
-    crs: pyproj.CRS
+    crs: pyproj.CRS = field()
     """Coordinate reference system, same for all data in a project"""
-    resolution: float = 30.0
+    resolution: float = field(default=30.0)
     """Resolution of cells, same for all data in a project, defaults to 30.0"""
-    alignment: str = 'AlignToCenter'
+    alignment: str = field(default='AlignToCenter')
     """Alignment of pixels in database, same for all data in a project,
     options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
+    xsize: int = field(default=1000)
+    """TileDB X Tile size for IO operations."""
+    ysize: int = field(default=1000)
+    """TileDB Y Tile size for IO operations."""
 
     attrs: list[Attribute] = field(
         default_factory=lambda: [
@@ -82,14 +90,16 @@ class StorageConfig(Config):
     """List of :class:`silvimetric.resources.attribute.Attribute` attributes
     that represent point data, defaults to Z, NumberOfReturns, ReturnNumber,
     Intensity"""
-    metrics: list[Metric] = field(default_factory=lambda: [])
+    metrics: list[Metric] = field(
+        default_factory=lambda: list(grid_metrics.get_grid_metrics().values())
+    )
     """List of :class:`silvimetric.resources.metrics.grid_metrics` grid_metrics
     that represent derived data, defaults to values in grid_metrics object"""
-    version: str = __version__
+    version: str = field(default=__version__)
     """Silvimetric version"""
-    capacity: int = 1000000
+    capacity: int = field(default=1000000)
     """TileDB Capacity, defaults to 1000000"""
-    next_time_slot: int = 1
+    next_time_slot: int = field(default=1)
     """Next time slot to be allocated to a shatter process. Increment after
     use., defaults to 1"""
 
@@ -101,14 +111,6 @@ class StorageConfig(Config):
             self.crs = crs
         else:
             self.crs = pyproj.CRS.from_user_input(crs)
-        if not len(self.attrs):
-            self.attrs = [
-                Attributes[a]
-                for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
-            ]
-        if not len(self.metrics):
-            gm = grid_metrics.get_grid_metrics()
-            self.metrics = list(gm.values())
 
         if not self.crs.is_projected:
             raise Exception(
@@ -131,6 +133,8 @@ class StorageConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['root'] = self.root.to_json()
+        d['xsize'] = self.xsize
+        d['ysize'] = self.ysize
         d['next_time_slot'] = self.next_time_slot
 
         return d
@@ -140,7 +144,8 @@ class StorageConfig(Config):
         x = json.loads(data)
         root = Bounds(*x['root'])
         if 'metrics' in x:
-            ms = [Metric.from_dict(m) for m in x['metrics']]
+            with mutex:
+                ms = [Metric.from_dict(m) for m in x['metrics']]
         else:
             ms = []
         if 'attrs' in x:
@@ -164,6 +169,8 @@ class StorageConfig(Config):
             capacity=x['capacity'],
             version=x['version'],
             next_time_slot=x['next_time_slot'],
+            xsize=x['xsize'],
+            ysize=x['ysize'],
         )
 
         return n
@@ -177,22 +184,20 @@ class StorageConfig(Config):
 class ApplicationConfig(Config):
     """Base application config"""
 
-    debug: bool = (False,)
+    debug: bool = field(default=False)
     """Debug mode, defaults to False"""
-    progress: bool = (False,)
-    """Should processes display progress bars, defaults to False"""
 
     # Dask configuration
-    dasktype: str = 'processes'
+    dasktype: str = field(default='processes')
     """Dask parallelization type. For information see
     https://docs.dask.org/en/stable/scheduling.html#local-threads """
-    scheduler: str = 'distributed'
+    scheduler: str = field(default='distributed')
     """Dask scheduler, defaults to 'distributed'"""
-    workers: int = 12
+    workers: int = field(default=12)
     """Number of dask workers"""
-    threads: int = 4
+    threads: int = field(default=4)
     """Number of threads per dask worker"""
-    watch: bool = False
+    watch: bool = field(default=False)
     """Open dask diagnostic page in default web browser"""
 
     def to_json(self):
@@ -205,7 +210,6 @@ class ApplicationConfig(Config):
         n = cls(
             tdb_dir=x['tdb_dir'],
             debug=x['debug'],
-            progress=x['progress'],
             dasktype=x['dasktype'],
             scheduler=x['scheduler'],
             workers=x['workers'],
@@ -227,8 +231,8 @@ class ShatterConfig(Config):
 
     filename: str
     """Input filename referencing a PDAL pipeline or point cloud file."""
-    date: Union[Tuple[datetime, datetime]]
-    """A date or date range representing data collection times."""
+    date: Tuple[datetime, datetime] = field(default=None)
+    """A date range representing data collection times."""
     bounds: Union[Bounds, None] = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
     name: uuid.UUID = field(default=uuid.uuid4())
@@ -236,13 +240,16 @@ class ShatterConfig(Config):
     provided., defaults to uuid.uuid()"""
     tile_size: Union[int, None] = field(default=None)
     """The number of cells to include in a tile., defaults to None"""
-    start_time: float = 0
-    """The process starting time in seconds since Jan 1 1970., defaults to 0"""
-    end_time: float = 0
-    """The process ending time in seconds since Jan 1 1970., defaults to 0"""
-    point_count: int = 0
+    start_timestamp: float = field(default=None)
+    """The process start timestamp., defaults to None"""
+    end_timestamp: float = field(default=None)
+    """The process ending timestamp., defaults to None"""
+    point_count: int = field(default=0)
     """The number of points that has been processed so far., defaults to 0"""
-    mbr: Mbr = field(default_factory=tuple)
+    tile_point_count: int = field(default=600 * 10**3)  # 600k
+    """Target number of points per Tile. Only used if tile_size is None.
+    defaults to 600000"""
+    mbr: Mbr = field(default_factory=lambda: tuple())
     """The minimum bounding rectangle derived from TileDB array fragments.
     This will be used to for resuming shatter processes and making sure it
     doesn't repeat work., defaults to tuple()"""
@@ -250,28 +257,40 @@ class ShatterConfig(Config):
     """Finished flag for shatter process., defaults to False"""
     time_slot: int = 0
     """The time slot that has been reserved for this shatter process. Will be
-    used as the timestamp in tiledb writes to better organize and manage
+    used as an attribute in tiledb writes to better organize and manage
     processes., defaults to 0"""
+    version: str = field(default=__version__)
+    """SilviMetric Version"""
 
     def __post_init__(self) -> None:
         from .storage import Storage
 
-        s = Storage.from_db(self.tdb_dir)
+        if isinstance(self.tdb_dir, Storage):
+            self.tdb_dir = self.tdb_dir.config.tdb_dir
         if isinstance(self.date, datetime):
             self.date = (self.date, self.date)
+        if isinstance(self.date, list):
+            self.date = tuple(d for d in self.date)
         if len(self.date) > 2 or len(self.date) < 1:
-            raise ValueError('Date range for must be either 1 or 2 values.')
+            raise ValueError(
+                f'Invalid date range ({self.date}). '
+                'Must be either 1 or 2 values.'
+            )
         if len(self.date) == 1:
             self.date = (self.date[0], self.date[0])
 
         if isinstance(self.tile_size, float):
             self.tile_size = int(self.tile_size)
-            self.log.warning(
-                f'Truncating tile size to integer({self.tile_size})'
-            )
-            pass
 
-        del s
+    @property
+    def timestamp(self):
+        end_time_temp = int(datetime.now().timestamp() * 1000)
+        if self.start_timestamp is None:
+            return tuple((0, end_time_temp))
+        if self.end_timestamp is None:
+            return tuple((self.start_timestamp, end_time_temp))
+        else:
+            return tuple((self.start_timestamp, self.end_timestamp))
 
     def history_json(self):
         # removing a attrs and metrics, since they'll be in the storage log
@@ -298,11 +317,8 @@ class ShatterConfig(Config):
         d['time_slot'] = self.time_slot
         d['bounds'] = self.bounds.to_json() if self.bounds is not None else None
         d['mbr'] = list(self.mbr)
+        d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
 
-        if isinstance(self.date, tuple):
-            d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
-        else:
-            d['date'] = self.date.strftime('%Y-%m-%dT%H:%M:%SZ')
         return d
 
     @classmethod
@@ -331,8 +347,8 @@ class ShatterConfig(Config):
             name=uuid.UUID(x['name']),
             bounds=Bounds(*x['bounds']),
             tile_size=x['tile_size'],
-            start_time=x['start_time'],
-            end_time=x['end_time'],
+            start_timestamp=x['start_timestamp'],
+            end_timestamp=x['end_timestamp'],
             point_count=x['point_count'],
             mbr=mbr,
             date=date,
@@ -352,25 +368,46 @@ class ExtractConfig(Config):
 
     out_dir: str
     """The directory where derived rasters should be written."""
-    attrs: list[Attribute] = field(default_factory=list)
+    attrs: list[Attribute] = field(default=None)
     """List of attributes to use in shatter. If this is not set it
     will be filled by the attributes in the database instance."""
-    metrics: list[Metric] = field(default_factory=list)
+    metrics: list[Metric] = field(default=None)
     """A list of metrics to use in shatter. If this is not set it
     will be filled by the metrics in the database instance."""
     bounds: Bounds = field(default=None)
     """The bounding box of the shatter process., defaults to None"""
+    date: Tuple[datetime, datetime] = field(
+        default_factory=lambda: tuple([datetime(1970, 1, 1), datetime.now()])
+    )
+    """A date range representing data collection times."""
 
     def __post_init__(self) -> None:
         from .storage import Storage
 
-        config = Storage.from_db(self.tdb_dir).config
-        if not len(self.attrs):
+        if isinstance(self.tdb_dir, Storage):
+            config = self.tdb_dir.config
+            self.tdb_dir = config.tdb_dir
+        else:
+            config = Storage.from_db(self.tdb_dir).config
+
+        if self.attrs is None:
             self.attrs = config.attrs
-        if not len(self.metrics):
+        if self.metrics is None:
             self.metrics = config.metrics
         if self.bounds is None:
             self.bounds: Bounds = config.root
+
+        if isinstance(self.date, datetime):
+            self.date = (self.date, self.date)
+        if isinstance(self.date, list):
+            self.date = tuple(d for d in self.date)
+        if len(self.date) > 2 or len(self.date) < 1:
+            raise ValueError(
+                f'Invalid date range ({self.date}). '
+                'Must be either 1 or 2 values.'
+            )
+        if len(self.date) == 1:
+            self.date = (self.date[0], self.date[0])
 
         p = Path(self.out_dir)
         p.mkdir(parents=True, exist_ok=True)
@@ -385,35 +422,50 @@ class ExtractConfig(Config):
         d['metrics'] = [m.to_json() for m in self.metrics]
         d['crs'] = json.loads(self.crs.to_json())
         d['bounds'] = self.bounds.to_json()
+        d['date'] = [dt.strftime('%Y-%m-%dT%H:%M:%SZ') for dt in self.date]
         return d
 
     @classmethod
-    def from_string(cls, data: str):
-        x = json.loads(data)
-        if 'metrics' in x:
-            ms = [Metric.from_dict(m) for m in x['metrics']]
-        if 'attrs' in x:
-            attrs = [Attribute.from_dict(a) for a in x['attrs']]
-        if 'bounds' in x:
-            bounds = Bounds(*x['bounds'])
-        if 'log' in x:
-            l = x['log']  # noqa: E741
+    def from_dict(cls, data: object):
+        if 'metrics' in data:
+            with mutex:
+                ms = [Metric.from_dict(m) for m in data['metrics']]
+        if 'attrs' in data:
+            attrs = [Attribute.from_dict(a) for a in data['attrs']]
+        if 'bounds' in data:
+            bounds = Bounds(*data['bounds'])
+        if 'log' in data:
+            l = data['log']  # noqa: E741
             log = Log(
                 l['log_level'], l['logdir'], l['logtype'], l['logfilename']
             )
         else:
             log = Log('INFO')
-        n = cls(
-            tdb_dir=x['tdb_dir'],
-            out_dir=x['out_dir'],
+        if isinstance(data['date'], list):
+            date = tuple(
+                (
+                    datetime.strptime(d, '%Y-%m-%dT%H:%M:%SZ')
+                    for d in data['date']
+                )
+            )
+        else:
+            date = datetime.strptime(data['date'], '%Y-%m-%dT%H:%M:%SZ')
+
+        return cls(
+            tdb_dir=data['tdb_dir'],
+            out_dir=data['out_dir'],
             attrs=attrs,
             metrics=ms,
-            debug=x['debug'],
+            debug=data['debug'],
             bounds=bounds,
             log=log,
+            date=date,
         )
 
-        return n
+    @classmethod
+    def from_string(cls, data: str):
+        x = json.loads(data)
+        return ExtractConfig.from_dict(x)
 
     def __repr__(self):
         return json.dumps(self.to_json())

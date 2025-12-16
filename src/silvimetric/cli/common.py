@@ -3,6 +3,7 @@ import pyproj
 import webbrowser
 
 import dask
+import numpy as np
 from dask.diagnostics import ProgressBar
 from dask.distributed import Client, LocalCluster
 
@@ -14,7 +15,7 @@ from ..resources.metrics import (
 )
 from ..resources.metrics import aad, grid_metrics, all_metrics
 
-from .. import Bounds, Attribute, Metric, Attributes, Log
+from .. import Bounds, Attribute, Metric, Attributes
 
 
 class BoundsParamType(click.ParamType):
@@ -26,6 +27,7 @@ class BoundsParamType(click.ParamType):
     "[1,2,101,102]"
     "[1,2,3,101,102,103]"
     """
+
     name = 'Bounds'
 
     def convert(self, value, param, ctx):
@@ -41,6 +43,7 @@ class CRSParamType(click.ParamType):
 
     Accepts a string and returns an instance of the pyproj.CRS class.
     """
+
     name = 'CRS'
 
     def convert(self, value, param, ctx) -> pyproj.CRS:
@@ -56,21 +59,33 @@ class AttrParamType(click.ParamType):
 
     Returns list of PDAL dimensions that match the strings input.
     """
+
     name = 'Attrs'
 
     # TODO add import similar to metrics
     def convert(self, value, param, ctx) -> list[Attribute]:
-        if isinstance(value, list):
+        attrs: set[Attribute] = set()
+        if not value:
+            return set(
+                Attributes[a]
+                for a in ['Z', 'ReturnNumber', 'NumberOfReturns', 'Intensity']
+            )
+        parsed_values = value.split(',')
+        for val in parsed_values:
             try:
-                return [Attributes[a] for a in value]
+                if isinstance(value, str):
+                    attrs.add(Attributes[val])
+                else:
+                    self.fail(f'{value!r} is of an invalid type.', param, ctx)
+
+            except KeyError:
+                attrs.add(Attribute(val, dtype=np.float32))
+
             except Exception as e:
                 self.fail(
-                    f'{value!r} is not available in Attributes, {e}', param, ctx
+                    f'Failed to add {value!r} as an Attribute, {e}', param, ctx
                 )
-        elif isinstance(value, str):
-            return Attributes[value]
-        else:
-            self.fail(f'{value!r} is of an invalid type.', param, ctx)
+        return list(attrs)
 
 
 class MetricParamType(click.ParamType):
@@ -79,11 +94,12 @@ class MetricParamType(click.ParamType):
     This param accepts names of metric groups or a path to a file containing
     custom metrics.
     """
+
     name = 'metrics'
 
     def convert(self, value, param, ctx) -> list[Metric]:
         if value is None or not value:
-            return list(all_metrics.values())
+            return list(grid_metrics.get_grid_metrics('Z').values())
         parsed_values = value.split(',')
         metrics: set[Metric] = set()
         for val in parsed_values:
@@ -98,8 +114,7 @@ class MetricParamType(click.ParamType):
                     p = Path(cwd, val)
                     if not p.exists():
                         self.fail(
-                            'Failed to find import file for metrics at'
-                            f' {p}',
+                            f'Failed to find import file for metrics at {p}',
                             param,
                             ctx,
                         )
@@ -135,8 +150,31 @@ class MetricParamType(click.ParamType):
                         metrics.update(list(percentiles.values()))
                     elif val == 'aad':
                         metrics.update(list(aad.aad.values()))
-                    elif val == 'grid_metrics':
-                        metrics.update(list(grid_metrics.get_grid_metrics().values()))
+                    elif 'grid_metric' in val:
+                        args = val.split('_')
+                        elev_key = 'Z'
+                        min_ht = 2
+                        ht_break = 3
+                        for idx, a in enumerate(args):
+                            if idx == 2:
+                                elev_key = a
+                            elif idx == 3:
+                                min_ht = a
+                            elif idx == 4:
+                                ht_break = a
+                            else:
+                                continue
+                        # TODO this shouldn't return grid_metrics if we're
+                        # coming from extract
+                        metrics.update(
+                            list(
+                                grid_metrics.get_grid_metrics(
+                                    elev_key=elev_key,
+                                    min_ht=min_ht,
+                                    ht_break=ht_break,
+                                ).values()
+                            )
+                        )
                     elif val == 'all':
                         metrics.update(list(all_metrics.values()))
                     else:
@@ -145,9 +183,11 @@ class MetricParamType(click.ParamType):
                             metrics.add(m)
                         else:
                             metrics.udpate(list(m))
-                except Exception:
+                except Exception as e:
                     self.fail(
-                        f'{val!r} is not available in Metrics', param, ctx
+                        f'{e} when trying to implement metric {val!r}',
+                        param,
+                        ctx,
                     )
         return list(metrics)
 
@@ -176,12 +216,6 @@ def dask_handle(
             p.register()
 
     elif scheduler == 'distributed':
-        # raise Exception("Dask distributed scheduler is currently disabled. "
-        #     "Please select another scheduler ('single-threaded' or 'local')")
-
-        # TODO: this is disabled for now. Distributed dask keeps crashing when
-        # used for shatter.
-
         dask_config['scheduler'] = scheduler
         if dasktype == 'processes':
             cluster = LocalCluster(

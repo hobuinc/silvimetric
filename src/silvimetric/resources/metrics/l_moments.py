@@ -8,12 +8,11 @@ def lmom4(data, *args):
     Adapted from https://xiaoganghe.github.io/python-climate-visuals/chapters/data-analytics/scipy-basic.html
     """
 
-    data = data.values
-    n = len(data)
+    n = data.count()
     idx = np.arange(n)
 
     # sort in descending order
-    data = np.sort(data.reshape(n))[::-1]
+    data = np.sort(data)[::-1]
 
     b0 = data.mean()
     l1: float = b0
@@ -103,7 +102,7 @@ def m_lkurtosis(data, *args):
 
 
 # intermediate metric, not intended for insertion into db
-l_mom_base = Metric('lmombase', object, lmom4, [])
+l_mom_base = Metric('lmombase', object, lmom4)
 
 
 l1 = Metric('l1', np.float32, m_l1, [l_mom_base])

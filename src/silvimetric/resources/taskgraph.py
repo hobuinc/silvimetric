@@ -8,8 +8,7 @@ class Graph:
     """
 
     def __init__(self, metrics: list[Metric] | Metric):
-        """Initialize task Graph class.
-        """
+        """Initialize task Graph class."""
         if isinstance(metrics, Metric):
             metrics = [metrics]
 
@@ -23,10 +22,10 @@ class Graph:
         Create task dependency list
         """
         for m in self.metrics:
-            self.nodes[m.name] = Node(m, self)
-        node_vals = list(self.nodes.values())
-        for n in node_vals:
+            n = Node(m, self)
             n.init()
+            self.nodes[m.name] = n
+
         self.initialized = True
         return self
 
@@ -38,6 +37,10 @@ class Graph:
             self.init()
 
         m_names = [m.name for m in self.metrics]
+        for n in self.nodes.values():
+            if not len(n.dependencies):
+                n.run(data_in)
+
         res = [n.run(data_in) for k, n in self.nodes.items() if k in m_names]
 
         self.results = res[0].join(res[1:])
@@ -45,8 +48,8 @@ class Graph:
 
 
 class Node:
-    """Class for coordinating a task run, its dependencies, and the results.
-    """
+    """Class for coordinating a task run, its dependencies, and the results."""
+
     # TODO add mutex to Node so it can be run in parallel
     def __init__(self, metric, graph):
         self.metric = metric

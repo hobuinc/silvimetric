@@ -43,7 +43,7 @@ PROJECTION[\"Lambert_Conformal_Conic_2SP\"],PARAMETER[\"latitude_of_origin\",
 AUTHORITY[\"EPSG\",\"9002\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH],
 AUTHORITY[\"EPSG\",\"2992\"]]"""
     b = Bounds(635579.2, 848884.83, 639003.73, 853536.21)
-    sc = StorageConfig(b, srs, 10, tdb_dir=p)
+    sc = StorageConfig(b, srs, 10, tdb_dir=p, xsize=100, ysize=100)
     Storage.create(sc)
     yield sc
 
@@ -59,7 +59,8 @@ def autzen_data(
 @pytest.fixture(scope='function')
 def metric_data(autzen_data: Data) -> Generator[pd.DataFrame, None, None]:
     p = autzen_data.pipeline
-    autzen_data.execute()
+    dims = ['Z', 'Intensity', 'xi', 'yi', 'X', 'Y']
+    autzen_data.execute(allowed_dims=dims)
     points = p.get_dataframe(0)
     points.loc[:, 'xi'] = np.floor(points.xi)
     points.loc[:, 'yi'] = np.ceil(points.yi)
@@ -115,7 +116,7 @@ def metric_shatter_config(
         assert isinstance(ndf, pd.DataFrame)
         return ndf
 
-    metrics[0].add_filter(dummy_fn)
+    metrics[0].filters = [dummy_fn]
     metrics[0].attributes = attrs
 
     """Make output"""
@@ -129,6 +130,8 @@ def metric_shatter_config(
         metrics=metrics,
         alignment=alignment,
         version=svversion,
+        xsize=5,
+        ysize=5
     )
 
     Storage.create(st_config)

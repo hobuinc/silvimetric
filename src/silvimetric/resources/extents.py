@@ -1,10 +1,10 @@
 import math
 import numpy as np
+import itertools
+from typing_extensions import Self
 
-import dask
-import dask.bag as db
-
-from math import ceil
+from dask.delayed import delayed
+from dask import compute
 
 from .bounds import Bounds
 from .storage import Storage
@@ -39,6 +39,8 @@ class Extents(object):
         """Alignment of pixels in database."""
         self.cell_count = int((self.rangex * self.rangey) / self.resolution**2)
         """Number of cells in this Extents"""
+        # TODO add checks for values being outside the bounds. Either throw or
+        # adjust the bounds and emit a warning.
 
         self.x1 = math.floor((minx - self.root.minx) / resolution)
         """Minimum X index"""
@@ -49,6 +51,7 @@ class Extents(object):
         """Minimum Y index, or maximum Y value in point cloud"""
         self.y2 = math.ceil((self.root.maxy - miny) / resolution)
         """Maximum Y index, or minimum Y value in point cloud"""
+
         self.domain: IndexDomainList = ((self.x1, self.x2), (self.y1, self.y2))
         """Minimum bounding rectangle of this Extents"""
 
@@ -61,7 +64,7 @@ class Extents(object):
         """
         xis = np.arange(self.x1, self.x2, dtype=np.int32)
         yis = np.arange(self.y1, self.y2, dtype=np.int32)
-        xys = np.array(np.meshgrid(xis,yis)).T.reshape(-1,2)
+        xys = np.array(np.meshgrid(xis, yis)).T.reshape(-1, 2)
         return xys
 
     def disjoint_by_mbr(self, mbr):
@@ -94,71 +97,79 @@ class Extents(object):
     def chunk(
         self,
         data: Data,
-        res_threshold=100,
         pc_threshold=600000,
-        depth_threshold=6,
-    ):
+    ) -> list[Self]:
         """
-        Split up a dataset into tiles based on the given thresholds. Unlike Scan
-        this will filter out any tiles that contain no points.
+        Split up a dataset into tiles based on the point threshold. Unlike Scan
+        this will not stop at a specific depth, but keep going until finding
+        nodes that fit the point count threshold.
 
         :param data: Incoming Data object to oeprate on.
+        :param pc_threshold: Point count threshold., defaults to 600000
+        :return: Return list of Extents that fit the criteria
+        """
+        data = delayed(data)
+        pc_threshold = delayed(pc_threshold)
+        tasks = [self.filter(data, pc_threshold)]
+        chunks = []
+        while tasks:
+            results = compute(*tasks)
+            tasks = []
+            for r in results:
+                if r is None:
+                    continue
+                elif isinstance(r, Extents):
+                    chunks.append(r)
+                else:
+                    tasks = tasks + r
+        return chunks
+
+    @delayed
+    def filter(
+        self,
+        data: Data,
+        pc_threshold=600000,
+        prev_estimate=0,
+    ):
+        """
+        Creates quad tree of chunks for this bounds, runs pdal quickinfo over
+        this to determine if there are any points available. Uses a bottom
+        resolution of 1km.
+
+        :param data: Data object containing point cloud details.
         :param res_threshold: Resolution threshold., defaults to 100
         :param pc_threshold: Point count threshold., defaults to 600000
         :param depth_threshold: Tree depth threshold., defaults to 6
-        :return: Return list of Extents that fit the criteria
+        :param depth: Current tree depth., defaults to 0
+        :return: Returns a list of Extents.
         """
-        if self.root is not None:
-            base_bbox = self.root.get()
-            r = self.root
+        pc = data.estimate_count(self.bounds)
+
+        target_pc = pc_threshold
+        minx, miny, maxx, maxy = self.bounds.get()
+
+        # is it empty?
+        if not pc:
+            return None
         else:
-            base_bbox = self.bounds.get()
-            r = self.bounds
+            # has it hit the threshold yet?
+            next_split_x = (maxx - minx) / 2
+            next_split_y = (maxy - miny) / 2
 
-        bminx = base_bbox[0]
-        bmaxy = base_bbox[3]
-
-        # make bounds in scale with the desired resolution
-        minx = bminx + (self.x1 * self.resolution)
-        maxx = bminx + (self.x2 * self.resolution)
-
-        miny = bmaxy - (self.y2 * self.resolution)
-        maxy = bmaxy - (self.y1 * self.resolution)
-
-        chunk = Extents(
-            Bounds(minx, miny, maxx, maxy), self.resolution, self.alignment, r
-        )
-
-        if self.bounds == self.root:
-            self.root = chunk.bounds
-
-        filtered = []
-        curr = db.from_delayed(
-            [
-                dask.delayed(ch.filter)(
-                    data, res_threshold, pc_threshold, depth_threshold, 1
-                )
-                for ch in chunk.split()
-            ]
-        )
-        curr_depth = 1
-
-        logger = data.storageconfig.log
-        while curr.npartitions > 0:
-            logger.debug(
-                f'Filtering {curr.npartitions} tiles at depth {curr_depth}'
-            )
-            n = curr.compute()
-            to_add = [ne for ne in n if isinstance(ne, Extents)]
-            if to_add:
-                filtered = filtered + to_add
-
-            curr = db.from_delayed(
-                [ne for ne in n if not isinstance(ne, Extents)]
-            )
-            curr_depth += 1
-
-        return filtered
+            # if the next split would put our area below the resolution, or if
+            # the point count is less than the point threshold then use this
+            # tile as the work unit.
+            if next_split_x < self.resolution or next_split_y < self.resolution:
+                return self
+            elif pc <= target_pc:
+                return self
+            elif pc == prev_estimate:
+                return self
+            else:
+                return [
+                    ch.filter(data, pc_threshold, prev_estimate=pc)
+                    for ch in self.split()
+                ]
 
     def split(self):
         """
@@ -174,7 +185,7 @@ class Extents(object):
         midx = minx + (x_adjusted * self.resolution)
         midy = maxy - (y_adjusted * self.resolution)
 
-        exts = [
+        return [
             Extents(
                 Bounds(minx, miny, midx, midy),
                 self.resolution,
@@ -200,82 +211,6 @@ class Extents(object):
                 self.root,
             ),  # top right
         ]
-        return exts
-
-    def filter(
-        self,
-        data: Data,
-        res_threshold=100,
-        pc_threshold=600000,
-        depth_threshold=6,
-        depth=0,
-    ):
-        """
-        Creates quad tree of chunks for this bounds, runs pdal quickinfo over
-        this to determine if there are any points available. Uses a bottom
-        resolution of 1km.
-
-        :param data: Data object containing point cloud details.
-        :param res_threshold: Resolution threshold., defaults to 100
-        :param pc_threshold: Point count threshold., defaults to 600000
-        :param depth_threshold: Tree depth threshold., defaults to 6
-        :param depth: Current tree depth., defaults to 0
-        :return: Returns a list of Extents.
-        """
-
-        pc = data.estimate_count(self.bounds)
-        target_pc = pc_threshold
-        minx, miny, maxx, maxy = self.bounds.get()
-
-        # is it empty?
-        if not pc:
-            return []
-        else:
-            # has it hit the threshold yet?
-            area = (maxx - minx) * (maxy - miny)
-            next_split_x = (maxx - minx) / 2
-            next_split_y = (maxy - miny) / 2
-
-            # if the next split would put our area below the resolution, or if
-            # the point count is less than the threshold (600k) then use this
-            # tile as the work unit.
-            if next_split_x < self.resolution or next_split_y < self.resolution:
-                return [self]
-            elif pc < target_pc:
-                return [self]
-            elif area < res_threshold**2 or depth >= depth_threshold:
-                pc_per_cell = pc / (area / self.resolution**2)
-                cell_estimate = ceil(target_pc / pc_per_cell)
-
-                return self.get_leaf_children(cell_estimate)
-            else:
-                return [
-                    dask.delayed(ch.filter)(
-                        data,
-                        res_threshold,
-                        pc_threshold,
-                        depth_threshold,
-                        depth=depth + 1,
-                    )
-                    for ch in self.split()
-                ]
-
-    def _find_dims(self, tile_size):
-        """
-        Find most square-like Extents given the number of cells per tile.
-
-        :param tile_size: Number of cells per tile.
-        :return: Returns x and y coordinates in a list.
-        """
-        s = math.sqrt(tile_size)
-        if int(s) == s:
-            return [s, s]
-        rng = np.arange(1, tile_size + 1, dtype=np.int32)
-        factors = rng[np.where(tile_size % rng == 0)]
-        idx = int((factors.size / 2) - 1)
-        x = factors[idx]
-        y = int(tile_size / x)
-        return [x, y]
 
     def get_leaf_children(self, tile_size):
         """
@@ -285,7 +220,8 @@ class Extents(object):
         :yield: Yield from list of child extents.
         """
         res = self.resolution
-        xnum, ynum = self._find_dims(tile_size)
+        xnum = math.floor(math.sqrt(tile_size))
+        ynum = xnum
 
         local_xs = np.array(
             [
@@ -308,7 +244,7 @@ class Extents(object):
         coords_list = np.array(
             [[*x, *y] for x in dx for y in dy], dtype=np.float64
         )
-        yield from [
+        return [
             Extents(
                 Bounds(minx, miny, maxx, maxy),
                 self.resolution,
@@ -318,30 +254,36 @@ class Extents(object):
             for minx, maxx, miny, maxy in coords_list
         ]
 
+    def get_overlap(self, other: Self) -> Self:
+        bounds = Bounds.shared_bounds(self.bounds, other.bounds)
+        return Extents(bounds, self.resolution, self.alignment, self.root)
+
     @staticmethod
-    def from_storage(tdb_dir: str):
+    def from_storage(storage: str | Storage):
         """
         Create Extents from information stored in database.
 
-        :param tdb_dir: TileDB database directory.
+        :param storage: SilviMetric Storage object or path to it.
         :return: Returns resulting Extents.
         """
-        storage = Storage.from_db(tdb_dir)
-        meta = storage.getConfig()
+        if isinstance(storage, str):
+            storage = Storage.from_db(storage)
+        meta = storage.get_config()
         return Extents(meta.root, meta.resolution, meta.alignment, meta.root)
 
     @staticmethod
-    def from_sub(tdb_dir: str, sub: Bounds):
+    def from_sub(storage: str | Storage, sub: Bounds):
         """
         Create an Extents that is less than the overall extents of the database.
 
-        :param tdb_dir: TileDB database directory.
+        :param storage: SilviMetric Storage object or path to it.
         :param sub: Desired bounding box.
         :return: Returns resulting Extents.
         """
-        storage = Storage.from_db(tdb_dir)
+        if isinstance(storage, str):
+            storage = Storage.from_db(storage)
 
-        meta = storage.getConfig()
+        meta = storage.get_config()
         res = meta.resolution
         align = meta.alignment
         base_extents = Extents(meta.root, res, align, meta.root)

@@ -2,7 +2,7 @@ from silvimetric import Data, Bounds
 from silvimetric.resources.config import StorageConfig
 
 
-class Test_Data(object):
+class Test_Data(object):  # noqa: D101
     def test_filepath(
         self,
         no_cell_line_path: str,
@@ -44,6 +44,7 @@ class Test_Data(object):
         data = Data(no_cell_line_pipeline, storage_config, bounds=ll)
 
         # data will be collared upon execution, extra data will be grabbed
+
         minx, miny, maxx, maxy = data.bounds.get()
         collared = Bounds(minx - 30, miny - 30, maxx + 30, maxy + 30)
 
@@ -62,7 +63,7 @@ class Test_Data(object):
         assert data.count(ll) == correct_count
 
 
-class Test_Autzen(object):
+class Test_Autzen(object):  # noqa: D101
     def test_filepath(
         self, autzen_filepath: str, storage_config: StorageConfig
     ):
@@ -72,3 +73,4 @@ class Test_Autzen(object):
         data.execute()
         assert len(data.array) == 577637
         assert data.estimate_count(data.bounds) == 577637
+

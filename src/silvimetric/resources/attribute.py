@@ -1,7 +1,7 @@
 import json
 import numpy as np
 import pdal
-from tiledb import Attr
+from tiledb import Attr, ZstdFilter, FilterList
 from .array_extensions import AttributeArray, AttributeDtype
 
 
@@ -33,6 +33,18 @@ class Attribute:
         """Return TileDB attribute name."""
         return self.name
 
+    def schema(self) -> Attr:
+        """
+        Create the tiledb schema for this attribute.
+        :return: TileDB attribute schema
+        """
+        return Attr(
+            name=self.name,
+            dtype=self.dtype.subtype,
+            var=True,
+            filters=FilterList([ZstdFilter()])
+        )
+
     def __eq__(self, other):
         if self.dtype != other.dtype:
             return False
@@ -43,13 +55,6 @@ class Attribute:
 
     def __hash__(self):
         return hash(('name', self.name, 'dtype', self.dtype))
-
-    def schema(self) -> Attr:
-        """
-        Create the tiledb schema for this attribute.
-        :return: TileDB attribute schema
-        """
-        return Attr(name=self.name, dtype=self.dtype.subtype, var=True)
 
     def to_json(self) -> object:
         return {'name': self.name, 'dtype': np.dtype(self.dtype.subtype).str}
@@ -79,7 +84,8 @@ class Attribute:
         return json.dumps(self.to_json())
 
 
-# A list of pdal dimensions can be found here https://pdal.io/en/2.6.0/dimensions.html
+# A list of pdal dimensions can be found here
+# https://pdal.io/en/2.6.0/dimensions.html
 Pdal_Attributes = {
     d['name']: Attribute(d['name'], d['dtype']) for d in pdal.dimensions
 }

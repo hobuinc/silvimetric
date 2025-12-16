@@ -48,6 +48,8 @@ def s3_storage_config(
         metrics=metrics,
         version=svversion,
         tdb_dir=s3_uri,
+        xsize=5,
+        ysize=5
     )
 
 
@@ -96,6 +98,8 @@ def uneven_storage_config(
         attrs=attrs,
         metrics=metrics,
         version=svversion,
+        xsize = 2,
+        ysize = 2
     )
     Storage.create(sc)
     yield sc
@@ -138,6 +142,8 @@ def partial_storage_config(
         metrics=metrics,
         alignment=alignment,
         version=svversion,
+        xsize=5,
+        ysize=5
     )
     Storage.create(sc)
     yield sc

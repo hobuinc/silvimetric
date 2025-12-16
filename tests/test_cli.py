@@ -33,12 +33,13 @@ class TestCli(object):
                 '--scheduler',
                 'single-threaded',
                 'initialize',
-                '--resolution',
-                '10',
+                '--resolution', '10',
                 '--crs',
                 'EPSG:3857',
                 '--bounds',
                 str(bounds),
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )
@@ -69,6 +70,8 @@ class TestCli(object):
                 str(bounds),
                 '-m',
                 'stats,p_moments',
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )
@@ -107,6 +110,8 @@ class TestCli(object):
                 str(bounds),
                 '-m',
                 f'{fakes}',
+                '--xsize', '5',
+                '--ysize', '5'
             ],
             catch_exceptions=False,
         )
@@ -121,7 +126,9 @@ class TestCli(object):
                 'shatter',
                 copc_filepath,
                 '--date',
-                date.isoformat() + 'Z',
+                date[0].isoformat() + 'Z',
+                '--date',
+                date[1].isoformat() + 'Z',
                 '--tilesize',
                 '10',
             ],
@@ -131,9 +138,9 @@ class TestCli(object):
         storage = Storage.from_db(p)
         with storage.open('r') as a:
             exists_vals = a[:, :]['m_Z_exists']
-            assert all(exists_vals)
+            assert exists_vals.all()
             count_vals = a[:, :]['m_Z_count']
-            assert all(count_vals == 100)
+            assert (count_vals == 100).all()
 
     def test_cli_shatter(
         self,
@@ -159,14 +166,16 @@ class TestCli(object):
                 'shatter',
                 copc_filepath,
                 '--date',
-                date.isoformat() + 'Z',
+                date[0].isoformat() + 'Z',
+                '--date',
+                date[1].isoformat() + 'Z',
                 '--tilesize',
                 '10',
             ],
             catch_exceptions=False,
         )
         assert res.exit_code == 0
-        confirm_one_entry(storage, maxy, base, test_point_count, 1)
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
     def test_cli_scan(
         self,
@@ -207,11 +216,9 @@ class TestCli(object):
     ):
         atts = []
         for a in extract_config.attrs:
-            atts.append('-a')
             atts.append(a.name)
         ms = []
         for m in extract_config.metrics:
-            ms.append('-m')
             ms.append(m.name)
         out_dir = extract_config.out_dir
         tdb_dir = extract_config.tdb_dir
@@ -224,8 +231,10 @@ class TestCli(object):
                 '--scheduler',
                 'single-threaded',
                 'extract',
-                *atts,
-                *ms,
+                '-a',
+                ','.join(atts),
+                '-m',
+                ','.join(ms),
                 '--outdir',
                 out_dir,
             ],
@@ -236,7 +245,11 @@ class TestCli(object):
     def test_cli_delete(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
     ) -> None:
-        i = shatter_config.name
+        pid = shatter_config.name
+
+        i = info.info(shatter_config.tdb_dir)
+        assert i['history'][0]['finished']
+
         res = runner.invoke(
             cli.cli,
             [
@@ -246,13 +259,13 @@ class TestCli(object):
                 'single-threaded',
                 'delete',
                 '--id',
-                i,
+                pid,
             ],
         )
         assert res.exit_code == 0
 
         i = info.info(shatter_config.tdb_dir)
-        assert len(i['history']) == 0
+        assert not i['history'][0]['finished']
 
     def test_cli_restart(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
@@ -278,7 +291,8 @@ class TestCli(object):
     def test_cli_resume(
         self, runner: CliRunner, shatter_config: ShatterConfig, pre_shatter: int
     ) -> None:
-        i = shatter_config.name
+        pid = shatter_config.name
+
         res = runner.invoke(
             cli.cli,
             [
@@ -286,12 +300,14 @@ class TestCli(object):
                 shatter_config.tdb_dir,
                 '--scheduler',
                 'single-threaded',
-                'restart',
+                'resume',
                 '--id',
-                i,
+                pid,
             ],
         )
         assert res.exit_code == 0
         i = info.info(shatter_config.tdb_dir)
         assert len(i['history']) == 1
-        assert ShatterConfig.from_dict(i['history'][0])
+        sc = ShatterConfig.from_dict(i['history'][0])
+        assert sc.finished
+

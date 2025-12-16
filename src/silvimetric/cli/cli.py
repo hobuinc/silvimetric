@@ -30,9 +30,6 @@ from .common import dask_handle, close_dask
 @click.option(
     '--log-dir', default=None, help='Directory for log output', type=str
 )
-@click.option(
-    '--progress', is_flag=True, default=True, type=bool, help='Report progress'
-)
 @click.option('--workers', type=int, help='Number of workers for Dask')
 @click.option(
     '--threads', type=int, help='Number of threads per worker for Dask'
@@ -66,7 +63,6 @@ def cli(
     database,
     debug,
     log_dir,
-    progress,
     dasktype,
     scheduler,
     workers,
@@ -88,7 +84,6 @@ def cli(
         tdb_dir=database,
         log=log,
         debug=debug,
-        progress=progress,
         scheduler=scheduler,
         dasktype=dasktype,
         workers=workers,
@@ -155,12 +150,15 @@ def info_cmd(
 
     start_date = dates[0] if dates else date
     end_date = dates[1] if dates else date
+    if start_date is None and end_date is None:
+        info_dates=None
+    else:
+        info_dates = tuple(start_date, end_date)
 
     i = info.info(
         app.tdb_dir,
         bounds=bounds,
-        start_time=start_date,
-        end_time=end_date,
+        dates = info_dates,
         name=name,
         concise=True,
     )
@@ -175,7 +173,6 @@ def info_cmd(
     ]
 
     i['metadata'].pop('metrics')
-    # print(metrics.keys())
     if any([history, metadata, attributes, metrics]):
         filtered = {}
         if history:
@@ -187,10 +184,10 @@ def info_cmd(
         if metrics:
             filtered['metrics'] = ms
 
-        app.log.info(json.dumps(filtered, indent=2))
+        print(json.dumps(filtered, indent=2))
 
     else:
-        app.log.info(json.dumps(i, indent=2))
+        print(json.dumps(i, indent=2))
         return
 
 
@@ -198,13 +195,6 @@ def info_cmd(
 @click.argument('pointcloud', type=str)
 @click.option(
     '--resolution', type=float, default=100, help='Summary pixel resolution'
-)
-@click.option(
-    '--filter_empty',
-    is_flag=True,
-    type=bool,
-    default=False,
-    help='Remove empty space in computation. Will take extra time.',
 )
 @click.option(
     '--point_count', type=int, default=600000, help='Point count threshold.'
@@ -215,7 +205,7 @@ def info_cmd(
 )
 @click.pass_obj
 def scan_cmd(
-    app, resolution, point_count, pointcloud, bounds, depth, filter_empty
+    app, resolution, point_count, pointcloud, bounds, depth
 ):
     """Scan point cloud, output information on it, and determine the optimal
     tile size."""
@@ -233,7 +223,6 @@ def scan_cmd(
         point_count,
         resolution,
         depth,
-        filter_empty,
         log=app.log,
     )
 
@@ -254,9 +243,9 @@ def scan_cmd(
 @click.option(
     '--attributes',
     '-a',
-    multiple=True,
     type=AttrParamType(),
-    help='List of attributes to include in Database',
+    default=[],
+    help='List of attributes to include in Database, eg. -a Z,Intensity',
 )
 @click.option(
     '--metrics',
@@ -267,6 +256,12 @@ def scan_cmd(
 )
 @click.option(
     '--resolution', type=float, default=30.0, help='Summary pixel resolution'
+)
+@click.option(
+    '--xsize', type=float, default=1000, help='TileDB X Tile size.'
+)
+@click.option(
+    '--ysize', type=float, default=1000, help='TileDB Y Tile size.'
 )
 @click.option(
     '--alignment',
@@ -283,6 +278,8 @@ def initialize_cmd(
     resolution: float,
     metrics: list[Metric],
     alignment: str,
+    xsize: int,
+    ysize: int
 ):
     """Initialize silvimetrics DATABASE"""
 
@@ -295,6 +292,8 @@ def initialize_cmd(
         metrics=metrics,
         resolution=resolution,
         alignment=alignment,
+        xsize=xsize,
+        ysize=ysize
     )
     return initialize.initialize(storageconfig)
 
@@ -376,7 +375,7 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
             report_path = f'reports/{config.name}.html'
             with performance_report(report_path):
                 shatter.shatter(config)
-            print(f'Writing report to {report_path}.')
+            app.log.debug(f'Writing report to {report_path}.')
     else:
         shatter.shatter(config)
 
@@ -385,10 +384,9 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 @click.option(
     '--attributes',
     '-a',
-    multiple=True,
     type=AttrParamType(),
     default=[],
-    help='List of attributes to include output',
+    help='List of attributes to include output, eg -a Z,Intensity',
 )
 @click.option(
     '--metrics',
@@ -414,15 +412,13 @@ def shatter_cmd(app, pointcloud, bounds, report, tilesize, date, dates):
 def extract_cmd(app, attributes, metrics, outdir, bounds):
     """Extract silvimetric metrics from DATABASE"""
 
-    # TODO only allow metrics and attributes to be added if they're present
-    # in the storage config.
-    # dask_handle(
-    #     app.dasktype,
-    #     app.scheduler,
-    #     app.workers,
-    #     app.threads,
-    #     app.watch,
-    # )
+    dask_handle(
+        app.dasktype,
+        app.scheduler,
+        app.workers,
+        app.threads,
+        app.watch,
+    )
 
     config = ExtractConfig(
         tdb_dir=app.tdb_dir,
@@ -445,7 +441,7 @@ def extract_cmd(app, attributes, metrics, outdir, bounds):
 )
 @click.pass_obj
 def delete_cmd(app, task_id):
-    manage.delete(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.delete(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('restart')
@@ -458,7 +454,7 @@ def delete_cmd(app, task_id):
 )
 @click.pass_obj
 def restart_cmd(app, task_id):
-    manage.restart(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.restart(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 @cli.command('resume')
@@ -471,7 +467,7 @@ def restart_cmd(app, task_id):
 )
 @click.pass_obj
 def resume_cmd(app, task_id):
-    manage.resume(tdb_dir=app.tdb_dir, name=task_id, log=app.log)
+    manage.resume(storage=app.tdb_dir, name=task_id, log=app.log)
 
 
 if __name__ == '__main__':

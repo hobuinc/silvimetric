@@ -6,7 +6,7 @@ import copy
 from datetime import datetime
 from typing_extensions import Generator
 
-from silvimetric import Extents, Bounds, Attribute, Storage
+from silvimetric import Extents, Bounds, Attribute, Storage, Attributes
 from silvimetric import all_metrics
 from silvimetric import Log, Metric, ShatterConfig, StorageConfig
 from silvimetric import ApplicationConfig, ExtractConfig
@@ -64,6 +64,8 @@ def storage_config(
         metrics=metrics,
         alignment=alignment,
         version=svversion,
+        xsize=5,
+        ysize=5
     )
     Storage.create(sc)
     yield sc
@@ -72,13 +74,15 @@ def storage_config(
 
 @pytest.fixture(scope='function')
 def storage(storage_config: StorageConfig):
-    yield Storage(storage_config)
+    st = Storage(storage_config)
+    yield st
 
 
 @pytest.fixture(scope='function')
 def shatter_config(
     copc_filepath: str,
     storage_config: StorageConfig,
+    storage: Storage,
     bounds: Bounds,
     date: datetime,
 ) -> Generator[ShatterConfig, None, None]:
@@ -101,6 +105,7 @@ def extract_config(
     metrics: list[Metric],
     shatter_config: ShatterConfig,
     extract_attrs: list[str],
+    date
 ):
     from silvimetric.commands import shatter
 
@@ -113,15 +118,18 @@ def extract_config(
         out_dir=tif_filepath,
         attrs=extract_attrs,
         metrics=metrics,
+        date=date
     )
     yield c
 
 
 @pytest.fixture(scope='function')
 def metrics() -> Generator[list[Metric], None, None]:
+    mean = all_metrics['mean']
+    median = all_metrics['median']
     yield [
-        copy.deepcopy(all_metrics['mean']),
-        copy.deepcopy(all_metrics['median']),
+        Metric('mean', dtype=mean.dtype, method=mean._method),
+        Metric('median', dtype=median.dtype, method=median._method)
     ]
 
 
@@ -143,7 +151,7 @@ def extents(
 @pytest.fixture(scope='function')
 def attrs(dims: dict) -> Generator[list[Attribute], None, None]:
     yield [
-        Attribute(a, dims[a])
+        copy.deepcopy(Attributes[a])
         for a in ['Z', 'NumberOfReturns', 'ReturnNumber', 'Intensity']
     ]
 
@@ -198,5 +206,5 @@ def crs() -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope='session')
-def date() -> Generator[datetime, None, None]:
-    yield datetime(2011, 1, 1)
+def date() -> Generator[list[datetime], None, None]:
+    yield [datetime(2011, 1, 1), datetime(2012,1,1)]

@@ -14,7 +14,7 @@ from silvimetric import (
 
 
 def tif_test(extract_config):
-    minx, miny, maxx, maxy = extract_config.bounds.get()
+    minx, _miny, _maxx, maxy = extract_config.bounds.get()
     resolution = extract_config.resolution
     filenames = [
         all_metrics[m.name].entry_name(a.name)

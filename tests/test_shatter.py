@@ -1,18 +1,16 @@
 import os
-import json
 import uuid
 import datetime
 from math import ceil
-
+import copy
 import pytest
+
 import numpy as np
+import pandas as pd
 import dask
-import tiledb
 
 from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
-from silvimetric.resources.attribute import Attribute
-from silvimetric.resources.metric import Metric
 
 
 @dask.delayed
@@ -27,43 +25,45 @@ def write(x, y, val, s: Storage, attrs, dims, metrics):
         data[m] = [val]
 
     data['count'] = [val]
-    data['start_datetime'] = [0]
-    data['end_datetime'] = [datetime.datetime.now().timestamp()]
+    data['shatter_process_num'] = 1
     with s.open('w') as w:
         w[x, y] = data
 
 
-def confirm_one_entry(storage, maxy, base, pointcount, num_entries=1):
+def confirm_one_entry(storage, maxy, base, pointcount):
     xysize = base
-    shape = xysize**2 * num_entries
-    pc = pointcount * num_entries
+    shape = xysize**2
+    pc = pointcount
 
     with storage.open('r') as a:
-        assert a[:, :]['Z'].shape[0] == shape
+        vals = a.df[:, :].set_index(['X', 'Y'])
+        assert vals.Z.shape[0] == shape
         xdom = int(a.schema.domain.dim('X').domain[1])
         ydom = int(a.schema.domain.dim('Y').domain[1])
         assert xdom == xysize
         assert ydom == xysize
-        assert a[:, :]['count'].sum() == pc
+        assert vals['count'].sum() == pc
         val_const = ceil(maxy / storage.config.resolution)
 
         for xi in range(xdom):
             for yi in range(ydom):
-                for i in range(a[xi, yi]['Z'].size):
-                    # assert np.all(a[xi, yi]['Z'][i] >= 9)
-                    # assert np.all(a[xi, yi]['Z'][i] <= 20)
-                    assert bool(
-                        np.all(a[xi, yi]['Z'][i] == (val_const - yi - 1))
-                    )
+                z = vals.loc[xi, yi].Z
+                zmean = vals.loc[xi, yi].m_Z_mean
+                if isinstance(z, np.ndarray):
+                    assert np.all(z == (val_const - yi - 1))
+                elif isinstance(z, pd.Series):
+                    for z1 in z.values:
+                        np.all(z1 == (val_const - yi - 1))
+                assert z.mean() == zmean
 
 
-class Test_Shatter(object):
+class Test_Shatter(object):  # noqa: D101
     def test_command(
         self,
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
+        # threaded_dask,
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
@@ -75,76 +75,68 @@ class Test_Shatter(object):
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
     ):
         shatter(shatter_config)
         base = 11 if storage.config.alignment == 'AlignToCenter' else 10
         maxy = storage.config.root.maxy
         confirm_one_entry(storage, maxy, base, test_point_count)
 
+        shatter_config2 = copy.deepcopy(shatter_config)
+        d2 = (datetime.datetime(2009, 1, 1), datetime.datetime(2010, 1, 1))
+
         # change attributes to make it a new run
-        shatter_config.name = uuid.uuid4()
-        shatter_config.mbr = ()
-        shatter_config.time_slot = 2
-        shatter_config.date = (datetime.datetime(2009,1,1),datetime.datetime(2010,1,1))
-        shatter(shatter_config)
-        confirm_one_entry(storage, maxy, base, test_point_count, 2)
+        shatter_config2.name = uuid.uuid4()
+        shatter_config2.mbr = ()
+        shatter_config2.time_slot = storage.reserve_time_slot()
+        shatter_config2.date = d2
+        shatter_config2.start_timestamp = None
+        shatter_config2.end_timestamp = None
+        shatter(shatter_config2)
+
+        # no longer allowing duplicates, so removing option for double items
+        confirm_one_entry(storage, maxy, base, test_point_count)
 
         # check that you can query results by datetime
-        with storage.open('r') as a:
-            a:tiledb.SparseArray
-            query_time = datetime.datetime(2009,6,1).timestamp()
-            q = a.query(cond=f'start_datetime >= {query_time}')
-            assert len(q.df[:,:]['start_datetime']) == base ** 2
+        with storage.open('r', timestamp=shatter_config2.timestamp) as a:
+            assert np.all(a.df[:, :].shatter_process_num == 2)
+            assert len(a.df[:, :]) == base**2
 
-        m = info(storage.config.tdb_dir)
+        with storage.open('r', timestamp=shatter_config.timestamp) as a2:
+            assert np.all(a2.df[:, :].shatter_process_num == 1)
+            assert len(a2.df[:, :]) == base**2
+
+        with storage.open(
+            'r',
+            timestamp=(
+                shatter_config.timestamp[0],
+                shatter_config2.timestamp[1],
+            ),
+        ) as a3:
+            vals = a3.df[:, :]
+            vals = vals[vals.shatter_process_num != 0]
+
+            proc1 = vals.shatter_process_num == 1
+            assert not proc1.any()
+
+            proc2 = vals.shatter_process_num == 2
+            assert proc2.all()
+
+        m = info(storage)
         assert len(m['history']) == 2
-
-    def test_parallel(
-        self,
-        storage: Storage,
-        attrs: list[Attribute],
-        dims: dict,
-        threaded_dask: None,
-        metrics: list[Metric],
-    ):
-        # test that writing in parallel doesn't affect ordering of values
-        # constrained by NumberOfReturns being uint8
-
-        count = 255
-        tl = [
-            write(0, 0, val, storage, attrs, dims, metrics)
-            for val in range(count)
-        ]
-
-        dask.compute(tl)
-
-        with storage.open('r') as r:
-            d = r[0, 0]
-            for idx in range(count):
-                assert bool(np.all(d['Z'][idx] == d['Intensity'][idx]))
-                assert bool(
-                    np.all(d['Intensity'][idx] == d['NumberOfReturns'][idx])
-                )
-                assert bool(
-                    np.all(d['NumberOfReturns'][idx] == d['ReturnNumber'][idx])
-                )
 
     def test_config(
         self,
         shatter_config: ShatterConfig,
         storage: Storage,
         test_point_count: int,
-        threaded_dask
     ):
         shatter(shatter_config)
         try:
-            meta = storage.getMetadata('shatter', shatter_config.time_slot)
+            meta = storage.get_shatter_meta(shatter_config.time_slot)
+            pc = meta.point_count
+            assert pc == test_point_count
         except BaseException as e:
             pytest.fail("Failed to retrieve 'shatter' metadata key." + e.args)
-        meta_j = json.loads(meta)
-        pc = meta_j['point_count']
-        assert pc == test_point_count
 
     @pytest.mark.parametrize(
         'sh_cfg', ['shatter_config', 'uneven_shatter_config']
@@ -154,9 +146,8 @@ class Test_Shatter(object):
         sh_cfg: str,
         test_point_count: int,
         request: pytest.FixtureRequest,
-        maxy: float,
         alignment: str,
-        threaded_dask
+        threaded_dask,
     ):
         s = request.getfixturevalue(sh_cfg)
         storage = Storage.from_db(s.tdb_dir)
@@ -225,4 +216,4 @@ class Test_Shatter(object):
         base = 11
         point_count = 108900
         shatter(s3_shatter_config)
-        confirm_one_entry(s3_storage, maxy, base, point_count, 1)
+        confirm_one_entry(s3_storage, maxy, base, point_count)

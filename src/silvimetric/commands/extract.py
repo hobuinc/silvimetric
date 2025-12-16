@@ -1,15 +1,11 @@
 from pathlib import Path
 
-from dask.diagnostics import ProgressBar
-from distributed.client import _get_global_client as get_client
-from typing_extensions import Union
 from osgeo import gdal, osr
 import dask
 import numpy as np
 import pandas as pd
 
-
-from .. import Storage, Extents, ExtractConfig, Bounds, Graph
+from .. import Storage, Extents, ExtractConfig, Bounds
 
 np_to_gdal_types = {
     np.dtype(np.byte).str: gdal.GDT_Byte,
@@ -31,6 +27,7 @@ def write_tif(
     data: np.ndarray,
     nan_val: float | int,
     name: str,
+    dtype: np.dtype,
     config: ExtractConfig,
 ) -> None:
     """
@@ -47,7 +44,7 @@ def write_tif(
     crs = config.crs
     srs = osr.SpatialReference()
     srs.ImportFromWkt(crs.to_wkt())
-    minx, miny, maxx, maxy = bounds.get()
+    minx, _miny, _maxx, maxy = bounds.get()
     ysize, xsize = data.shape
 
     transform = [
@@ -60,7 +57,7 @@ def write_tif(
     ]
 
     driver = gdal.GetDriverByName('GTiff')
-    gdal_type = np_to_gdal_types[np.dtype(data.dtype).str]
+    gdal_type = np_to_gdal_types[dtype.str]
     tif = driver.Create(
         str(path),
         int(xsize),
@@ -76,41 +73,7 @@ def write_tif(
     tif = None
 
 
-def get_metrics(
-    data_in: pd.DataFrame, storage: Storage
-) -> Union[None, pd.DataFrame]:
-    """
-    Reruns a metric over this cell. Only called if there is overlapping data.
-
-    :param data_in: Dataframe to be rerun.
-    :param storage: Base storage object.
-    :return: Combined dict of attribute and newly derived metric data.
-    """
-
-    # TODO should just use the metric calculation methods from shatter
-    if data_in is None:
-        return None
-
-    def expl(x):
-        return x.explode()
-
-    attrs = [a.name for a in storage.config.attrs if a.name not in ['X', 'Y']]
-
-    # set index so we can apply to the whole dataset without needing to skip X
-    # and Y then reset in the index because that's what metric.do expects
-    data_in = data_in.set_index(['Y', 'X'])
-    exploded = data_in.apply(expl)[attrs].reset_index()
-
-    exploded.rename(columns={'X': 'xi', 'Y': 'yi'}, inplace=True)
-    graph = Graph(storage.config.metrics)
-    metric_data = graph.run(exploded)
-    #rename index from xi,yi to X,Y
-    metric_data.index = metric_data.index.rename(['Y','X'])
-
-    return metric_data
-
-
-def handle_overlaps(
+def get_data(
     config: ExtractConfig, storage: Storage, extents: Extents
 ) -> pd.DataFrame:
     """
@@ -124,59 +87,43 @@ def handle_overlaps(
     :return: Dataframe of rerun data.
     """
 
-    ma_list = storage.getDerivedNames()
-    att_list = [a.name for a in config.attrs]
-
-    minx = extents.x1
-    maxx = extents.x2
-    miny = extents.y1
-    maxy = extents.y2
-
-    att_meta = {}
-    att_meta['X'] = np.int32
-    att_meta['Y'] = np.int32
-    att_meta['count'] = np.int32
-    for a in config.attrs:
-        att_meta[a.name] = a.dtype
+    ma_list = storage.get_derived_names(config.metrics, config.attrs)
 
     with storage.open('r') as tdb:
-        storage.config.log.info('Looking for overlaps...')
+        # tiledb queries need dates as int64 values
+        start_datetime = (
+            np.datetime64(config.date[0], 'D').astype(np.int64).item()
+        )
+        end_datetime = (
+            np.datetime64(config.date[1], 'D').astype(np.int64).item()
+        )
+        cond = f'end_time >= {start_datetime} and start_time <= {end_datetime}'
+        xdim = tdb.schema.domain.dim('X').domain
+        ydim = tdb.schema.domain.dim('Y').domain
+        minx = max(extents.x1, xdim[0])
+        maxx = min(extents.x2, xdim[1])
+        miny = max(extents.y1, ydim[0])
+        maxy = min(extents.y2, ydim[1])
+
+        # older versions of silvimetric supported multiple values, and
+        # for backwards compatibility we will try to accept it still
         data = tdb.query(
-            attrs=[*ma_list],
+            attrs=[*ma_list, 'end_time', 'start_time'],
             order='F',
+            cond=cond,
             coords=True,
-        ).df[minx:maxx, miny:maxy]
-        data = data
+        ).df[minx : maxx - 1, miny : maxy - 1]
+
+        data = data[data.end_time >= np.datetime64(config.date[0], 'D')]
+        data = data[data.start_time <= np.datetime64(config.date[1], 'D')]
 
         # find values that are not unique, means they have multiple entries
+        # TODO phase this out at some point, storage is no longer created
+        # with duplicate entries as an option
         data = data.set_index(['Y', 'X'])
-        redo_indices = data.index[data.index.duplicated(keep='first')]
-        if redo_indices.empty:
-            storage.config.log.info('No overlapping data. Continuing...')
-            return data
-
-        redo_data = (
-            tdb.query(
-                attrs=[*att_list],
-                order='F',
-                coords=True,
-                use_arrow=False,
-            )
-            .df[:, :]
-            .set_index(['Y', 'X'])
-        )
-
-        # data with overlaps
-        redo_data = redo_data.loc[redo_indices]
-
-        # data that has no overlaps
-        clean_data = data.loc[data.index[~data.index.duplicated(False)]]
-
-        storage.config.log.warning(
-            'Overlapping data detected. Rerunning metrics over these cells...'
-        )
-        new_metrics = get_metrics(redo_data.reset_index(), storage)
-    return pd.concat([clean_data, new_metrics])
+        dedup_data = data[data.index.duplicated(keep='last')]
+        clean_data = data[~data.index.duplicated(False)]
+        return pd.concat([clean_data, dedup_data])
 
 
 def extract(config: ExtractConfig) -> None:
@@ -189,7 +136,8 @@ def extract(config: ExtractConfig) -> None:
     dask.config.set({'dataframe.convert-string': False})
 
     storage = Storage.from_db(config.tdb_dir)
-    ma_list = storage.getDerivedNames()
+    schema = storage.open('r').schema
+    ma_list = storage.get_derived_names(config.metrics, config.attrs)
     config.log.debug(f'Extracting metrics {[m for m in ma_list]}')
     root_bounds = storage.config.root
 
@@ -199,27 +147,17 @@ def extract(config: ExtractConfig) -> None:
         storage.config.alignment,
         root=root_bounds,
     )
+    cell_size = 0
+    for a in config.attrs:
+        for m in config.metrics:
+            if a in m.attributes:
+                cell_size = cell_size + np.dtype(m.dtype).itemsize
 
-    # figure out if there are any overlaps and handle them
-    final = handle_overlaps(config, storage, e)
-
-    xis = final.index.get_level_values(1).astype(np.int64)
-    yis = final.index.get_level_values(0).astype(np.int64)
-    new_idx = pd.MultiIndex.from_product(
-        (range(yis.min(), yis.max() + 1), range(xis.min(), xis.max() + 1))
-    ).rename(['Y','X'])
-    final = final.reindex(new_idx)
-
-    xs = root_bounds.minx + xis * config.resolution
-    ys = root_bounds.maxy - yis * config.resolution
-    final_bounds = Bounds(xs.min(), ys.min(), xs.max(), ys.max())
-
-    # output metric data to tifs
-    config.log.info(f'Writing rasters to {config.out_dir}')
+    final = get_data(config, storage, e)
     futures = []
     for ma in ma_list:
-        # TODO should output in sections so we don't run into memory problems
-        dtype = final[ma].dtype
+        dtype = schema.attr(ma).dtype
+        nan_val = -9999 if dtype.kind in ['i', 'f'] else 0
         if dtype.kind == 'u':
             nan_val = 0
         elif dtype.kind in ['i', 'f']:
@@ -227,15 +165,13 @@ def extract(config: ExtractConfig) -> None:
         else:
             nan_val = 0
         unstacked = final[ma].unstack()
+        unstacked = unstacked.fillna(nan_val)
         m_data = unstacked.to_numpy()
 
         futures.append(
-            dask.delayed(write_tif)(final_bounds, m_data, nan_val, ma, config)
+            dask.delayed(write_tif)(
+                e.bounds, m_data, nan_val, ma, dtype, config
+            )
         )
 
-    dc = get_client()
-    if dc is not None:
-        dask.compute(*futures)
-    else:
-        with ProgressBar():
-            dask.compute(*futures)
+    dask.compute(*futures)
