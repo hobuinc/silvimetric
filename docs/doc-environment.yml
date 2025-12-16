@@ -2,7 +2,7 @@ channels:
   - conda-forge
 
 dependencies:
-  - jupyter-book
+  - jupyter-book<2.0.0
   - sphinx > 6
   - sphinx-notfound-page
   - python>=3.10, <3.13
