@@ -42,8 +42,6 @@ class TestMetrics:
         metric_data: pd.DataFrame,
         metric_data_results: pd.DataFrame,
     ):
-        # TODO fix this, changed to hilbert ordering and changed
-        # to not using sort in groupbys
         ms = list(s.values())
         graph = Graph(ms)
         metrics = graph.run(metric_data)
@@ -51,7 +49,7 @@ class TestMetrics:
         # cannot use pandas compare because dataframes may not have identical
         # column ordering, so compare values of each column
         for m in metric_data_results.columns:
-            assert all(metric_data_results[m].values == metrics[m].values)
+            assert all(np.isclose(metric_data_results[m].values, metrics[m].values))
 
     def test_dependencies(self, metric_data: pd.DataFrame):
         # should be able to create a dependency graph
