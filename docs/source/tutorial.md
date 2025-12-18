@@ -159,7 +159,7 @@ to be pushed and fetched to and from the database.
 
  import numpy as np
 
- from silvimetric.resources import Metric
+ from silvimetric.resources.metrics import Metric
 
  def metrics() -> list[Metric]:
 
