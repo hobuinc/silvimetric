@@ -406,10 +406,10 @@ from silvimetric.resources.metrics.stats import sm_min, sm_max, mean
 # directory that will house the raster data.
 curpath = Path(os.path.dirname(os.path.realpath(__file__)))
 filename = "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
-db_dir_path = Path(curpath  / "western_us.tdb")
+db_dir_path = Path(curpath  / "western-us.tdb")
 
 db_dir = db_dir_path.as_posix()
-out_dir = (curpath / "westsern_us_tifs").as_posix()
+out_dir = (curpath / "western-us-tifs").as_posix()
 resolution = 30 # 30 meter resolution
 
 # we'll use PDAL python bindings to find the srs of our data, and the bounds
