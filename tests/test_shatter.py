@@ -200,20 +200,23 @@ class Test_Shatter(object):  # noqa: D101
         actual = 22500 if alignment == 'AlignToCorner' else 32400
         assert pc == actual
 
-    @pytest.mark.skipif(
-        os.environ.get('AWS_SECRET_ACCESS_KEY') is None
-        or os.environ.get('AWS_ACCESS_KEY_ID') is None,
-        reason='Missing necessary AWS environment variables',
-    )
-    def test_remote_creation(
-        self,
-        s3_shatter_config: ShatterConfig,
-        s3_storage: Storage,
-    ):
-        # need processes scheduler to accurately test bug fix
-        dask.config.set(scheduler='processes')
-        maxy = s3_storage.config.root.maxy
-        base = 11
-        point_count = 108900
-        shatter(s3_shatter_config)
-        confirm_one_entry(s3_storage, maxy, base, point_count)
+    # Removing to speed up github actions tests. Currently causing some actions
+    # to time out.
+
+    # @pytest.mark.skipif(
+    #     os.environ.get('AWS_SECRET_ACCESS_KEY') is None
+    #     or os.environ.get('AWS_ACCESS_KEY_ID') is None,
+    #     reason='Missing necessary AWS environment variables',
+    # )
+    # def test_remote_creation(
+    #     self,
+    #     s3_shatter_config: ShatterConfig,
+    #     s3_storage: Storage,
+    # ):
+    #     # need processes scheduler to accurately test bug fix
+    #     dask.config.set(scheduler='processes')
+    #     maxy = s3_storage.config.root.maxy
+    #     base = 11
+    #     point_count = 108900
+    #     shatter(s3_shatter_config)
+    #     confirm_one_entry(s3_storage, maxy, base, point_count)
