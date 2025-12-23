@@ -1,4 +1,5 @@
 import json
+import xml.etree.ElementTree as ET
 
 from math import floor
 from typing_extensions import Optional, Union, Literal
@@ -176,9 +177,89 @@ class Storage:
             writer.meta['config'] = str(config)
 
         s = Storage(config)
+
+        geotransform = (
+            config.root.minx,
+            config.resolution,
+            0.0,
+            config.root.miny,
+            0.0,
+            -config.resolution
+        )
+        sample_dtype = (
+            metric_atts[0].dtype if metric_atts else np.float64
+        )
+        pam_metadata = s.build_pam_metadata(
+            geotransform= geotransform,
+            data_type=str(np.dtype(sample_dtype)),
+            nbits=np.dtype(sample_dtype).itemsize * 8,
+        )
+
+        s.save_metadata('_meta', pam_metadata)
         s.save_config()
 
         return s
+    
+    def build_pam_metadata(
+        self,
+        geotransform: tuple,
+        data_type: str,
+        nbits: int
+    ) -> str:
+        tb = ET.TreeBuilder()
+
+        tb.start("PMDataset", {})
+
+        tb.start("SRS", {"dataAxisToSRSAxisMapping": "1,2"})
+        tb.data(self.config.crs.to_wkt("WKT1_GDAL"))
+        tb.end("SRS")
+
+        tb.start("GeoTransform", {})
+        tb.data("  " + ",  ".join(f"{v:.16e}" for v in geotransform))
+        tb.end("GeoTransform")
+    
+        tb.start("Metadata", {})
+        tb.start("MDI", {"key": "AREA_OR_POINT"})
+        tb.data("Area")
+        tb.end("MDI")
+        tb.end("Metadata")
+
+        tb.start("Metadata", {"domain": "IMAGE_STRUCTURE"})
+
+        def mdi(key, value):
+            tb.start("MDI", {"key": key})
+            tb.data(str(value))
+            tb.end("MDI")
+
+        mdi("DATASET_TYPE", "raster")
+        # mdi("DATA_TYPE", data_type)
+        mdi("INTERLEAVE", "BAND")
+        mdi("NBITS", nbits)
+        mdi("X_SIZE", self.config.xsize)
+        mdi("Y_SIZE", self.config.ysize)
+
+        tb.end("Metadata")
+
+        tb.start("PAMRasterBand", {"band": "1"})
+        tb.start("Description", {})
+        tb.data("metrics")
+        tb.end("Description")
+
+        tb.start("SourceFilename", {"relativeToVRT": "1"})
+        tb.data(self.config.tdb_dir)
+        tb.end("SourceFilename")
+
+        tb.end("PAMRasterBand")
+        tb.end("PAMDataset")
+
+        root = tb.close()
+        return ET.tostring(
+            root,
+            encoding="utf-8",
+            xml_declaration=True,
+        ).decode("utf-8")
+
+
 
     @staticmethod
     def from_db(tdb_dir: str, ctx: tiledb.Ctx = None):
