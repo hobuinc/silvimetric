@@ -4,6 +4,7 @@ import pytest
 import os
 import copy
 import datetime
+import xml.etree.ElementTree as ET
 
 from silvimetric import (
     Storage,
@@ -127,3 +128,21 @@ class Test_Storage(object):
 
         assert ShatterConfig.from_json(history[0])== shatter_config
         assert ShatterConfig.from_json(history[1]) == shc_copy
+    
+    def test_pam_metadata(self, storage: Storage):
+        pam_meta = storage.get_metadata(key="_meta")
+        try:
+            root = ET.fromstring(pam_meta)
+        except ET.ParseError as e:
+            pytest.fail(f"Metadata is not valid XML: {e}")
+
+        items = list(root)
+        # TODO: change verbose assertions to use a schema
+        assert root.tag == "PAMDataset"
+        assert items[0].tag == "SRS"
+        assert items[1].tag == "GeoTransform"
+        assert items[2].tag == "Metadata"
+        assert items[3].tag == "Metadata"
+        assert items[4].tag == "PAMRasterBand"
+        assert items[4][0].tag == "Description"
+        assert items[4][1].tag == "SourceFilename"
