@@ -208,7 +208,7 @@ class Storage:
     ) -> str:
         tb = ET.TreeBuilder()
 
-        tb.start("PMDataset", {})
+        tb.start("PAMDataset", {})
 
         tb.start("SRS", {"dataAxisToSRSAxisMapping": "1,2"})
         tb.data(self.config.crs.to_wkt("WKT1_GDAL"))
