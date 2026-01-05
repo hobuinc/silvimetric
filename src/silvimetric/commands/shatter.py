@@ -147,7 +147,7 @@ def write(
     return p
 
 
-def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
+def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFrame:
     """
     Create dask bags and the order of operations.
 
@@ -160,18 +160,17 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> db.Bag:
     # remove any extents that have already been done, only skip if full overlap
     if config.mbr:
         if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
-            return 0
+            return None
     points = get_data(leaf, config.filename, storage)
     if points.empty:
-        return 0
+        return None
     listed_data = agg_list(points, config.time_slot)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
-    point_count = write(joined_data, storage, config.date)
 
-    del points, joined_data, listed_data, metric_data
+    del points, listed_data, metric_data
 
-    return point_count
+    return joined_data
 
 
 Leaves = Generator[Extents, None, None]
@@ -189,22 +188,22 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
     start_time = int(datetime.now().timestamp()*1000)
     dc = get_client()
+
+    joined_dfs = []
     failures = []
+
     if dc is not None:
         # TODO make this a batched operation of like 1000 tasks at a time?
         # itertools batched would limit us to >python3.12
         futures = [dc.submit(do_one, leaf=leaf, config=config, storage=storage) for leaf in leaves]
         res = as_completed(futures, with_results=True, raise_errors=False)
-        for future, pc in res:
+        for future, df in res:
             if future.status == 'error':
                 failures.append(pc)
                 continue
 
-            if pc is None:
-                continue
-            if isinstance(pc, int):
-                config.point_count = config.point_count + pc
-            del pc
+            if df is not None:
+                joined_dfs.append(df)
 
         # TODO write out errors to errors storage path?
 
@@ -212,11 +211,18 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
         # Handle non-distributed dask scenarios
         results = compute(*processes)
-        pcs = [
-            possible_pc for possible_pc in results if possible_pc is not None
-        ]
-        pc = sum(pcs)
+
+        joined_dfs = [df for df in results if df is not None]
+    
+    if joined_dfs:
+        final_df = pd.concat(joined_dfs, ignore_index=True)
+        pc = write(final_df, storage, config.date)
         config.point_count = config.point_count + pc
+
+        del final_df, joined_dfs
+    else:
+        config.point_count = 0
+
     end_time = int(datetime.now().timestamp()*1000)
     storage.consolidate(timestamp=(start_time, end_time))
 
