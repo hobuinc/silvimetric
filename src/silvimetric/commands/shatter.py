@@ -213,7 +213,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         joined_dfs = [df for df in results if df is not None]
     
     if joined_dfs:
-        final_df = pd.concat(joined_dfs, ignore_index=True)
+        final_df = pd.concat(joined_dfs).sort_values(by=['xi', 'yi'])
         pc = write(final_df, storage, config.date)
         config.point_count = config.point_count + pc
 
