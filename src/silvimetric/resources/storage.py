@@ -206,6 +206,14 @@ class Storage:
         data_type: str,
         nbits: int
     ) -> str:
+        """
+        Create ElementTree containing the metadata for the DataFrame.
+
+        :param geotransform: Transform of the metadata
+        :param data_type: Type of MDI metadata
+        :param nbits: Number of bits for MDI metadata
+        :return: String definition of an ElementTree containing the metadata.
+        """
         tb = ET.TreeBuilder()
 
         tb.start("PAMDataset", {})
