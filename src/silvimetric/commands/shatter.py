@@ -193,13 +193,11 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     failures = []
 
     if dc is not None:
-        # TODO make this a batched operation of like 1000 tasks at a time?
-        # itertools batched would limit us to >python3.12
         futures = [dc.submit(do_one, leaf=leaf, config=config, storage=storage) for leaf in leaves]
         res = as_completed(futures, with_results=True, raise_errors=False)
         for future, df in res:
             if future.status == 'error':
-                failures.append(pc)
+                failures.append(df)
                 continue
 
             if df is not None:
@@ -207,9 +205,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
         # TODO write out errors to errors storage path?
 
+            del df
     else:
         processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
-        # Handle non-distributed dask scenarios
         results = compute(*processes)
 
         joined_dfs = [df for df in results if df is not None]
