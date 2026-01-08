@@ -1,4 +1,5 @@
 import json
+from typing import Sequence
 import xml.etree.ElementTree as ET
 
 from math import floor
@@ -136,6 +137,13 @@ class Storage:
             for a in config.attrs
             if a in m.attributes or not m.attributes
         ]
+        # tdb_att = tiledb.Attr(
+        #     name = 'TDB_VALUES',
+        #     dtype=np.float32,
+        #     var=False,
+        #     nullable=False,
+        #     enum_label=None
+        # )
 
         # Check that all attributes required for metric usage are available
         att_list = [a.name for a in config.attrs]
@@ -149,19 +157,20 @@ class Storage:
             if ra not in att_list:
                 raise ValueError(f'Missing required dependency, {ra}.')
 
+        attrs = [
+            count_att,
+            proc_att,
+            start_time_att,
+            end_time_att,
+            *dim_atts,
+            *metric_atts,
+        ]
         # allows_duplicates lets us insert multiple values into each cell,
         # with each value representing a set of values from a shatter process
         # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
         schema = tiledb.ArraySchema(
             domain=domain,
-            attrs=[
-                count_att,
-                proc_att,
-                start_time_att,
-                end_time_att,
-                *dim_atts,
-                *metric_atts,
-            ],
+            attrs=attrs,
             # offsets_filters=tiledb.FilterList(
             #     [
             #         tiledb.PositiveDeltaFilter(),
@@ -172,9 +181,10 @@ class Storage:
         )
         schema.check()
 
+
         tiledb.DenseArray.create(config.tdb_dir, schema)
-        with tiledb.DenseArray(config.tdb_dir, 'w') as writer:
-            writer.meta['config'] = str(config)
+        # with tiledb.DenseArray(config.tdb_dir, 'w') as writer:
+        #     writer.meta['config'] = str(config)
 
         s = Storage(config)
 
@@ -186,16 +196,16 @@ class Storage:
             0.0,
             -config.resolution
         )
-        sample_dtype = (
-            metric_atts[0].dtype if metric_atts else np.float64
-        )
+        # sample_dtype = (
+        #     metric_atts[0].dtype if metric_atts else np.float64
+        # )
         pam_metadata = s.build_pam_metadata(
             geotransform= geotransform,
-            data_type=str(np.dtype(sample_dtype)),
-            nbits=np.dtype(sample_dtype).itemsize * 8,
+            attrs=attrs
         )
 
-        s.save_metadata('_meta', pam_metadata)
+        s.save_metadata('_gdal', pam_metadata)
+        s.save_metadata('dataset_type', "raster")
         s.save_config()
 
         return s
@@ -203,8 +213,7 @@ class Storage:
     def build_pam_metadata(
         self,
         geotransform: tuple,
-        data_type: str,
-        nbits: int
+        attrs: Sequence[Attribute]
     ) -> str:
         """
         Create ElementTree containing the metadata for the DataFrame.
@@ -223,7 +232,7 @@ class Storage:
         tb.end("SRS")
 
         tb.start("GeoTransform", {})
-        tb.data("  " + ",  ".join(f"{v:.16e}" for v in geotransform))
+        tb.data(",  ".join(f"{v:.16e}" for v in geotransform))
         tb.end("GeoTransform")
     
         tb.start("Metadata", {})
@@ -240,31 +249,48 @@ class Storage:
             tb.end("MDI")
 
         mdi("DATASET_TYPE", "raster")
-        # mdi("DATA_TYPE", data_type)
+        mdi("DATA_TYPE", "Float32")
         mdi("INTERLEAVE", "BAND")
-        mdi("NBITS", nbits)
-        mdi("X_SIZE", self.config.xsize)
-        mdi("Y_SIZE", self.config.ysize)
+        mdi("NBITS", 8)
+        mdi("X_SIZE", int(self.config.xsize))
+        mdi("Y_SIZE", int(self.config.ysize))
 
         tb.end("Metadata")
 
-        tb.start("PAMRasterBand", {"band": "1"})
-        tb.start("Description", {})
-        tb.data("metrics")
-        tb.end("Description")
+        for idx, attr in enumerate(attrs):
+            # print(idx, attr)
+            tb.start("PAMRasterBand", {"band": str(idx + 1)})
+            tb.start("Description", {})
+            tb.data(attr.name)
+            tb.end("Description")
 
-        tb.start("SourceFilename", {"relativeToVRT": "1"})
-        tb.data(self.config.tdb_dir)
-        tb.end("SourceFilename")
+            tb.start("SourceFilename", {"relativeToVRT": "1"})
+            tb.data(self.config.tdb_dir)
+            tb.end("SourceFilename")
 
-        tb.end("PAMRasterBand")
+            tb.start("SourceBand", {})
+            tb.data(attr.name)
+            tb.end("SourceBand")
+
+            tb.start("DataType", {})
+            tb.data(str(attr.dtype))
+            tb.end("DataType")
+
+            tb.end("PAMRasterBand")
+        
         tb.end("PAMDataset")
 
         root = tb.close()
+
+        ET.indent(root, space="  ", level=0)
+
+        xml_str = ET.tostring(root, encoding="unicode")
+        print(xml_str)
+
         return ET.tostring(
             root,
             encoding="utf-8",
-            xml_declaration=True,
+            xml_declaration=False,
         ).decode("utf-8")
 
 
