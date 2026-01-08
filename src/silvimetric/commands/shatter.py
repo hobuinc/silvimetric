@@ -211,7 +211,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         results = compute(*processes)
 
         joined_dfs = [df for df in results if df is not None]
-    
+
     if joined_dfs:
         final_df = pd.concat(joined_dfs).sort_values(by=['xi', 'yi'])
         pc = write(final_df, storage, config.date)
@@ -296,8 +296,6 @@ def shatter(config: ShatterConfig) -> int:
         except Exception as e:
             final(config, storage)
             raise e
-    storage.consolidate(timestamp=config.timestamp)
-    storage.vacuum()
 
     final(config, storage, finished=True)
     return config.point_count
