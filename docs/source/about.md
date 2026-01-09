@@ -5,7 +5,7 @@
 Summarizing and filtering point cloud data into useful information for modeling
 is challenging. In forestry applications in particular, the {{ FUSION }} software toolkit
 is often used to extract information in preparation for modeling. FUSION, however,
-has a few missing features that make it
+has a few missing features that make it more difficult to use for this task.
 
 Working with Bob McGaughey and the USFS GTAC team, Kyle Mann and Howard Butler from
 {{ HOBU }}, developed the initial prototype of SilviMetric to implement an alternative
