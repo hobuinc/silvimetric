@@ -87,18 +87,28 @@ class Storage:
             (config.root.maxy - config.root.miny) / float(config.resolution)
         )
 
+        # protect user from out of bounds errors
+        xsize = min(config.xsize, xi+1)
+        ysize = min(config.ysize, yi+1)
+        if xsize < config.xsize:
+            config.log.warning(f'X Tile size lowered to {xsize}')
+        if ysize < config.ysize:
+            config.log.warning(f'Y Tile size lowered to {ysize}')
+        config.xsize = xsize
+        config.ysize = ysize
+
         dim_row = tiledb.Dim(
             name='X',
             domain=(0, xi),
             dtype=np.uint64,
-            tile=config.xsize,
+            tile=xsize,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
-            tile=config.ysize,
+            tile=ysize,
             filters=tiledb.FilterList([tiledb.ZstdFilter()]),
         )
         domain = tiledb.Domain(dim_row, dim_col)

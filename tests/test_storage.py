@@ -3,7 +3,6 @@ import numpy as np
 import pytest
 import os
 import copy
-import datetime
 
 from silvimetric import (
     Storage,
@@ -92,6 +91,39 @@ class Test_Storage(object):
         assert isinstance(s, Storage)
 
         ms[0].dependencies = []
+
+    def test_oob_storage(
+        self,
+        tmp_path_factory,
+        metrics,
+        crs,
+        resolution,
+        attrs,
+        bounds,
+    ):
+        ms = copy.deepcopy(metrics)
+        path = tmp_path_factory.mktemp('test_tdb')
+        p = os.path.abspath(path)
+
+        sc = StorageConfig(
+            tdb_dir=p,
+            crs=crs,
+            resolution=resolution,
+            attrs=attrs,
+            metrics=ms,
+            root=bounds,
+            xsize=1000,
+            ysize=1000
+        )
+
+        s = Storage.create(sc)
+        a = s.open('r')
+
+        assert a.schema.domain.dim('X').tile == 12
+        assert s.config.xsize == 12
+        assert a.schema.domain.dim('Y').tile == 12
+        assert s.config.ysize == 12
+
 
     def test_metrics(self, storage: Storage):
         m_list = storage.get_metrics()
