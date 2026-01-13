@@ -116,7 +116,14 @@ class Test_Storage(object):
             ysize=1000
         )
 
-        Storage.create(sc)
+        s = Storage.create(sc)
+        a = s.open('r')
+
+        assert a.schema.domain.dim('X').tile == 12
+        assert s.config.xsize == 12
+        assert a.schema.domain.dim('Y').tile == 12
+        assert s.config.ysize == 12
+
 
     def test_metrics(self, storage: Storage):
         m_list = storage.get_metrics()
