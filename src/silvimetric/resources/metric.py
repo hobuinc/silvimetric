@@ -144,7 +144,7 @@ class Metric:
         return Attr(
             name=entry_name,
             dtype=self.dtype,
-            filters=FilterList([ZstdFilter()]),
+            filters=FilterList([ZstdFilter(level = 7)]),
             nullable=True
         )
 
