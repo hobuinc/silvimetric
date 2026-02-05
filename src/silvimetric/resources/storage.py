@@ -102,39 +102,39 @@ class Storage:
             domain=(0, xi),
             dtype=np.uint64,
             tile=xsize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
             tile=ysize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(
             name='count',
             dtype=np.uint32,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
             dtype=np.uint16,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
         start_time_att = tiledb.Attr(
             name='start_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
         end_time_att = tiledb.Attr(
             name='end_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
         dim_atts = [attr.schema() for attr in config.attrs]
@@ -171,13 +171,11 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            # offsets_filters=tiledb.FilterList(
-            #     [
-            #         tiledb.PositiveDeltaFilter(),
-            #         tiledb.BitWidthReductionFilter(),
-            #         tiledb.ZstdFilter(),
-            #     ]
-            # ),
+            offsets_filters=tiledb.FilterList(
+                [
+                    tiledb.PositiveDeltaFilter(),
+                ]
+            ),
         )
         schema.check()
 
