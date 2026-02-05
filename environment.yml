@@ -18,6 +18,6 @@ dependencies:
   - websocket-client
   - python-json-logger
   - dill
-  - pandas
+  - pandas<3.0.0
   - typing_extensions
   - fast-histogram
