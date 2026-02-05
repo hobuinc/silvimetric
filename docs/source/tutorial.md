@@ -397,7 +397,7 @@ from shutil import rmtree
 from silvimetric import Storage, Metric, Bounds, Pdal_Attributes
 from silvimetric import StorageConfig, ShatterConfig, ExtractConfig
 from silvimetric import scan, extract, shatter
-from silvimetric.resources.metrics.stats import sm_min, sm_max, mean
+from silvimetric.resources.metrics.stats import minimum, maximum, mean
 
 ########## Setup #############
 
@@ -442,7 +442,7 @@ def db():
         Pdal_Attributes[a]
         for a in ['Z', 'Intensity']
     ]
-    metrics = [ mean, sm_max, sm_min ]
+    metrics = [ mean, maximum, minimum ]
     metrics.append(perc_75)
     st_config = StorageConfig(root=bounds, resolution=resolution, crs=srs,
         attrs=attrs, metrics=metrics, tdb_dir=db_dir)
