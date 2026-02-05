@@ -2,7 +2,7 @@ name: pdal-sm
 channels:
   - conda-forge
 dependencies:
-  - python>=3.11, <3.14
+  - python>=3.12, <=3.14
   - pip
   - cloudpickle>=3.1.2
   - boto3
@@ -18,6 +18,6 @@ dependencies:
   - websocket-client
   - python-json-logger
   - dill
-  - pandas
+  - pandas<3.0.0
   - typing_extensions
   - fast-histogram

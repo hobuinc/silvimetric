@@ -87,44 +87,54 @@ class Storage:
             (config.root.maxy - config.root.miny) / float(config.resolution)
         )
 
+        # protect user from out of bounds errors
+        xsize = min(config.xsize, xi+1)
+        ysize = min(config.ysize, yi+1)
+        if xsize < config.xsize:
+            config.log.warning(f'X Tile size lowered to {xsize}')
+        if ysize < config.ysize:
+            config.log.warning(f'Y Tile size lowered to {ysize}')
+        config.xsize = xsize
+        config.ysize = ysize
+
         dim_row = tiledb.Dim(
             name='X',
             domain=(0, xi),
             dtype=np.uint64,
-            tile=config.xsize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            tile=xsize,
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
         dim_col = tiledb.Dim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
-            tile=config.ysize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            tile=ysize,
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
         domain = tiledb.Domain(dim_row, dim_col)
 
         count_att = tiledb.Attr(
             name='count',
             dtype=np.uint32,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
         proc_att = tiledb.Attr(
             name='shatter_process_num',
             dtype=np.uint16,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
         start_time_att = tiledb.Attr(
             name='start_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
         end_time_att = tiledb.Attr(
             name='end_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter()]),
+            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
         dim_atts = [attr.schema() for attr in config.attrs]
@@ -161,13 +171,11 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            # offsets_filters=tiledb.FilterList(
-            #     [
-            #         tiledb.PositiveDeltaFilter(),
-            #         tiledb.BitWidthReductionFilter(),
-            #         tiledb.ZstdFilter(),
-            #     ]
-            # ),
+            offsets_filters=tiledb.FilterList(
+                [
+                    tiledb.PositiveDeltaFilter(),
+                ]
+            ),
         )
         schema.check()
 
