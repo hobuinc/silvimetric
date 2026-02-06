@@ -4,7 +4,7 @@ import copy
 from urllib.parse import urlparse
 from typing import Optional
 
-import boto3
+import tiledb
 import pdal
 import numpy as np
 
@@ -106,17 +106,9 @@ class Data:
         # aren't, go make_pipeline using some options that
         # process the data
         if self.is_pipeline():
-            if 's3://' in self.filename:
-                s3 = boto3.client('s3')
-                parsed = urlparse(self.filename)
-                bucket = parsed.netloc
-                key = parsed.path[1:]
-                res = s3.get_object(Bucket=bucket, Key=key)
-                j = res['Body'].read().decode('utf-8')
-            else:
-                p = pathlib.Path(self.filename)
-                j = p.read_bytes().decode('utf-8')
-            stages = pdal.pipeline._parse_stages(j)
+            vfs = tiledb.VFS()
+            pipeline_str = vfs.open(self.filename).read()
+            stages = pdal.pipeline._parse_stages(pipeline_str)
             pipeline = pdal.Pipeline(stages)
         else:
             pipeline = self.make_pipeline()
@@ -220,17 +212,9 @@ class Data:
         """
         if self.is_pipeline():
             if self.pipeline is None:
-                if 's3://' in self.filename:
-                    s3 = boto3.client('s3')
-                    parsed = urlparse(self.filename)
-                    bucket = parsed.netloc
-                    key = parsed.path[1:]
-                    res = s3.get_object(Bucket=bucket, Key=key)
-                    j = res['Body'].read().decode('utf-8')
-                else:
-                    p = pathlib.Path(self.filename)
-                    j = p.read_bytes().decode('utf-8')
-                stages = pdal.pipeline._parse_stages(j)
+                vfs = tiledb.VFS()
+                pipeline_str = vfs.open(self.filename).read()
+                stages = pdal.pipeline._parse_stages(pipeline_str)
             else:
                 stages = self.pipeline.stages
 
