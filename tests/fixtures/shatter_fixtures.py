@@ -3,6 +3,7 @@ import pytest
 from typing_extensions import Generator
 from uuid import uuid4
 import os
+import tiledb
 
 from silvimetric import __version__ as svversion
 from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
@@ -56,13 +57,12 @@ def s3_storage_config(
 @pytest.fixture(scope='function')
 def s3_storage(
     s3_storage_config: StorageConfig,
+    s3_uri: str
 ) -> Generator[Storage, None, None]:
-    import subprocess
+    vfs = tiledb.VFS()
 
     yield Storage.create(s3_storage_config)
-    subprocess.call(
-        ['aws', 's3', 'rm', '--recursive', s3_storage_config.tdb_dir]
-    )
+    vfs.remove_dir(s3_uri)
 
 
 @pytest.fixture(scope='function')

@@ -1,4 +1,4 @@
-__version__ = '1.4.1'
+__version__ = '2.0.1'
 
 from .resources.bounds import Bounds
 from .resources.extents import Extents

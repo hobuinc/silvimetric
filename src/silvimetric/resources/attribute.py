@@ -42,7 +42,7 @@ class Attribute:
             name=self.name,
             dtype=self.dtype.subtype,
             var=True,
-            filters=FilterList([ZstdFilter()])
+            filters=FilterList([ZstdFilter(level = 7)])
         )
 
     def __eq__(self, other):
