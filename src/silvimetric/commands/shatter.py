@@ -147,7 +147,7 @@ def write(
     return p
 
 
-def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFrame:
+def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> int:
     """
     Create dask bags and the order of operations.
 
@@ -160,17 +160,18 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFra
     # remove any extents that have already been done, only skip if full overlap
     if config.mbr:
         if not all(leaf.disjoint_by_mbr(m) for m in config.mbr):
-            return None
+            return 0
     points = get_data(leaf, config.filename, storage)
     if points.empty:
-        return None
+        return 0
     listed_data = agg_list(points, config.time_slot)
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
+    sorted_data = joined_data.sort_values(by=['xi', 'yi'])
 
-    del points, listed_data, metric_data
+    del points, listed_data, metric_data, joined_data
 
-    return joined_data
+    return write(sorted_data, storage, config.date)
 
 
 Leaves = Generator[Extents, None, None]
@@ -189,37 +190,26 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     start_time = int(datetime.now().timestamp()*1000)
     dc = get_client()
 
-    joined_dfs = []
+    point_count = 0
     failures = []
 
     if dc is not None:
         futures = [dc.submit(do_one, leaf=leaf, config=config, storage=storage) for leaf in leaves]
         res = as_completed(futures, with_results=True, raise_errors=False)
-        for future, df in res:
+        for future, result in res:
             if future.status == 'error':
-                failures.append(df)
+                failures.append(result)
                 continue
 
-            if df is not None:
-                joined_dfs.append(df)
+            point_count += result
 
         # TODO write out errors to errors storage path?
-
-            del df
     else:
         processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
         results = compute(*processes)
+        point_count = sum(results)
 
-        joined_dfs = [df for df in results if df is not None]
-
-    if joined_dfs:
-        final_df = pd.concat(joined_dfs).sort_values(by=['xi', 'yi'])
-        pc = write(final_df, storage, config.date)
-        config.point_count = config.point_count + pc
-
-        del final_df, joined_dfs
-    else:
-        config.point_count = 0
+    config.point_count = config.point_count + point_count
 
     end_time = int(datetime.now().timestamp()*1000)
     storage.consolidate(timestamp=(start_time, end_time))
