@@ -3,7 +3,7 @@ import pytest
 from typing_extensions import Generator
 from uuid import uuid4
 import os
-import tiledb
+import fsspec
 
 from silvimetric import __version__ as svversion
 from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
@@ -59,10 +59,9 @@ def s3_storage(
     s3_storage_config: StorageConfig,
     s3_uri: str
 ) -> Generator[Storage, None, None]:
-    vfs = tiledb.VFS()
-
     yield Storage.create(s3_storage_config)
-    vfs.remove_dir(s3_uri)
+    fs, path = fsspec.core.url_to_fs(s3_uri)
+    fs.rm(path, recursive=True)
 
 
 @pytest.fixture(scope='function')

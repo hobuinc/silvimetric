@@ -20,7 +20,7 @@ def scan(
     """
     Scan pointcloud and determine appropriate tile sizes.
 
-    :param tdb_dir: TileDB database directory.
+    :param tdb_dir: Storage database directory.
     :param pointcloud: Path to point cloud.
     :param bounds: Bounding box to filter by.
     :param point_count: Point count threshold., defaults to 600000

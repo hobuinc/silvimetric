@@ -258,10 +258,10 @@ def scan_cmd(
     '--resolution', type=float, default=30.0, help='Summary pixel resolution'
 )
 @click.option(
-    '--xsize', type=float, default=1000, help='TileDB X Tile size.'
+    '--xsize', type=float, default=1000, help='Storage X chunk size.'
 )
 @click.option(
-    '--ysize', type=float, default=1000, help='TileDB Y Tile size.'
+    '--ysize', type=float, default=1000, help='Storage Y chunk size.'
 )
 @click.option(
     '--alignment',

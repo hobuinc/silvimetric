@@ -13,13 +13,13 @@ from typing_extensions import (
 from functools import reduce
 from threading import Lock
 
-from tiledb import Attr, FilterList, ZstdFilter
 import numpy as np
 import dill
 import pandas as pd
 
 from distributed import Future
 from .attribute import Attribute
+from .zarr_backend import ZarrAttr
 
 MetricFn = Callable[[pd.DataFrame, Any], pd.DataFrame]
 FilterFn = Callable[[pd.DataFrame, Optional[Union[Any, None]]], pd.DataFrame]
@@ -30,7 +30,7 @@ mutex = Lock()
 
 class Metric:
     """
-    A Metric is a TileDB entry representing derived cell data. There is a base
+    A Metric is a storage entry representing derived cell data. There is a base
     set of metrics available through Silvimetric, or you can create your own.
     A Metric object has all the information necessary to facilitate the
     derivation of data as well as its insertion into the database.
@@ -135,21 +135,20 @@ class Metric:
 
     def schema(self, attr: Attribute) -> Any:
         """
-        Create schema for TileDB creation.
+        Create schema for storage creation.
 
         :param attr: :class:`silvimetric.resources.entry.Atttribute`
-        :return: TileDB Attribute
+        :return: Storage attribute
         """
         entry_name = self.entry_name(attr.name)
-        return Attr(
+        return ZarrAttr(
             name=entry_name,
             dtype=self.dtype,
-            filters=FilterList([ZstdFilter(level = 7)]),
             nullable=True
         )
 
     def entry_name(self, attr: str) -> str:
-        """Name for use in TileDB and extract file generation."""
+        """Name for use in storage and extract file generation."""
         return f'm_{attr}_{self.name}'
 
     def sanitize_and_run(self, d, locs, deps):

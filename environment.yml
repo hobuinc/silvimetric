@@ -1,12 +1,25 @@
-name: pdal-sm
+name: pdal-sm-zarr
 channels:
   - conda-forge
 dependencies:
   - python>=3.12, <=3.14
   - pip
+  - setuptools
+  - wheel
+  - python-build
+  - pytest
+  - lmoments3
   - cloudpickle>=3.1.2
-  - tiledb>=2.29.2
-  - tiledb-py>=0.35.2
+  - zarr>=3.0.0
+  - icechunk
+  - numcodecs
+  - xarray
+  - fsspec
+  - s3fs
+  - obstore
+  - kerchunk
+  - rechunker
+  - virtualizarr
   - libpdal-core>=2.9.2
   - python-pdal
   - numpy

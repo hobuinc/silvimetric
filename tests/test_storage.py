@@ -1,4 +1,3 @@
-import tiledb
 import numpy as np
 import pytest
 import os
@@ -18,7 +17,7 @@ from silvimetric.resources.config import ShatterConfig
 class Test_Storage(object):
     def test_schema(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
-            s: tiledb.ArraySchema = st.schema
+            s = st.schema
             assert s.has_attr('count')
             assert s.attr('count').dtype == np.uint32
 
@@ -130,7 +129,7 @@ class Test_Storage(object):
         a_list = storage.get_attributes()
 
         with storage.open('r') as st:
-            s: tiledb.ArraySchema = st.schema
+            s = st.schema
             for m in m_list:
                 assert m.name in all_metrics.keys()
 

@@ -241,7 +241,7 @@ def shatter(config: ShatterConfig) -> int:
     if config.start_timestamp is None:
         config.start_timestamp = int(datetime.now().timestamp() * 1000)
 
-    # set up tiledb
+    # set up storage
     storage = Storage.from_db(config.tdb_dir)
     data = Data(config.filename, storage.config, config.bounds)
     extents = Extents.from_sub(config.tdb_dir, data.bounds)
@@ -269,7 +269,7 @@ def shatter(config: ShatterConfig) -> int:
         alignment=extents.alignment,
         root=extents.root,
     )
-    # get leaves reflecting TileDB tile bounds
+    # get leaves reflecting storage chunk bounds
     potential_leaves = root_ext.get_leaf_children(leaf_size)
     # filter by tiles that overlap, and get the overlapping extent
     filtered_leaves = [

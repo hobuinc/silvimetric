@@ -15,7 +15,7 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
     """
     Delete Shatter process from database and return config for that process.
 
-    :param storage: SilviMetric Storage or TileDB directory path.
+    :param storage: SilviMetric Storage or storage directory path.
     :param name: UUID name of the Shatter process.
     :raises KeyError: Shatter process with ID does not exist.
     :raises ValueError: Shatter process with ID is missing a time reservation
@@ -23,7 +23,7 @@ def delete(storage: str|Storage, name: str, log: Log = None) -> ShatterConfig:
     """
 
     # NOTE: this process is not perfect due to the technology employed by
-    # tiledb. After consolidations, this should eventually show up as working
+    # storage. After consolidations, this should eventually show up as working
     # but may not immediately show results
 
     logger = get_logger(log)
@@ -45,7 +45,7 @@ def restart(storage: str|Storage, name: str, log: Log = None) -> int:
     """
     Delete shatter process from database and run it again with the same config.
 
-    :param storage: SilviMetric Storage or TileDB directory path.
+    :param storage: SilviMetric Storage or storage directory path.
     :param name: UUID name of Shatter process.
     :return: Point count of the restarted shatter process.
     """
@@ -70,7 +70,7 @@ def resume(storage: str|Storage, name: str, log: Log = None) -> int:
     Resume partially completed shatter process. Process must partially completed
     and have an already established time slot.
 
-    :param storage: SilviMetric Storage or TileDB directory path.
+    :param storage: SilviMetric Storage or storage directory path.
     :param name: UUID name of Shatter process.
     :return: Point count of the restarted shatter process.
     """

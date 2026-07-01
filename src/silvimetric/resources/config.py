@@ -28,7 +28,7 @@ class Config(ABC):
     """Base config"""
 
     tdb_dir: str = field()
-    """Path to TileDB directory to use."""
+    """Path to storage directory to use."""
     log: Log = field(default_factory=lambda: Log('INFO'))
     """Log object."""
     debug: bool = field(default=False)
@@ -77,9 +77,9 @@ class StorageConfig(Config):
     """Alignment of pixels in database, same for all data in a project,
     options: 'AlignToCenter' or 'AlignToCorner', defaults to 'AlignToCenter'"""
     xsize: int = field(default=1000)
-    """TileDB X Tile size for IO operations."""
+    """Storage X chunk size for IO operations."""
     ysize: int = field(default=1000)
-    """TileDB Y Tile size for IO operations."""
+    """Storage Y chunk size for IO operations."""
 
     attrs: list[Attribute] = field(
         default_factory=lambda: [
@@ -98,7 +98,7 @@ class StorageConfig(Config):
     version: str = field(default=__version__)
     """Silvimetric version"""
     capacity: int = field(default=1000000)
-    """TileDB Capacity, defaults to 1000000"""
+    """Storage capacity hint, defaults to 1000000"""
     next_time_slot: int = field(default=1)
     """Next time slot to be allocated to a shatter process. Increment after
     use., defaults to 1"""
@@ -250,14 +250,14 @@ class ShatterConfig(Config):
     """Target number of points per Tile. Only used if tile_size is None.
     defaults to 600000"""
     mbr: Mbr = field(default_factory=lambda: tuple())
-    """The minimum bounding rectangle derived from TileDB array fragments.
+    """The minimum bounding rectangle derived from storage fragments.
     This will be used to for resuming shatter processes and making sure it
     doesn't repeat work., defaults to tuple()"""
     finished: bool = False
     """Finished flag for shatter process., defaults to False"""
     time_slot: int = 0
     """The time slot that has been reserved for this shatter process. Will be
-    used as an attribute in tiledb writes to better organize and manage
+    used as an attribute in storage writes to better organize and manage
     processes., defaults to 0"""
     version: str = field(default=__version__)
     """SilviMetric Version"""
