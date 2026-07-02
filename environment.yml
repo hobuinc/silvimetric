@@ -1,4 +1,4 @@
-name: pdal-sm-zarr
+name: pdal-sm-backends
 channels:
   - conda-forge
 dependencies:
@@ -10,6 +10,8 @@ dependencies:
   - pytest
   - lmoments3
   - cloudpickle>=3.1.2
+  - tiledb>=2.29.2
+  - tiledb-py>=0.35.2
   - zarr>=3.0.0
   - icechunk
   - numcodecs

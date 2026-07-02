@@ -147,6 +147,7 @@ class Test_Shatter(object):  # noqa: D101
         test_point_count: int,
         request: pytest.FixtureRequest,
         alignment: str,
+        storage_backend_protocol: str,
         threaded_dask,
     ):
         s = request.getfixturevalue(sh_cfg)

@@ -83,13 +83,14 @@ def uneven_storage_config(
     crs: str,
     attrs: list[Attribute],
     metrics: list[Metric],
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     log = Log('INFO')
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
 
     sc = StorageConfig(
-        tdb_dir=p,
+        tdb_dir=f'{storage_backend_protocol}://{p}',
         log=log,
         crs=crs,
         root=bounds,
@@ -125,6 +126,7 @@ def partial_storage_config(
     metrics: list[Metric],
     bounds: Bounds,
     alignment: int,
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
@@ -132,7 +134,7 @@ def partial_storage_config(
 
     b = next(iter(bounds.bisect()))
     sc = StorageConfig(
-        tdb_dir=p,
+        tdb_dir=f'{storage_backend_protocol}://{p}',
         log=log,
         crs=crs,
         root=b,

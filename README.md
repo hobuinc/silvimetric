@@ -1,7 +1,7 @@
 ## SilviMetric
 
 
-SilviMetric is an open source library and set of command line utilities for extracting point cloud metrics into a Zarr-backed database. See https://silvimetric.com for documentation and tutorials.
+SilviMetric is an open source library and set of command line utilities for extracting point cloud metrics into a selectable TileDB or Zarr/Icechunk-backed database. See https://silvimetric.com for documentation and tutorials.
 
 [<img src="https://github.com/hobuinc/silvimetric/blob/main/docs/source/logo/Logos/PNG/SilviMeteric_Logo_2c.png?raw=true">](https://silvimetric.com/)
 
@@ -13,7 +13,12 @@ GitHub hosts the project at https://github.com/hobuinc/silvimetric
 ### Installation
 These scripts will install `Silvimetric` dependencies as python libraries to the conda environment silvimetric.
 
-`Silvimetric` requires that we install some packages from `conda` (`Zarr`, `Icechunk`, `GDAL`, and `PDAL`) so it's usually easier to use only `conda` to handle your environment. If this is unavailable to you, you will need to install `GDAL` and `PDAL` from source before installing the python packages that are dependent on those (`python-pdal`, `gdal`).
+`Silvimetric` requires that we install some packages from `conda` (`TileDB`, `Zarr`, `Icechunk`, `GDAL`, and `PDAL`) so it's usually easier to use only `conda` to handle your environment. If this is unavailable to you, you will need to install `TileDB`, `GDAL`, and `PDAL` from source before installing the python packages that are dependent on those (`python-pdal`, `gdal`, `tiledb-py`).
+
+Storage backend selection is based on the configured database URI. Plain paths
+default to the Zarr/Icechunk backend, while `zarr:///path/to/db`,
+`icechunk:///path/to/db`, and `tiledb:///path/to/db` select a backend
+explicitly.
 
 ##### Pip
 

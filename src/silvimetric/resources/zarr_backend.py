@@ -80,6 +80,9 @@ class ZarrDomain:
     def dim(self, name: str) -> ZarrDim:
         return self._dims[name]
 
+    def dims(self) -> list[ZarrDim]:
+        return list(self._dims.values())
+
     def to_json(self) -> list[dict[str, Any]]:
         return [d.to_json() for d in self._dims.values()]
 
@@ -98,6 +101,9 @@ class ZarrSchema:
 
     def attr(self, name: str) -> ZarrAttr:
         return self._attrs[name]
+
+    def attrs(self) -> list[ZarrAttr]:
+        return list(self._attrs.values())
 
     def check(self) -> None:
         return None
@@ -245,6 +251,16 @@ def append_records(uri: str, data: pd.DataFrame) -> None:
     group.attrs['_next_write_id'] = write_id + 1
 
 
+def write_records(
+    uri: str,
+    data: pd.DataFrame,
+    _column_types: dict | None = None,
+    _varlen_types: set | None = None,
+    _fillna: dict | None = None,
+) -> None:
+    append_records(uri, data)
+
+
 def read_records(uri: str) -> pd.DataFrame:
     group = zarr.open_group(uri, mode='a')
     return _read_blob(group)
@@ -264,6 +280,18 @@ def fragments(uri: str, timestamp: tuple[int, int] | None = None):
         domain = (xs, ys)
         frags.append(ZarrFragment((commit, commit), domain, (domain,)))
     return frags
+
+
+def vacuum(_uri: str, mode: str = 'fragments'):
+    return None
+
+
+def consolidate(
+    _uri: str,
+    mode: str = 'fragments',
+    timestamp: tuple[int, int] | None = None,
+) -> None:
+    return None
 
 
 def _slice_dim(df: pd.DataFrame, name: str, key):

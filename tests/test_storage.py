@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 import os
 import copy
@@ -15,6 +16,93 @@ from silvimetric.resources.config import ShatterConfig
 
 
 class Test_Storage(object):
+    @pytest.mark.parametrize(
+        ('protocol', 'backend'),
+        [('zarr', 'zarr'), ('icechunk', 'zarr'), ('tiledb', 'tiledb')],
+    )
+    def test_backend_protocol_selection(
+        self,
+        tmp_path_factory,
+        metrics,
+        crs,
+        resolution,
+        alignment,
+        attrs,
+        bounds,
+        protocol,
+        backend,
+    ):
+        path = tmp_path_factory.mktemp(f'test_{protocol}')
+        p = os.path.abspath(path)
+        uri = f'{protocol}://{p}'
+        sc = StorageConfig(
+            tdb_dir=uri,
+            crs=crs,
+            resolution=resolution,
+            alignment=alignment,
+            attrs=attrs,
+            metrics=metrics,
+            root=bounds,
+            xsize=5,
+            ysize=5
+        )
+
+        storage = Storage.create(sc)
+        assert storage.backend_name == backend
+        assert storage.storage_uri == p
+
+        reopened = Storage.from_db(uri)
+        assert reopened.backend_name == backend
+        assert reopened.storage_uri == p
+
+    @pytest.mark.parametrize('protocol', ['zarr', 'tiledb'])
+    def test_backend_write_roundtrip(
+        self,
+        tmp_path_factory,
+        metrics,
+        crs,
+        resolution,
+        alignment,
+        attrs,
+        bounds,
+        date,
+        protocol,
+    ):
+        path = tmp_path_factory.mktemp(f'test_{protocol}_write')
+        uri = f'{protocol}://{os.path.abspath(path)}'
+        sc = StorageConfig(
+            tdb_dir=uri,
+            crs=crs,
+            resolution=resolution,
+            alignment=alignment,
+            attrs=attrs,
+            metrics=metrics,
+            root=bounds,
+            xsize=5,
+            ysize=5
+        )
+        storage = Storage.create(sc)
+        record = {
+            'xi': [0],
+            'yi': [0],
+            'count': [1],
+            'shatter_process_num': [1],
+        }
+        for attr in attrs:
+            record[attr.name] = [
+                np.array([1], dtype=attr.dtype.subtype)
+            ]
+        for name in storage.get_derived_names():
+            record[name] = [1.0]
+
+        storage.write(pd.DataFrame(record), date)
+
+        with storage.open('r') as array:
+            data = array.df[:, :]
+            assert len(data) == 1
+            assert data['count'].iloc[0] == 1
+            assert data['shatter_process_num'].iloc[0] == 1
+
     def test_schema(self, storage: Storage, attrs: list[Attribute]):
         with storage.open('r') as st:
             s = st.schema
@@ -139,7 +227,22 @@ class Test_Storage(object):
                 def schema(att, met):
                     return all_metrics[met.name].schema(att)
 
-                assert all([e_name(a, m) == schema(a, m) for a in a_list])
+                def attr_tuple(attr):
+                    return (
+                        attr.name,
+                        np.dtype(attr.dtype),
+                        getattr(attr, 'var', False),
+                        getattr(attr, 'nullable', None)
+                        if hasattr(attr, 'nullable')
+                        else attr.isnullable,
+                    )
+
+                assert all(
+                    [
+                        attr_tuple(e_name(a, m)) == attr_tuple(schema(a, m))
+                        for a in a_list
+                    ]
+                )
 
     def test_metadata(self, storage: Storage, shatter_config: ShatterConfig):
         shatter_config.time_slot = storage.reserve_time_slot()
