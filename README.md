@@ -20,6 +20,13 @@ default to the Zarr/Icechunk backend, while `zarr:///path/to/db`,
 `icechunk:///path/to/db`, and `tiledb:///path/to/db` select a backend
 explicitly.
 
+For example:
+
+```
+silvimetric -d "zarr://${PWD}/autzen-smdb.zarr" initialize --bounds "$BOUNDS" --crs "$CRS"
+silvimetric -d "tiledb://${PWD}/autzen-smdb.tdb" initialize --bounds "$BOUNDS" --crs "$CRS"
+```
+
 ##### Pip
 
 ```

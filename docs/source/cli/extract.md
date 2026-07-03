@@ -26,6 +26,14 @@ Options:
 
 ## Example
 
+Zarr/Icechunk:
+
 ```
-silvimetric -d test.tdb extract -o test_tifs/
+silvimetric -d "zarr://${PWD}/test.zarr" extract -o test_tifs/
+```
+
+TileDB:
+
+```
+silvimetric -d "tiledb://${PWD}/test.tdb" extract -o test_tifs/
 ```

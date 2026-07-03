@@ -29,6 +29,14 @@ Options:
 
 ## Example
 
+Zarr/Icechunk:
+
 ```
-silvimetric -d test.tdb shatter --date 2023-1-1 tests/data/test_data.copc.laz
+silvimetric -d "zarr://${PWD}/test.zarr" shatter --date 2023-1-1 tests/data/test_data.copc.laz
+```
+
+TileDB:
+
+```
+silvimetric -d "tiledb://${PWD}/test.tdb" shatter --date 2023-1-1 tests/data/test_data.copc.laz
 ```

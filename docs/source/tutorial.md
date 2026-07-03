@@ -15,9 +15,9 @@ Date: 2/05/2024
 This tutorial will cover how to interact with SilviMetric, including the key
 commands {ref}`initialize`, {ref}`info`, {ref}`scan`, {ref}`shatter`, and
 {ref}`extract`. These commands make up the core functionality of SilviMetric
-and will allow you convert point cloud files into a storage system with TileDB
-and extract the metrics that are produced into rasters or read with the
-library/language of your choice.
+and will allow you convert point cloud files into a Zarr/Icechunk or TileDB
+storage database and extract the metrics that are produced into rasters or read
+with the library/language of your choice.
 
 ## Introduction
 
@@ -26,7 +26,7 @@ written by Robert McGaughey, with a focus on the point cloud metric extraction
 and management capability that FUSION provides in the form of GridMetrics.
 SilviMetric aims to handle the challenge of computing statistics and metrics
 from LiDAR data by using {{ Python }} instead of C++, delegate data management to
-{{ TileDB }}, and leverage the wealth of capabilities provided in the machine
+{{ Zarr }}, {{ Icechunk }}, or {{ TileDB }}, and leverage the wealth of capabilities provided in the machine
 learning and scientific computing ecosystem of Python. The goal is to create a
 library and command line utilities that a wider audience of researchers and
 developers can contribute to, support distributed computing and storage systems
@@ -35,6 +35,14 @@ distributing and managing LiDAR metrics that are typically used for forestry
 modeling.
 
 ## Technologies
+
+### Zarr and Icechunk
+
+{{ Zarr }} is an open source array storage format that works well with the
+scientific Python ecosystem. {{ Icechunk }} is part of the Zarr universe and
+provides transaction-oriented storage for array data. SilviMetric uses the
+Zarr/Icechunk backend by default for plain paths, `zarr://` URIs, and
+`icechunk://` URIs.
 
 ### TileDB
 
@@ -67,7 +75,8 @@ ecosystem build upon including {{ PDAL }}, {{ SciPy }}, {{ scikitlearn }} and
 ### Base
 
 The base options for SilviMetric include setup options that include dask setup
-options, log setup options, and progress reporting options. The [click](https://pypi.org/project/click/) python library requires that commands and
+options, log setup options, backend storage selection, and progress reporting
+options. The [click](https://pypi.org/project/click/) python library requires that commands and
 options associated with specific groups appear in certain orders, so our base
 options will always be first.
 
@@ -99,9 +108,16 @@ Options:
 Dask distributed scheduler is currently disabled for SilviMetric
 :::
 
+:::{note}
+The database URI selects the backend. Plain paths default to the
+Zarr/Icechunk backend. Use `zarr:///path/to/db` or `icechunk:///path/to/db`
+for the Zarr/Icechunk backend, and `tiledb:///path/to/db` for the TileDB
+backend.
+:::
+
 ### Initialize
 
-{ref}`initialize` will create a {{ TileDB }} database that will house all future information
+{ref}`initialize` will create a SilviMetric database that will house all future information
 that is collected about processed point clouds, including attribute data collected
 about point in a cell, as well as the computed metrics for each individual
 combination of `Attribute` and `Metric` for each cell.
@@ -114,7 +130,11 @@ propagated to future processes.
 Example:
 
 ```console
-$ DB_NAME="western-us.tdb"
+$ ZARR_DB="zarr://${PWD}/western-us.zarr"
+$ TILEDB_DB="tiledb://${PWD}/western-us.tdb"
+$ DB_NAME="$ZARR_DB"
+# To run the same workflow against TileDB instead:
+# DB_NAME="$TILEDB_DB"
 $ BOUNDS="[-14100053.268191, 3058230.975702, -11138180.816218, 6368599.176434]"
 $ EPSG=3857
 
@@ -243,7 +263,8 @@ SilviMetric will take all the previously defined variables like the bounds,
 resolution, and our tile size, and it will split all data values up into their
 respective bins. From here, SilviMetric will perform each `Metric` previously
 defined in {ref}`initialize` over the data in each cell. At the end of all that,
-this data will be written to a `SparseArray` in `TileDB`, where it will be much easier to access.
+this data will be written to the configured Zarr/Icechunk or TileDB backend,
+where it will be much easier to access.
 
 Usage:
 
@@ -312,7 +333,7 @@ Output:
         }
     ],
     "metadata": {
-        "tdb_dir": "western-us.tdb",
+        "tdb_dir": "zarr:///path/to/western-us.zarr",
         "log": {
             "logdir": null,
             "log_level": "INFO",
@@ -406,9 +427,13 @@ from silvimetric.resources.metrics.stats import minimum, maximum, mean
 # directory that will house the raster data.
 curpath = Path(os.path.dirname(os.path.realpath(__file__)))
 filename = "https://s3-us-west-2.amazonaws.com/usgs-lidar-public/MT_RavalliGraniteCusterPowder_4_2019/ept.json"
-db_dir_path = Path(curpath  / "western-us.tdb")
+db_backend = "zarr"
+db_dir_path = curpath / "western-us.zarr"
+# To run the same workflow against TileDB instead:
+# db_backend = "tiledb"
+# db_dir_path = curpath / "western-us.tdb"
 
-db_dir = db_dir_path.as_posix()
+db_dir = f"{db_backend}://{db_dir_path.as_posix()}"
 out_dir = (curpath / "western-us-tifs").as_posix()
 resolution = 30 # 30 meter resolution
 
@@ -430,11 +455,12 @@ def make_metric():
     return Metric(name='p75', dtype=np.float32, method = p75)
 
 ###### Create Storage #####
-# This will create a tiledb database, same as the `initialize` command would
-# from the command line. Here we'll define the overarching bounds, which may
-# extend beyond the current dataset, as well as the CRS of the data, the list
-# of attributes that will be used, as well as metrics. The config will be stored
-# in the database for future processes to use.
+# This will create a database with the selected backend, same as the
+# `initialize` command would from the command line. Here we'll define the
+# overarching bounds, which may extend beyond the current dataset, as well as
+# the CRS of the data, the list of attributes that will be used, as well as
+# metrics. The config will be stored in the database for future processes to
+# use.
 
 def db():
     perc_75 = make_metric()
@@ -460,7 +486,8 @@ def sc(b):
 # The shatter process will pull the config from the database that was previously
 # made and will populate information like CRS, Resolution, Attributes, and what
 # Metrics to perform from there. This will split the data into cells, perform
-# the metric method over each cell, and then output that information to TileDB
+# the metric method over each cell, and then output that information to the
+# selected backend.
 
 def sh(b, tile_size):
     sh_config = ShatterConfig(tdb_dir=db_dir, date=datetime.datetime.now(),
@@ -480,7 +507,8 @@ def ex():
 
 
 if __name__ == "__main__":
-    rmtree(db_dir)
+    if db_dir_path.exists():
+        rmtree(db_dir_path)
     make_metric()
     db()
 

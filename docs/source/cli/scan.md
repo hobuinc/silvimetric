@@ -27,6 +27,14 @@ Options:
 
 ## Usage
 
+Zarr/Icechunk:
+
 ```
-silvimetric --database test.tdb scan tests/data/test_data.copc.laz
+silvimetric --database "zarr://${PWD}/test.zarr" scan tests/data/test_data.copc.laz
+```
+
+TileDB:
+
+```
+silvimetric --database "tiledb://${PWD}/test.tdb" scan tests/data/test_data.copc.laz
 ```

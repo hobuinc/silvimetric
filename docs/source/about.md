@@ -27,8 +27,8 @@ computing rasterized point cloud metrics. These technologies include:
   as it ingested.
 - {{ Dask }} processes tasks for :ref\`shatter\` and {ref}`extract` in a highly
   parallel, cloud-friendly distributed computing environment.
-- {{ TileDB }} stores metrics in cloud object stores such as {{ S3 }} in addition to
-  typical filesystems.
+- {{ Zarr }}, {{ Icechunk }}, and {{ TileDB }} store metrics in local filesystems
+  and object stores such as {{ S3 }}.
 - {{ Python }} computes metrics and provides a diverse and convenient computing
   capability for users to easily add and extract their own metrics to the database.
 

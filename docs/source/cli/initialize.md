@@ -9,9 +9,11 @@ Initialize constructs a SilviMetric database
 ```{Index} initialize
 ```
 
-The `initialize` subcommand constructs the basic {{ TileDB }} instance to host the
-SilviMetric data. It can be either a local filesystem path or a {{ S3 }} URI (eg.
-`s3://silvimetric/mydata`).
+The `initialize` subcommand constructs the storage database that hosts
+SilviMetric data. The backend is selected from the database URI: plain paths and
+`zarr://` or `icechunk://` URIs use the Zarr/Icechunk backend, while `tiledb://`
+URIs use the TileDB backend. Storage can be a local filesystem path or, for
+supported backends, an object-store URI such as `s3://silvimetric/mydata`.
 
 ## Synopsis
 
@@ -31,7 +33,16 @@ Options:
 
 ## Example
 
+Zarr/Icechunk:
+
 ```
-silvimetric --database test.tdb initialize --crs "EPSG:3857" \
+silvimetric --database "zarr://${PWD}/test.zarr" initialize --crs "EPSG:3857" \
+    --bounds '[300, 300, 600, 600]'
+```
+
+TileDB:
+
+```
+silvimetric --database "tiledb://${PWD}/test.tdb" initialize --crs "EPSG:3857" \
     --bounds '[300, 300, 600, 600]'
 ```

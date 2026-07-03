@@ -83,6 +83,8 @@ parse:
     TensorFlow: '[TensorFlow](https://tensorflow.org)'
     Dask: '[Dask](https://www.dask.org)'
     TileDB: '[TileDB](https://docs.tiledb.com/main)'
+    Zarr: '[Zarr](https://zarr.dev/)'
+    Icechunk: '[Icechunk](https://icechunk.io/)'
     GeoTIFF: '[GeoTIFF](https://github.com/OSGeo/libgeotiff)'
     HOBU: '[Hobu](https://hobu.co/)'
     FUSION: '[FUSION](http://forsys.sefs.uw.edu/fusion/fusionlatest.html)'
@@ -101,4 +103,3 @@ parse:
     - substitution
     - deflist
     - dollarmath
-

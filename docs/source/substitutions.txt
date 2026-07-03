@@ -8,6 +8,8 @@
 .. |Dask| replace:: `Dask <https://www.dask.org/>`__
 .. |NumPy| replace:: `NumPy <https://numpy.org/>`__
 .. |TileDB| replace:: `TileDB <https://tiledb.com/>`__
+.. |Zarr| replace:: `Zarr <https://zarr.dev/>`__
+.. |Icechunk| replace:: `Icechunk <https://icechunk.io/>`__
 .. |PROJ| replace:: `PROJ <http://proj.org/>`__
 .. |Conda| replace:: `Conda <https://docs.conda.io/en/latest/>`__
 .. |CondaForge| replace:: `Conda Forge <https://conda-forge.org/docs/>`__
