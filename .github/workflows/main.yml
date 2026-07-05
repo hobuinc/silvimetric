@@ -29,10 +29,10 @@ jobs:
         python-version: ['3.12', '3.13', '3.14']
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           lfs: 'true'
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: mamba-org/setup-micromamba@v3
         with:
           init-shell: bash
           environment-file: "environment.yml"
@@ -66,10 +66,10 @@ jobs:
           shell: bash -el {0}
       steps:
         - name: Checkout Repository
-          uses: actions/checkout@v4
+          uses: actions/checkout@v7
           with:
             fetch-depth: 2
-        - uses: mamba-org/setup-micromamba@v2
+        - uses: mamba-org/setup-micromamba@v3
           with:
             init-shell: bash
             environment-file: "environment.yml"
@@ -79,7 +79,7 @@ jobs:
             echo "CODEQL_PYTHON=$(which python)" >> $GITHUB_ENV
         # Initializes the CodeQL tools for scanning.
         - name: Initialize CodeQL
-          uses: github/codeql-action/init@v2
+          uses: github/codeql-action/init@v4
           with:
             languages: 'python'
             # Supported options are ['csharp', 'cpp', 'go', 'java', 'javascript', 'python']
@@ -88,5 +88,4 @@ jobs:
             # Prefix the list here with "+" to use these queries and those in the config file.
             queries: +security-and-quality
             setup-python-dependencies: false
-
 
