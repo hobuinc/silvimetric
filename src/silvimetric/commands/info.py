@@ -16,7 +16,7 @@ def info(
     """
     Collect information about database in current state
 
-    :param storage: SilviMetric Storage or TileDB directory path.
+    :param storage: SilviMetric Storage or storage directory path.
     :param dates: DateTime range query, defaults to None.
     :param bounds: Bounds query, defaults to None.
     :param name: Name query, defaults to None.

@@ -50,8 +50,7 @@ class AttributeDtype(pd.api.extensions.ExtensionDtype):
 
 
 class AttributeArray(pd.api.extensions.ExtensionArray):
-    """Pandas Array Extension for easier insertion of PDAL point data to TileDB.
-    """
+    """Pandas Array Extension for easier insertion of PDAL point data."""
     def __init__(self, arrays, dtype):
         assert isinstance(dtype, AttributeDtype)
         self._dtype = dtype

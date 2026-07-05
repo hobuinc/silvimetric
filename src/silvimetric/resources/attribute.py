@@ -1,8 +1,8 @@
 import json
 import numpy as np
 import pdal
-from tiledb import Attr, ZstdFilter, FilterList
 from .array_extensions import AttributeArray, AttributeDtype
+from .zarr_backend import ZarrAttr
 
 
 class Attribute:
@@ -26,23 +26,22 @@ class Attribute:
                 ) from e
 
     def make_array(self, data, copy=False):
-        """Create Pandas Extension array for TileDB compatibility."""
+        """Create Pandas Extension array for storage compatibility."""
         return AttributeArray(data=data, copy=copy)
 
     def entry_name(self) -> str:
-        """Return TileDB attribute name."""
+        """Return storage attribute name."""
         return self.name
 
-    def schema(self) -> Attr:
+    def schema(self) -> ZarrAttr:
         """
-        Create the tiledb schema for this attribute.
-        :return: TileDB attribute schema
+        Create the storage schema for this attribute.
+        :return: Storage attribute schema
         """
-        return Attr(
+        return ZarrAttr(
             name=self.name,
             dtype=self.dtype.subtype,
             var=True,
-            filters=FilterList([ZstdFilter(level = 7)])
         )
 
     def __eq__(self, other):

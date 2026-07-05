@@ -28,6 +28,17 @@ pytest_plugins = [
 ]
 
 
+@pytest.fixture(scope='function', params=['zarr', 'tiledb'])
+def storage_backend_protocol(
+    request: pytest.FixtureRequest,
+) -> str:
+    return request.param
+
+
+def storage_uri(path: str, backend: str) -> str:
+    return f'{backend}://{path}'
+
+
 @pytest.fixture(scope='function')
 def tdb_filepath(storage_config: StorageConfig) -> Generator[str, None, None]:
     yield storage_config.tdb_dir
@@ -49,13 +60,14 @@ def storage_config(
     attrs: list[Attribute],
     metrics: list[Metric],
     alignment: int,
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
     log = Log('INFO')
 
     sc = StorageConfig(
-        tdb_dir=p,
+        tdb_dir=storage_uri(p, storage_backend_protocol),
         log=log,
         crs=crs,
         root=bounds,

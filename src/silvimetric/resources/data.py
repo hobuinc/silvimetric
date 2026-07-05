@@ -4,7 +4,7 @@ import copy
 from urllib.parse import urlparse
 from typing import Optional
 
-import tiledb
+import fsspec
 import pdal
 import numpy as np
 
@@ -106,8 +106,8 @@ class Data:
         # aren't, go make_pipeline using some options that
         # process the data
         if self.is_pipeline():
-            vfs = tiledb.VFS()
-            pipeline_str = vfs.open(self.filename).read()
+            with fsspec.open(self.filename, mode='rt') as src:
+                pipeline_str = src.read()
             stages = pdal.pipeline._parse_stages(pipeline_str)
             pipeline = pdal.Pipeline(stages)
         else:
@@ -212,8 +212,8 @@ class Data:
         """
         if self.is_pipeline():
             if self.pipeline is None:
-                vfs = tiledb.VFS()
-                pipeline_str = vfs.open(self.filename).read()
+                with fsspec.open(self.filename, mode='rt') as src:
+                    pipeline_str = src.read()
                 stages = pdal.pipeline._parse_stages(pipeline_str)
             else:
                 stages = self.pipeline.stages

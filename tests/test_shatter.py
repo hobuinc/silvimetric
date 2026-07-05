@@ -13,6 +13,13 @@ from silvimetric import Extents, Log, info, shatter, Storage
 from silvimetric import ShatterConfig
 
 
+def has_s3_credentials():
+    return all(
+        os.environ.get(name, '').strip()
+        for name in ('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY')
+    )
+
+
 @dask.delayed
 def write(x, y, val, s: Storage, attrs, dims, metrics):
     m_list = [m.entry_name(a.name) for m in metrics for a in attrs]
@@ -147,6 +154,7 @@ class Test_Shatter(object):  # noqa: D101
         test_point_count: int,
         request: pytest.FixtureRequest,
         alignment: str,
+        storage_backend_protocol: str,
         threaded_dask,
     ):
         s = request.getfixturevalue(sh_cfg)
@@ -201,9 +209,8 @@ class Test_Shatter(object):  # noqa: D101
         assert pc == actual
 
     @pytest.mark.skipif(
-        os.environ.get('AWS_SECRET_ACCESS_KEY') is None
-        or os.environ.get('AWS_ACCESS_KEY_ID') is None,
-        reason='Missing necessary AWS environment variables',
+        not has_s3_credentials(),
+        reason='Missing AWS credentials from GitHub secrets',
     )
     def test_remote_creation(
         self,

@@ -72,7 +72,7 @@ class Extents(object):
         Determine if this Extents shares any points with a minimum bounding
         rectangle.
 
-        :param mbr: Minimum bounding rectangle as defined by TileDB.
+        :param mbr: Minimum bounding rectangle as defined by storage.
         :return: True if no shared points, false otherwise.
         """
         xs, ys = mbr

@@ -1,16 +1,23 @@
 import json
+from importlib import import_module
 
 from math import floor
 from typing_extensions import Optional, Union, Literal
 from datetime import datetime
 
-import tiledb
 import numpy as np
 import pandas as pd
 
 from .config import StorageConfig, ShatterConfig
 from .metric import Metric, Attribute
 from .bounds import Bounds
+from .storage_protocols import split_storage_uri
+from .zarr_backend import (
+    ZarrAttr,
+    ZarrDim,
+    ZarrDomain,
+    ZarrSchema,
+)
 
 
 def ts_overlap(first: int, second: int):
@@ -42,17 +49,44 @@ def ts_encompass(first, second):
         return False
 
 
+def _load_backend(name: str):
+    return import_module(f'.{name}_backend', package=__package__)
+
+
+def _backend_from_uri(uri: str):
+    name, storage_uri = split_storage_uri(uri)
+    return name, storage_uri, _load_backend(name)
+
+
+def _detect_backend(uri: str):
+    name, storage_uri = split_storage_uri(uri)
+    backend = _load_backend(name)
+    if backend.is_store(storage_uri):
+        return name, storage_uri, backend
+
+    for candidate in ('zarr', 'tiledb'):
+        backend = _load_backend(candidate)
+        if backend.is_store(uri):
+            return candidate, uri, backend
+
+    return name, storage_uri, _load_backend(name)
+
+
 class Storage:
-    """Handles storage of shattered data in a TileDB Database."""
+    """Handles storage of shattered data in a selected backend."""
 
     def __init__(self, config: StorageConfig):
-        if not tiledb.object_type(config.tdb_dir) == 'array':
+        name, storage_uri, backend = _detect_backend(config.tdb_dir)
+        if not backend.is_store(storage_uri):
             raise Exception(
                 f"Given database directory '{config.tdb_dir}' does not exist"
             )
 
         self.config: StorageConfig = config
-        self._reader: tiledb.DenseArray = None
+        self.backend_name = name
+        self.storage_uri = storage_uri
+        self._backend = backend
+        self._reader = None
 
     def __enter__(self):
         return self
@@ -64,19 +98,15 @@ class Storage:
         return
 
     @staticmethod
-    def create(config: StorageConfig, ctx: tiledb.Ctx = None):
+    def create(config: StorageConfig, ctx=None):
         """
-        Creates TileDB storage.
+        Creates storage using the backend selected by the storage URI.
 
         :param config: :class:`silvimetric.resources.config.StorageConfig`
-        :param ctx: :class:`tiledb.Ctx`, defaults to None
+        :param ctx: Deprecated compatibility argument, ignored.
         :raises ValueError: If missing requried dependency in Metrics.
         :return: :class:`silvimetric.resources.storage.Storage`
         """
-
-        if ctx is None:
-            ctx = tiledb.default_ctx()
-
         # adjust cell bounds if necessary
         config.root.adjust_alignment(config.resolution, config.alignment)
 
@@ -97,44 +127,38 @@ class Storage:
         config.xsize = xsize
         config.ysize = ysize
 
-        dim_row = tiledb.Dim(
+        dim_row = ZarrDim(
             name='X',
             domain=(0, xi),
             dtype=np.uint64,
             tile=xsize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
-        dim_col = tiledb.Dim(
+        dim_col = ZarrDim(
             name='Y',
             domain=(0, yi),
             dtype=np.uint64,
             tile=ysize,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
         )
-        domain = tiledb.Domain(dim_row, dim_col)
+        domain = ZarrDomain([dim_row, dim_col])
 
-        count_att = tiledb.Attr(
+        count_att = ZarrAttr(
             name='count',
             dtype=np.uint32,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
-        proc_att = tiledb.Attr(
+        proc_att = ZarrAttr(
             name='shatter_process_num',
             dtype=np.uint16,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=0,
         )
-        start_time_att = tiledb.Attr(
+        start_time_att = ZarrAttr(
             name='start_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
-        end_time_att = tiledb.Attr(
+        end_time_att = ZarrAttr(
             name='end_time',
             dtype=np.datetime64('', 'D').dtype,
-            filters=tiledb.FilterList([tiledb.ZstdFilter(level = 7)]),
             fill=np.datetime64(0, 'D'),
         )
         dim_atts = [attr.schema() for attr in config.attrs]
@@ -158,10 +182,7 @@ class Storage:
             if ra not in att_list:
                 raise ValueError(f'Missing required dependency, {ra}.')
 
-        # allows_duplicates lets us insert multiple values into each cell,
-        # with each value representing a set of values from a shatter process
-        # https://docs.tiledb.com/main/how-to/performance/performance-tips/summary-of-factors#allows-duplicates
-        schema = tiledb.ArraySchema(
+        schema = ZarrSchema(
             domain=domain,
             attrs=[
                 count_att,
@@ -171,17 +192,11 @@ class Storage:
                 *dim_atts,
                 *metric_atts,
             ],
-            offsets_filters=tiledb.FilterList(
-                [
-                    tiledb.PositiveDeltaFilter(),
-                ]
-            ),
         )
         schema.check()
 
-        tiledb.DenseArray.create(config.tdb_dir, schema)
-        with tiledb.DenseArray(config.tdb_dir, 'w') as writer:
-            writer.meta['config'] = str(config)
+        _name, storage_uri, backend = _backend_from_uri(config.tdb_dir)
+        backend.create_store(storage_uri, schema, {'config': str(config)})
 
         s = Storage(config)
         s.save_config()
@@ -189,18 +204,15 @@ class Storage:
         return s
 
     @staticmethod
-    def from_db(tdb_dir: str, ctx: tiledb.Ctx = None):
+    def from_db(tdb_dir: str, ctx=None):
         """
         Create Storage object from information stored in a database.
 
-        :param tdb_dir: TileDB database directory.
-        :param ctx: :class:`tiledb.Ctx`, defaults to None.
+        :param tdb_dir: Storage database directory.
         :return: Returns the derived storage.
         """
-        if ctx is None:
-            ctx = tiledb.default_ctx()
-
-        reader = tiledb.open(tdb_dir, 'r')
+        _name, storage_uri, backend = _detect_backend(tdb_dir)
+        reader = backend.open_array(storage_uri, 'r')
         metadata = reader.meta
         s = metadata['config']
         config = StorageConfig.from_string(s)
@@ -237,7 +249,7 @@ class Storage:
 
     def save_shatter_meta(self, config: ShatterConfig):
         """
-        Save shatter metadata to the base TileDB metadata with the name
+        Save shatter metadata to the base storage metadata with the name
         convention `shatter_{proc_num}`
         """
         key = f'shatter_{config.time_slot}'
@@ -246,7 +258,7 @@ class Storage:
 
     def get_shatter_meta(self, time_slot: int):
         """
-        Get shatter metadata from the base TileDB metadata with the name
+        Get shatter metadata from the base storage metadata with the name
         convention `shatter_{proc_num}`
 
         :return: :class:`silvimetric.resources.config.ShatterConfig`
@@ -281,19 +293,16 @@ class Storage:
         :param data: Data to save to metadata.
         """
         # if writer isn't set up, do it now
-        # propogate the key-value to both tiledb and the local copy
+        # propogate the key-value to both storage and the local copy
         with self.open('w') as w:
             w.meta[key] = data
         if self._reader is not None:
             self._reader.reopen()
 
     def get_tdb_context(self):
-        cfg = tiledb.Config()
-        cfg['vfs.s3.connect_scale_factor'] = '25'
-        cfg['vfs.s3.connect_max_retries'] = '10'
-        # cfg['vfs.s3.max_parallel_ops'] = '1'
-        ctx = tiledb.Ctx(cfg)
-        return ctx
+        if hasattr(self._backend, 'get_tdb_context'):
+            return self._backend.get_tdb_context()
+        return None
 
     def get_attributes(
         self, names: Optional[list[str]] = None
@@ -326,7 +335,7 @@ class Storage:
         attributes: Optional[list[str, Attribute]] = None,
     ) -> list[str]:
         """
-        Return names of TileDB Attribute names based on combination of
+        Return names of storage attributes based on combination of
         Metrics and SilviMetric Attributes. If none are specified, grab
         all Metrics and Attributes from Storage Config.
         """
@@ -343,38 +352,33 @@ class Storage:
             if not m.attributes or a.name in [ma.name for ma in m.attributes]
         ]
 
-    def open(self, mode: str = 'r', timestamp=None) -> tiledb.SparseArray:
+    def open(self, mode: str = 'r', timestamp=None):
         """
-        Open stream for TileDB database in given mode and at given timestamp.
+        Open stream for the selected database backend.
 
-        :param mode: Mode to open TileDB stream in. Valid options are
+        :param mode: Mode to open storage stream in. Valid options are
             'w', 'r', 'm', 'd'., defaults to 'r'.
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param timestamp: Storage timestamp, a tuple of start and end datetime.
         :raises Exception: Incorrect Mode, only valid modes are 'w' and 'r'.
-        :raises Exception: Path exists and is not a TileDB array.
+        :raises Exception: Path exists and is not a storage array.
         :raises Exception: Path does not exist.
-        :yield: TileDB array context manager.
+        :yield: Storage array context manager.
         """
-
-        # tiledb and dask have bad interaction with opening an array if
-        # other threads present
-        ctx = self.get_tdb_context()
-
         # non-timestamped reader and writer are stored as member variables to
         # avoid opening and closing too many io objects.
         if timestamp is not None or mode != 'r':
-            return tiledb.open(
-                self.config.tdb_dir, mode, timestamp=timestamp, ctx=ctx
+            return self._backend.open_array(
+                self.storage_uri, mode, timestamp=timestamp
             )
         else:  # no timestamp and mode is 'r'
             if self._reader is None or not self._reader.isopen:
-                self._reader = tiledb.open(self.config.tdb_dir, 'r')
+                self._reader = self._backend.open_array(self.storage_uri, 'r')
 
             self._reader.reopen()
             return self._reader
 
     def write(self, data_in: pd.DataFrame, dates: tuple[datetime, datetime]):
-        """Write to TileDB Array."""
+        """Write to the selected storage backend."""
 
         data_in = data_in.rename(columns={'xi': 'X', 'yi': 'Y'})
         attr_dict = {f'{a.name}': a.dtype for a in self.config.attrs}
@@ -383,13 +387,13 @@ class Storage:
             f'{m.entry_name(a.name)}': np.dtype(m.dtype)
             for m in self.config.metrics
             for a in self.config.attrs
-            if a in m.attributes
+            if a in m.attributes or not m.attributes
         }
         dtype_dict = attr_dict | xy_dict | metr_dict
 
         varlen_types = {a.dtype for a in self.config.attrs}
 
-        # so tiledb knows how to fill null spots
+        # so storage knows how to fill null spots
         fillna_dict = {
             f'{m.entry_name(a.name)}': m.nan_value
             for m in self.config.metrics
@@ -398,7 +402,7 @@ class Storage:
         fillna_dict['count'] = 0
         fillna_dict['shatter_process_num'] = 0
 
-        # TileDB can't handle null cell writes for variable length arrays, so
+        # Fill null cell writes for variable length arrays, so
         # make sure that any index in the dense block that doesn't have a value
         # is fill with a designated null value
         xi_vals = data_in.X
@@ -426,21 +430,16 @@ class Storage:
                 ).values
             data_in = listed.reset_index()
 
-        # timestamp call does seconds since epoch, tiledb requires nanoseconds
         data_in = data_in.assign(
             start_time=np.datetime64(dates[0], 'ns')
         ).assign(end_time=np.datetime64(dates[1], 'ns'))
 
-        tiledb.from_pandas(
-            uri=self.config.tdb_dir,
-            # ctx=ctx,
-            sparse=False,
-            dataframe=data_in,
-            mode='append',
-            column_types=dtype_dict,
-            varlen_types=varlen_types,
-            fillna=fillna_dict,
-            fit_to_df=True,
+        self._backend.write_records(
+            self.storage_uri,
+            data_in,
+            dtype_dict,
+            varlen_types,
+            fillna_dict,
         )
 
     def reserve_time_slot(self) -> int:
@@ -516,7 +515,7 @@ class Storage:
         granulated than if the fragments are still intact. Mbrs are represented
         as tuples in the form of ((minx, maxx), (miny, maxy))
 
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param timestamp: Storage timestamp, a tuple of start and end datetime.
         :param bounds: :class:`silvimetric.resources.bounds.Bounds`
 
         """
@@ -526,7 +525,7 @@ class Storage:
         af_all = self.get_fragments(config.timestamp, config.bounds)
         mbrs_list = tuple(af.nonempty_domain for af in af_all)
         mbrs = tuple(
-            tuple(tuple(a.item() for a in mb) for mb in m)
+            tuple(tuple(a.item() if hasattr(a, 'item') else a for a in mb) for mb in m)
             for m in mbrs_list
             if not ex.disjoint_by_mbr(m)
         )
@@ -537,11 +536,11 @@ class Storage:
         timestamp: tuple[int, int],
         bounds: Optional[Bounds] = None,
         encompass: bool = False,
-    ) -> list[tiledb.FragmentInfo]:
+    ):
         """
-        Get TileDB array fragments from the time slot specified.
+        Get Zarr write fragments from the time slot specified.
 
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param timestamp: Storage timestamp, a tuple of start and end datetime.
         :param bounds: Bounds of desired fragments.
         :param encompass: If true, timestamps and bounds of fragments must be
             fully encompassed.
@@ -551,7 +550,7 @@ class Storage:
 
         overlap_method = ts_encompass if encompass else ts_overlap
 
-        af = tiledb.array_fragments(self.config.tdb_dir, include_mbrs=True)
+        af = self._backend.fragments(self.storage_uri, timestamp)
         if bounds is not None:
             ex = Extents.from_sub(self, bounds)
         fragments = []
@@ -634,12 +633,7 @@ class Storage:
     ]
 
     def vacuum(self, mode: ManageType = 'fragments'):
-        c = tiledb.Config(
-            {
-                'sm.vacuum.mode': mode,
-            }
-        )
-        tiledb.vacuum(self.config.tdb_dir, config=c)
+        return self._backend.vacuum(self.storage_uri, mode)
 
     def consolidate(
         self,
@@ -651,20 +645,10 @@ class Storage:
         This makes the database perform better, but reduces the granularity of
         time traveling.
 
-        :param mode: TileDB consolidation mode.
-        :param timestamp: TileDB timestamp, a tuple of start and end datetime.
+        :param mode: Storage consolidation mode.
+        :param timestamp: Storage timestamp, a tuple of start and end datetime.
         """
-        ts_start = timestamp[0] if timestamp is not None else 0
-        ts_end_def = int(datetime.now().timestamp() * 1000)
-        ts_end = timestamp[1] if timestamp is not None else ts_end_def
-        c = tiledb.Config(
-            {
-                'sm.consolidation.mode': mode,
-                'sm.consolidation.timestamp_start': ts_start,
-                'sm.consolidation.timestamp_end': ts_end,
-            }
-        )
         try:
-            tiledb.consolidate(self.config.tdb_dir, ctx=tiledb.Ctx(c), config=c)
+            return self._backend.consolidate(self.storage_uri, mode, timestamp)
         except Exception as e:
             self.config.log.warning(f'{e.args}')

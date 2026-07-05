@@ -89,8 +89,8 @@ def get_data(
 
     ma_list = storage.get_derived_names(config.metrics, config.attrs)
 
-    with storage.open('r') as tdb:
-        # tiledb queries need dates as int64 values
+    with storage.open('r') as store:
+        # storage queries use dates as int64 values
         start_datetime = (
             np.datetime64(config.date[0], 'D').astype(np.int64).item()
         )
@@ -98,8 +98,8 @@ def get_data(
             np.datetime64(config.date[1], 'D').astype(np.int64).item()
         )
         cond = f'end_time >= {start_datetime} and start_time <= {end_datetime}'
-        xdim = tdb.schema.domain.dim('X').domain
-        ydim = tdb.schema.domain.dim('Y').domain
+        xdim = store.schema.domain.dim('X').domain
+        ydim = store.schema.domain.dim('Y').domain
         minx = max(extents.x1, xdim[0])
         maxx = min(extents.x2, xdim[1])
         miny = max(extents.y1, ydim[0])
@@ -107,7 +107,7 @@ def get_data(
 
         # older versions of silvimetric supported multiple values, and
         # for backwards compatibility we will try to accept it still
-        data = tdb.query(
+        data = store.query(
             attrs=[*ma_list, 'end_time', 'start_time'],
             order='F',
             cond=cond,

@@ -43,10 +43,11 @@ def western_config(
     WebMercator: str,
     attrs: list[Attribute],
     metrics: list[Metric],
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     log = Log(20)
     yield StorageConfig(
-        tdb_dir=western_filepath,
+        tdb_dir=f'{storage_backend_protocol}://{western_filepath}',
         log=log,
         crs=WebMercator,
         root=WesternBounds,

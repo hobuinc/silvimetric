@@ -83,10 +83,14 @@ need a bounds and a coordinate reference system.
     match the coordinate system of the SilviMetric database.
     ```
 
-3. With bounds and CRS in hand, we can now initialize the database. We'll add in a resolution we want (30 feet for ~10 meter), as well as a selection of what metrics we want computed. You can select from a group of pre-defined metrics, select individual metrics, or create your in a python file and pass a path to that file. For now we'll stick to the metrics defined in FUSION.
+3. With bounds and CRS in hand, we can now initialize the database. We'll add in a resolution we want (30 feet for ~10 meter), as well as a selection of what metrics we want computed. You can select from a group of pre-defined metrics, select individual metrics, or create your in a python file and pass a path to that file. For now we'll stick to the metrics defined in FUSION. The database URI selects the storage backend: use `zarr://` or `icechunk://` for the Zarr/Icechunk backend, or `tiledb://` for the TileDB backend.
 
     ```shell-session
-    db_name="autzen-smdb.tdb"
+    zarr_db="zarr://${PWD}/autzen-smdb.zarr"
+    tiledb_db="tiledb://${PWD}/autzen-smdb.tdb"
+    db_name="${zarr_db}"
+    # To run the same workflow against TileDB instead:
+    # db_name="${tiledb_db}"
     crs="EPSG:$epsg"
     res=30
     silvimetric -d "${db_name}" initialize --bounds "${bbox}" --crs "${crs}" --resolution="${res}" -m grid_metrics
@@ -215,7 +219,7 @@ silvimetric -d ${db_name} extract -o output-directory
 We can also remove a `shatter` process by using the `delete` command. This will remove all data associated with that shatter process from the database.
 
 ```shell-session
-silvimetric -d autzen-smdb.tdb delete --id $uuid
+silvimetric -d ${db_name} delete --id $uuid
 ```
 
 ## Restart
@@ -223,7 +227,7 @@ silvimetric -d autzen-smdb.tdb delete --id $uuid
 If you would like to rerun a `Shatter` process, whether or not it was previously finished, you can use the `restart` command. This will call the `delete` method and use the config from that to re-run the `shatter` process.
 
 ```shell-session
-silvimetric -d autzen-smdb.tdb restart --id $uuid
+silvimetric -d ${db_name} restart --id $uuid
 ```
 
 ## Resume
@@ -231,6 +235,5 @@ silvimetric -d autzen-smdb.tdb restart --id $uuid
 If a `Shatter` process is cancelled partway through, we can pick up where we left off with the `Resume` command.
 
 ```shell-session
-silvimetric -d autzen-smdb.tdb resume --id $uuid
+silvimetric -d ${db_name} resume --id $uuid
 ```
-

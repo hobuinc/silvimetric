@@ -31,6 +31,14 @@ Options:
 
 ## Example
 
+Zarr/Icechunk:
+
 ```
-silvimetric -d test.tdb info
+silvimetric -d "zarr://${PWD}/test.zarr" info
+```
+
+TileDB:
+
+```
+silvimetric -d "tiledb://${PWD}/test.tdb" info
 ```

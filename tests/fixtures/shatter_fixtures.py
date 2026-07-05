@@ -3,7 +3,7 @@ import pytest
 from typing_extensions import Generator
 from uuid import uuid4
 import os
-import tiledb
+import fsspec
 
 from silvimetric import __version__ as svversion
 from silvimetric import StorageConfig, ShatterConfig, Storage, Log, Bounds
@@ -59,10 +59,9 @@ def s3_storage(
     s3_storage_config: StorageConfig,
     s3_uri: str
 ) -> Generator[Storage, None, None]:
-    vfs = tiledb.VFS()
-
     yield Storage.create(s3_storage_config)
-    vfs.remove_dir(s3_uri)
+    fs, path = fsspec.core.url_to_fs(s3_uri)
+    fs.rm(path, recursive=True)
 
 
 @pytest.fixture(scope='function')
@@ -84,13 +83,14 @@ def uneven_storage_config(
     crs: str,
     attrs: list[Attribute],
     metrics: list[Metric],
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     log = Log('INFO')
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
 
     sc = StorageConfig(
-        tdb_dir=p,
+        tdb_dir=f'{storage_backend_protocol}://{p}',
         log=log,
         crs=crs,
         root=bounds,
@@ -126,6 +126,7 @@ def partial_storage_config(
     metrics: list[Metric],
     bounds: Bounds,
     alignment: int,
+    storage_backend_protocol: str,
 ) -> Generator[StorageConfig, None, None]:
     path = tmp_path_factory.mktemp('test_tdb')
     p = os.path.abspath(path)
@@ -133,7 +134,7 @@ def partial_storage_config(
 
     b = next(iter(bounds.bisect()))
     sc = StorageConfig(
-        tdb_dir=p,
+        tdb_dir=f'{storage_backend_protocol}://{p}',
         log=log,
         crs=crs,
         root=b,
