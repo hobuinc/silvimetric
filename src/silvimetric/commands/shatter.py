@@ -142,12 +142,12 @@ def write(
     storage.write(data_in, dates)
 
     pc = data_in['count'].sum().item()
-    p = copy.deepcopy(pc)
+    # p = copy.deepcopy(pc)
 
-    return p
+    return pc
 
 
-def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFrame:
+def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFrame | None:
     """
     Create dask bags and the order of operations.
 
@@ -168,7 +168,7 @@ def do_one(leaf: Extents, config: ShatterConfig, storage: Storage) -> pd.DataFra
     metric_data = run_graph(points, storage.get_metrics())
     joined_data = join(listed_data, metric_data)
 
-    del points, listed_data, metric_data
+    # del points, listed_data, metric_data
 
     return joined_data
 
@@ -193,7 +193,9 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
     failures = []
 
     if dc is not None:
-        futures = [dc.submit(do_one, leaf=leaf, config=config, storage=storage) for leaf in leaves]
+        cfg = dc.scatter(config)
+        st = dc.scatter(storage)
+        futures = [dc.submit(do_one, leaf=leaf, config=cfg, storage=st) for leaf in leaves]
         res = as_completed(futures, with_results=True, raise_errors=False)
         for future, df in res:
             if future.status == 'error':
@@ -205,7 +207,7 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
 
         # TODO write out errors to errors storage path?
 
-            del df
+            # del df
     else:
         processes = [delayed(do_one)(leaf, config, storage) for leaf in leaves]
         results = compute(*processes)
@@ -217,7 +219,8 @@ def run(leaves: Leaves, config: ShatterConfig, storage: Storage) -> int:
         pc = write(final_df, storage, config.date)
         config.point_count = config.point_count + pc
 
-        del final_df, joined_dfs
+        # del final_df, joined_dfs
+
     else:
         config.point_count = 0
 
